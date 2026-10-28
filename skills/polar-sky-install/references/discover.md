@@ -23,6 +23,14 @@ It reports:
 
 Do not sign in or install anything to make a line pass. If a needed tool is missing, tell the person what to install and stop until they have it.
 
+If `helm version --short` shows Helm 4, the person needs Helm 3 next to it; Polar Sky tests its charts with Helm 3 only. Give them these commands to put Helm 3.19.0 in the install folder without touching their Helm 4 (use `darwin` or `linux`, and `arm64` or `amd64`, from `uname -s` and `uname -m`):
+
+```bash
+mkdir -p ~/polar-sky-install/bin && cd ~/polar-sky-install/bin && curl -fsSLO https://get.helm.sh/helm-v3.19.0-<os>-<arch>.tar.gz && tar -xzf helm-v3.19.0-<os>-<arch>.tar.gz --strip-components=1 <os>-<arch>/helm && rm helm-v3.19.0-<os>-<arch>.tar.gz && ./helm version --short
+```
+
+Then add `export PATH="$HOME/polar-sky-install/bin:$PATH"` to `values.env`, so every later command uses Helm 3.
+
 ## What each install needs
 
 | Need | For |

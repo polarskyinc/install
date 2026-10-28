@@ -50,7 +50,7 @@ All files live in one folder on this machine, by default `~/polar-sky-install`, 
 | `client.key` | **Yes** | [Certificate](references/certificate.md) |
 | `client.csr`, `client.crt`, `ca-chain.crt` | No | [Certificate](references/certificate.md) |
 
-`values.env` holds only `export NAME='value'` lines with public values. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
+`values.env` holds only `export NAME='value'` lines with public values, plus, when phase 2 put Helm 3 in the install folder, the one line `export PATH="$HOME/polar-sky-install/bin:$PATH"`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
 
 ## Phases
 
