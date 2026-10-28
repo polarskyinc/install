@@ -5,7 +5,7 @@
 Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Stop, and give the person this command to run in their own terminal:
 
 ```bash
-npx add-mcp@<pinned version> https://mcp.polarsky.ai/install -g
+npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g
 ```
 
 Then ask them to restart their agent and start again. Do not try to go on without the server.

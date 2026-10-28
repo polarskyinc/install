@@ -10,8 +10,8 @@ If a person asked you to install Polar Sky from this repository, do these three 
    claude mcp add --transport http polar-sky-install https://mcp.polarsky.ai/install
    ```
 
-   In another agent, use that agent's own way to add a remote MCP server, or run `npx add-mcp@<pinned version> https://mcp.polarsky.ai/install -g`.
-2. **Get the skill.** If you can install skills, run `npx skills@<pinned version> add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
+   In another agent, use that agent's own way to add a remote MCP server, or run `npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g`.
+2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
 3. **Start.** Tell the person that they may need to restart you before the MCP server loads. Then start phase 1 of the skill.
 
 The skill's hard rules apply from the first command. Read them in the "Hard rules" section of `SKILL.md` before you run anything.
@@ -35,8 +35,8 @@ The skill runs on your machine with your own tools and accounts. It creates or c
 Run these two commands in a terminal, then restart your agent:
 
 ```bash
-npx add-mcp@<pinned version> https://mcp.polarsky.ai/install -g
-npx skills@<pinned version> add polarskyinc/install -g
+npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g
+npx skills@1.7.4 add polarskyinc/install -g
 ```
 
 The first command connects your agent to the Polar Sky Install server. The second adds the skill.
