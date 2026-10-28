@@ -17,6 +17,18 @@ gcloud services enable admin.googleapis.com drive.googleapis.com --project="${GO
 
 This turns on the Admin SDK and Google Drive APIs in the project. Run it after a yes.
 
+## When the service accounts already exist
+
+If `service-accounts create` answers that the account already exists (an earlier, stopped install), keep it: save its email and client ID as below, and do not create a second one. For its key:
+
+- If the person still has the key file from that install, they move it into the install folder under the name below. Check it belongs to the account without showing the private key: this prints only two public fields of the file, and Google's list of the account's keys, which must include that key ID and show it not disabled.
+
+  ```bash
+  cd ~/polar-sky-install && jq -r '.client_email, .private_key_id' <key file> && gcloud iam service-accounts keys list --iam-account="<account email>" --managed-by=user --project="${GOOGLE_CLOUD_PROJECT_ID}" --format='value(name.basename(),disabled)'
+  ```
+
+- If they don't have it, create a new key as below, and tell them the old key stays active until their administrator deletes it.
+
 ## On-premises service account and its key
 
 Show both commands, say they create one service account and one key file, and run them after a yes:
