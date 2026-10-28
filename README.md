@@ -10,7 +10,13 @@ If a person asked you to install Polar Sky from this repository, do these three 
    claude mcp add --transport http polar-sky-install https://mcp.polarsky.ai/install
    ```
 
-   In another agent, use that agent's own way to add a remote MCP server, or run `npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g`.
+   In Codex, run:
+
+   ```bash
+   codex mcp add polar-sky-install --url https://mcp.polarsky.ai/install
+   ```
+
+   Polar Sky supports Claude Code and Codex. In another agent, tell the person that Polar Sky does not support it yet, and stop.
 2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
 3. **Start.** Tell the person that they may need to restart you before the MCP server loads. Then start phase 1 of the skill.
 
@@ -18,7 +24,7 @@ The skill's hard rules apply from the first command. Read them in the "Hard rule
 
 ## What this is
 
-The Polar Sky install skill lets your own AI agent install Polar Sky for your organization. It works with Claude Code, Codex, Cursor, GitHub Copilot, OpenCode and VS Code agents.
+The Polar Sky install skill lets your own AI agent install Polar Sky for your organization. It works with Claude Code and Codex.
 
 The skill runs on your machine with your own tools and accounts. It creates or checks your Kubernetes cluster, creates the Google service accounts, gets the engine certificate, installs the Polar Sky Document Processing Engine, and connects Google Workspace. It shows you every command first and asks before it changes anything.
 
