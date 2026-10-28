@@ -32,7 +32,7 @@ The answer is one of three:
 
 | Answer | What to do |
 | --- | --- |
-| A signed certificate and a CA chain | Write the certificate to `client.crt` and the chain to `ca-chain.crt` in the install folder, exactly as given, with your file tool. Then check it. |
+| A signed certificate and a CA chain | Write the certificate to `client.crt` and the chain to `ca-chain.crt` in the install folder, exactly as given, with your file tool. Staff signing by hand send `client.crt` and `server-ca.crt`: save `server-ca.crt` as `ca-chain.crt`. Then check it. |
 | Polar Sky staff will sign it | Tell the person Polar Sky staff will send `client.crt` to them. Stop this phase. When they have it, they save it as `~/polar-sky-install/client.crt` and tell you; then check it. You may go on with phase 6 up to the secrets. |
 | A refusal | Show the reason. If it says the subject is wrong, make the request again with the subject above. For anything else, stop and tell the person to contact Polar Sky. |
 
