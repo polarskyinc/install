@@ -36,7 +36,7 @@ finish() {
 }
 
 if [ -z "${namespace}" ] || [ -z "${profile}" ]; then
-  printf 'Load values.env first: POLAR_SKY_NAMESPACE and POLAR_SKY_INFRA_PROFILE must be set.\n'
+  printf 'Load values.env first: POLAR_SKY_NAMESPACE and POLAR_SKY_INFRA_PROFILE (from phase 2) must be set.\n'
   exit 2
 fi
 

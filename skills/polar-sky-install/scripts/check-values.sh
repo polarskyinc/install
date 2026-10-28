@@ -47,11 +47,14 @@ fi
 show POLAR_SKY_ORGANIZATION_NAME "${POLAR_SKY_ORGANIZATION_NAME:-}"
 [ -n "${POLAR_SKY_ORGANIZATION_NAME:-}" ] || problem "POLAR_SKY_ORGANIZATION_NAME is missing from values.env"
 
-if require POLAR_SKY_INFRA_PROFILE; then
+if [ -n "${POLAR_SKY_INFRA_PROFILE:-}" ]; then
+  show POLAR_SKY_INFRA_PROFILE "${POLAR_SKY_INFRA_PROFILE}"
   case "${POLAR_SKY_INFRA_PROFILE}" in
     gke | eks | aks) ;;
     *) problem "POLAR_SKY_INFRA_PROFILE must be gke, eks or aks" ;;
   esac
+else
+  show POLAR_SKY_INFRA_PROFILE "<not chosen yet: phase 2 sets it>"
 fi
 
 if require POLAR_SKY_CHART_VERSION; then
@@ -68,15 +71,6 @@ if require POLAR_SKY_HOST; then
     problem "POLAR_SKY_HOST must look like connect.polarsky.ai:443"
 fi
 require POLAR_SKY_CONSOLE_URL || true
-
-if [ -z "${POLAR_SKY_SIGNER_PRINCIPAL:-}" ]; then
-  show POLAR_SKY_SIGNER_PRINCIPAL "<none: keyless not offered, use the key fallback>"
-elif require POLAR_SKY_SIGNER_PRINCIPAL; then
-  case "${POLAR_SKY_SIGNER_PRINCIPAL}" in
-    group:?*@?*) ;;
-    *) problem "POLAR_SKY_SIGNER_PRINCIPAL must look like group:<email>" ;;
-  esac
-fi
 
 if require POLAR_SKY_CLOUD_SCOPES; then
   check_scopes POLAR_SKY_CLOUD_SCOPES

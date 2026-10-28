@@ -1,6 +1,6 @@
 # Phase 3: Cluster and preflight checks
 
-Use the cluster type the person chose in phase 2. Use Polar Sky's recipe exactly as supplied: do not change node counts, GPU types, storage classes or other settings.
+Use the platform (`POLAR_SKY_INFRA_PROFILE`) and the cluster type the person confirmed in phase 2. Use Polar Sky's recipe exactly as supplied: do not change node counts, GPU types, storage classes or other settings.
 
 ## New cluster from the recipe (GKE or EKS)
 

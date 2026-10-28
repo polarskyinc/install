@@ -39,10 +39,11 @@ First say what you found and how, so they can correct it. For example: "gcloud i
 
 Then ask, proposing what you detected:
 
-1. **Cluster.** A new cluster from Polar Sky's recipe, or an existing cluster? Always ask. A kubectl context only shows that some cluster exists, not that it is the one to use. The profile from `get_install_values` decides the cloud: `gke` is Google Cloud, `eks` is AWS, `aks` is Azure. Polar Sky has a recipe only for `gke` and `eks`; for `aks`, the cluster is always an existing one.
-2. **Terraform or OpenTofu,** for a new cluster. If both are installed, ask which one. Write `export IAC='terraform'` or `export IAC='tofu'` into `values.env`.
-3. **Google Cloud project** for the Polar Sky service accounts. You may propose the gcloud project, saying where it came from, but record it only after the person names or confirms it. Write `export GOOGLE_CLOUD_PROJECT_ID='...'` into `values.env`.
-4. **Workspace admin email.** The Google Workspace administrator Polar Sky acts as. It must be an active, monitored administrator account with the Reports privilege. Write `export GOOGLE_WORKSPACE_ADMIN_EMAIL='...'` into `values.env`.
-5. **Is the person a Google Workspace super admin?** If not, ask who is. Phase 4 needs them.
+1. **Platform.** Which Kubernetes platform the engine runs on: `gke` (Google Kubernetes Engine on Google Cloud), `eks` (Amazon EKS on AWS) or `aks` (Azure Kubernetes Service). Propose the one that the signed-in cloud CLI and the kubectl context point to, and say how you found it. For example, a context named `gke_...` is GKE, and one whose cluster is an `arn:aws:eks:...` is EKS. If the signals disagree, or none points to a platform, ask. Write the confirmed answer into `values.env` as `export POLAR_SKY_INFRA_PROFILE='gke'` (or `eks` or `aks`), then run `scripts/check-values.sh` again as in phase 1.
+2. **Cluster.** A new cluster from Polar Sky's recipe, or an existing cluster? Always ask. A kubectl context only shows that some cluster exists, not that it is the one to use. Polar Sky has a recipe only for `gke` and `eks`; for `aks`, the cluster is always an existing one.
+3. **Terraform or OpenTofu,** for a new cluster. If both are installed, ask which one. Write `export IAC='terraform'` or `export IAC='tofu'` into `values.env`.
+4. **Google Cloud project** for the Polar Sky service accounts. You may propose the gcloud project, saying where it came from, but record it only after the person names or confirms it. Write `export GOOGLE_CLOUD_PROJECT_ID='...'` into `values.env`.
+5. **Workspace admin email.** The Google Workspace administrator Polar Sky acts as. It must be an active, monitored administrator account with the Reports privilege. Write `export GOOGLE_WORKSPACE_ADMIN_EMAIL='...'` into `values.env`.
+6. **Is the person a Google Workspace super admin?** If not, ask who is. Phase 4 needs them.
 
 Record only answers the person has confirmed.
