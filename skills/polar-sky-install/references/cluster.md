@@ -10,6 +10,14 @@ Ask the person for the path to the recipe folder they got from Polar Sky: `on-pr
 
 For GKE, ask which Google Cloud project the cluster goes in. It may be the service-account project from phase 2 or another one. Write it into `values.env` as `CLUSTER_PROJECT_ID`.
 
+Before the plan, check that the project has billing (read only; the first command turns on the Cloud Billing API, which costs nothing). It must print `True`:
+
+```bash
+gcloud services enable cloudbilling.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud billing projects describe "${CLUSTER_PROJECT_ID}" --format='value(billingEnabled)'
+```
+
+If it prints `False`, stop: without billing Google refuses to turn on Compute Engine and Kubernetes Engine, and the apply fails part way. Tell the person a billing account must be linked to the project (Cloud Console, Billing), usually by a billing administrator. You may go on with phase 4 and phase 5 while they do it.
+
 GKE:
 
 ```bash

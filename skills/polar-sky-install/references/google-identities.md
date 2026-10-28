@@ -29,6 +29,12 @@ gcloud iam service-accounts create polar-sky-on-prem-dpe --display-name="Polar S
 cd ~/polar-sky-install && umask 077 && gcloud iam service-accounts keys create on-prem-key.json --iam-account="polar-sky-on-prem-dpe@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com" --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
+Google can take a minute before a new service account can get a key. Before each `keys create`, wait until the account is readable (read only), and if `keys create` still answers `NOT_FOUND`, delete the empty key file it left (`[ ! -s <file> ] && rm <file>`) and try again after a minute:
+
+```bash
+for attempt in 1 2 3 4 5 6; do gcloud iam service-accounts describe "<account email>" --project="${GOOGLE_CLOUD_PROJECT_ID}" --format='value(email)' && break; sleep 10; done
+```
+
 The key goes straight into `on-prem-key.json`. Never open, print or send this file. It goes only into the cluster, in phase 6.
 
 If Google refuses to create the key because of an organization policy (`iam.disableServiceAccountKeyCreation`), stop. Tell the person their organization blocks service account keys, and that their Google Cloud administrator must allow a key for these two service accounts, or they contact Polar Sky.
