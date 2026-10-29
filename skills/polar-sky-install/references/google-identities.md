@@ -92,7 +92,13 @@ gcloud iam service-accounts describe "${GOOGLE_ON_PREM_SERVICE_ACCOUNT}" --forma
 
 Write them into `values.env` as `GOOGLE_CLOUD_CLIENT_ID` and `GOOGLE_ON_PREM_CLIENT_ID`. Never read a client ID from a key file.
 
-A Google Workspace super admin adds two entries in the [Google Admin console](https://admin.google.com/): **Security** > **Access and data control** > **API controls** > **Domain-wide delegation** > **Manage all**. Give them both entries with the exact values, one per client ID:
+A Google Workspace super admin adds two entries in the Google Admin console. Make a link for each entry that opens the console's "Add a new client ID" dialog with the client ID and scopes already filled in (read only, prints two links):
+
+```bash
+. ~/polar-sky-install/values.env && enc() { printf '%s' "$1" | sed 's/:/%3A/g; s#/#%2F#g; s/,/%2C/g'; } && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_CLOUD_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_CLOUD_SCOPES}")&overwriteClientId=true" && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_ON_PREM_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_ON_PREM_SCOPES}")&overwriteClientId=true"
+```
+
+The super admin opens each link signed in to the Admin console, checks the client ID and scopes in the dialog, and clicks **Authorize**. Give the two links and, as the fallback if a link does not open the dialog, both entries with the exact values to add by hand under **Security** > **Access and data control** > **API controls** > **Domain-wide delegation** > **Manage all**:
 
 | Entry | Client ID | Scopes (one line, comma-separated, no spaces) |
 | --- | --- | --- |
@@ -101,16 +107,22 @@ A Google Workspace super admin adds two entries in the [Google Admin console](ht
 
 Show the real values, not the names. Always add this warning:
 
-> **Important:** Editing an existing delegation entry replaces its entire scope list. If a client ID already has an entry, enter every scope it needs again. Never paste only the new scope.
+> **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. If a client ID already has an entry with other scopes it still needs, add them by hand instead.
 
 Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`) needs the **Reports** privilege, and Google can take up to 24 hours to apply delegation changes.
 
-If the person is not a super admin, write them a message to forward. Fill in every value:
+If the person is a super admin, they can open the links now. If not, write them a message to forward. Fill in every value, with the two links in full:
 
 ```text
 Hello,
 
-We are installing Polar Sky. Please add two domain-wide delegation entries in the Google Admin console
+We are installing Polar Sky. Please add two domain-wide delegation entries in the Google Admin console.
+Open each link while signed in as a super admin, check the client ID and scopes, and click Authorize:
+
+1. <link for GOOGLE_CLOUD_CLIENT_ID>
+2. <link for GOOGLE_ON_PREM_CLIENT_ID>
+
+If a link does not open the dialog, add the entries by hand
 (Security > Access and data control > API controls > Domain-wide delegation > Manage all):
 
 1. Client ID: <GOOGLE_CLOUD_CLIENT_ID>
@@ -119,8 +131,8 @@ We are installing Polar Sky. Please add two domain-wide delegation entries in th
 2. Client ID: <GOOGLE_ON_PREM_CLIENT_ID>
    Scopes: <POLAR_SKY_ON_PREM_SCOPES>
 
-Paste each scope line exactly as written, as one line. Editing an existing entry replaces its entire scope list,
-so if a client ID already has an entry, keep every scope it needs.
+Each link, and each edit by hand, replaces the entry's entire scope list, so if a client ID already has
+an entry, keep every scope it needs.
 
 Please also make sure <GOOGLE_WORKSPACE_ADMIN_EMAIL> has the Reports admin privilege.
 
