@@ -176,6 +176,25 @@ check_permissions() {
   fi
 }
 
+check_gitops() {
+  local flux_namespaces other argo
+  flux_namespaces="$(kubectl get deployments --all-namespaces --field-selector metadata.name=helm-controller -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' 2>/dev/null | sort -u)"
+  other="$(printf '%s\n' "${flux_namespaces}" | grep -v -x -e "${namespace}" -e '' | tr '\n' ' ')"
+  if [ -n "${other}" ]; then
+    warn "Flux already runs in this cluster (namespace ${other% })" "a second Flux in ${namespace} must not share custom resource definitions of another version with it; agree the install path with Polar Sky before phase 6"
+  elif [ -n "${flux_namespaces}" ]; then
+    pass "Flux runs only in ${namespace}, from an earlier Polar Sky install"
+  else
+    pass "no other Flux in the cluster"
+  fi
+  argo="$(kubectl get customresourcedefinitions applications.argoproj.io -o name 2>/dev/null)"
+  if [ -n "${argo}" ]; then
+    warn "Argo CD is installed in this cluster" "make sure no Argo CD Application manages ${namespace} or Flux's resources; Argo CD would undo what Flux deploys. Agree the install path with Polar Sky before phase 6"
+  else
+    pass "no Argo CD in the cluster"
+  fi
+}
+
 pod_manifest() {
   local pod_namespace="$1" name="$2" label="$3" image="$4" user="$5" command="$6" hosts="$7"
   cat <<EOF
@@ -326,6 +345,7 @@ check_nodes
 check_gpu_nodes
 check_storage_class
 check_permissions
+check_gitops
 check_network_policy
 check_egress
 finish

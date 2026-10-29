@@ -96,7 +96,7 @@ Polar Sky approves an existing cluster before the install. Show and run (read on
 kubectl config current-context && kubectl get nodes && kubectl get storageclass
 ```
 
-Ask the person to confirm the context is the approved cluster. For Entra-integrated AKS, `kubelogin` must be installed. If the cluster already runs Flux or ArgoCD, stop and tell the person to agree the install path with Polar Sky first: ArgoCD must not take over Flux resources, and an existing Flux needs a review.
+Ask the person to confirm the context is the approved cluster. For Entra-integrated AKS, `kubelogin` must be installed. Preflight warns when the cluster already runs Flux outside the Polar Sky namespace, or Argo CD. Then tell the person to agree the install path with Polar Sky before phase 6: Argo CD must not take over Flux resources, and an existing Flux needs a review.
 
 ## What the profile needs
 
@@ -117,6 +117,7 @@ The script checks the cluster against guide section 2 and reports every problem 
 - GPU nodes: label, taint and allocatable GPUs (the NVIDIA device plugin), or a note that the pool is at zero
 - the profile's StorageClass
 - that the person can install Flux (custom resource definitions, cluster roles and their bindings) and manage resources in the namespace, with `kubectl auth can-i`
+- whether another Flux, or Argo CD, already runs in the cluster (a warning, not a failure)
 - that the cluster enforces NetworkPolicy: two test pods in a new temporary namespace `polar-sky-preflight-<time>`, first allowed to talk, then blocked by a policy
 - outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host; for the Polar Sky host it trusts the Polar Sky CA in [scripts/polar-sky-ca.crt](../scripts/polar-sky-ca.crt), because that host's certificate is not from a public CA
 
