@@ -49,8 +49,9 @@ All files live in one folder on this machine, by default `~/polar-sky-install`, 
 | `cloud-key.json` (deleted after phase 8 uploads it) | **Yes** | [Google identities](references/google-identities.md) |
 | `client.key` | **Yes** | [Certificate](references/certificate.md) |
 | `client.csr`, `client.crt`, `ca-chain.crt` | No | [Certificate](references/certificate.md) |
+| `aws-config` (only for an `aws login` sign-in) | No | [Cluster](references/cluster.md) |
 
-`values.env` holds only `export NAME='value'` lines with public values, plus, when phase 2 put Helm 3 in the install folder, the one line `export PATH="$HOME/polar-sky-install/bin:$PATH"`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
+`values.env` holds only `export NAME='value'` lines with public values, plus, when phase 2 put Helm 3 in the install folder, the one line `export PATH="$HOME/polar-sky-install/bin:$PATH"`. For an `aws login` sign-in on EKS, phase 3 adds `AWS_CONFIG_FILE` and `AWS_PROFILE`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
 
 ## Phases
 

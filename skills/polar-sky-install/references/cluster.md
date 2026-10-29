@@ -24,6 +24,26 @@ GKE:
 cd <recipe folder> && $IAC init && $IAC plan -var="project_id=${CLUSTER_PROJECT_ID}" -var="region=${CLUSTER_REGION}" -var="zone=${CLUSTER_ZONE}" -var='gpu_node_spot=false' -out=polar-sky.plan
 ```
 
+For EKS, check how the AWS CLI is signed in (read only). It prints a value when the person signed in with `aws login`:
+
+```bash
+aws configure get login_session --profile "${AWS_PROFILE:-default}"
+```
+
+If it prints a value, OpenTofu and Terraform cannot use that sign-in, and the 15-minute credentials it hands out run out during the apply. Write `aws-config` in the install folder with your file tool, with the person's profile name in place of `<profile>` and the home folder written out in full:
+
+```ini
+[profile polar-sky-install]
+credential_process = env AWS_CONFIG_FILE=<home folder>/.aws/config aws configure export-credentials --profile <profile> --format process
+region = <CLUSTER_REGION>
+```
+
+Then add `export AWS_CONFIG_FILE='<home folder>/polar-sky-install/aws-config'` and `export AWS_PROFILE='polar-sky-install'` to `values.env`. Every later `aws`, OpenTofu, Terraform and `kubectl` command gets fresh credentials from the person's `aws login` through it, so load `values.env` first in each of them. Check it works:
+
+```bash
+. ~/polar-sky-install/values.env && aws sts get-caller-identity --query Arn --output text
+```
+
 EKS:
 
 ```bash
