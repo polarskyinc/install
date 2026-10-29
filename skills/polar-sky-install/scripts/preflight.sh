@@ -203,7 +203,7 @@ spec:
           value: "${hosts}"
         - name: CONNECT_HOST
           value: "${8:-}"
-        - name: CA_BASE64
+        - name: CA_PEM
           value: "${9:-}"
       resources:
         requests:
@@ -274,9 +274,9 @@ EOF
 }
 
 check_egress() {
-  local hosts host code connect_host results ca_base64
+  local hosts host code connect_host results ca_pem
   connect_host="${polar_sky_host%%:*}"
-  ca_base64="$(base64 < "$(dirname "$0")/polar-sky-ca.crt" | tr -d '\n')"
+  ca_pem="$(awk '{printf "%s\\n", $0}' "$(dirname "$0")/polar-sky-ca.crt")"
   hosts="${connect_host} us-docker.pkg.dev fluxcd-community.github.io ghcr.io registry-1.docker.io auth.docker.io oauth2.googleapis.com admin.googleapis.com www.googleapis.com ${model_host}"
   if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
     fail "namespace ${namespace} does not exist, so egress is not tested" "create the namespace as cluster.md says, then run this again"
@@ -284,7 +284,7 @@ check_egress() {
   fi
   kubectl delete pod polar-sky-egress-check --namespace "${namespace}" --ignore-not-found --wait=true --timeout=60s >/dev/null 2>&1
   if ! pod_manifest "${namespace}" polar-sky-egress-check polar-sky-preflight "${curl_image}" 100 \
-    'echo $CA_BASE64 | base64 -d > /tmp/polar-sky-ca.crt; for h in $HOSTS; do c=0; ca=; [ $h = $CONNECT_HOST ] && ca=/tmp/polar-sky-ca.crt; curl -sS -o /dev/null --max-time 15 ${ca:+--cacert} $ca https://$h/ 2>/dev/null || c=$?; echo $h $c; done' "${hosts}" "${connect_host}" "${ca_base64}" |
+    'printenv CA_PEM > /tmp/polar-sky-ca.crt; for h in $HOSTS; do c=0; ca=; [ $h = $CONNECT_HOST ] && ca=/tmp/polar-sky-ca.crt; curl -sS -o /dev/null --max-time 15 ${ca:+--cacert} $ca https://$h/ 2>/dev/null || c=$?; echo $h $c; done' "${hosts}" "${connect_host}" "${ca_pem}" |
     kubectl apply -f - >/dev/null 2>&1; then
     fail "could not start the egress test pod in ${namespace}" "check that you may create pods there and that no admission policy blocks them"
     return

@@ -118,7 +118,7 @@ The script checks the cluster against guide section 2 and reports every problem 
 - the profile's StorageClass
 - that the person can install Flux (custom resource definitions, cluster roles and their bindings) and manage resources in the namespace, with `kubectl auth can-i`
 - that the cluster enforces NetworkPolicy: two test pods in a new temporary namespace `polar-sky-preflight-<time>`, first allowed to talk, then blocked by a policy
-- outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host
+- outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host; for the Polar Sky host it trusts the Polar Sky CA in [scripts/polar-sky-ca.crt](../scripts/polar-sky-ca.crt), because that host's certificate is not from a public CA
 
 It changes the cluster in two ways, so ask before running it:
 
