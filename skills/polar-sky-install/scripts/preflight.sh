@@ -201,6 +201,10 @@ spec:
       env:
         - name: HOSTS
           value: "${hosts}"
+        - name: CONNECT_HOST
+          value: "${8:-}"
+        - name: CA_BASE64
+          value: "${9:-}"
       resources:
         requests:
           cpu: 10m
@@ -270,8 +274,9 @@ EOF
 }
 
 check_egress() {
-  local hosts host code connect_host results
+  local hosts host code connect_host results ca_base64
   connect_host="${polar_sky_host%%:*}"
+  ca_base64="$(base64 < "$(dirname "$0")/polar-sky-ca.crt" | tr -d '\n')"
   hosts="${connect_host} us-docker.pkg.dev fluxcd-community.github.io ghcr.io registry-1.docker.io auth.docker.io oauth2.googleapis.com admin.googleapis.com www.googleapis.com ${model_host}"
   if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
     fail "namespace ${namespace} does not exist, so egress is not tested" "create the namespace as cluster.md says, then run this again"
@@ -279,7 +284,7 @@ check_egress() {
   fi
   kubectl delete pod polar-sky-egress-check --namespace "${namespace}" --ignore-not-found --wait=true --timeout=60s >/dev/null 2>&1
   if ! pod_manifest "${namespace}" polar-sky-egress-check polar-sky-preflight "${curl_image}" 100 \
-    'for h in $HOSTS; do c=0; curl -sS -o /dev/null --max-time 15 https://$h/ 2>/dev/null || c=$?; echo $h $c; done' "${hosts}" |
+    'echo $CA_BASE64 | base64 -d > /tmp/polar-sky-ca.crt; for h in $HOSTS; do c=0; ca=; [ $h = $CONNECT_HOST ] && ca=/tmp/polar-sky-ca.crt; curl -sS -o /dev/null --max-time 15 ${ca:+--cacert} $ca https://$h/ 2>/dev/null || c=$?; echo $h $c; done' "${hosts}" "${connect_host}" "${ca_base64}" |
     kubectl apply -f - >/dev/null 2>&1; then
     fail "could not start the egress test pod in ${namespace}" "check that you may create pods there and that no admission policy blocks them"
     return
@@ -298,7 +303,7 @@ check_egress() {
       0) pass "HTTPS to ${host}" ;;
       6) fail "DNS cannot resolve ${host} from ${namespace}" "allow DNS from the namespace and check the resolver" ;;
       7 | 28) fail "no HTTPS connection to ${host}:443 from ${namespace}" "the network team allows outbound TCP 443 from the namespace and from the CPU and GPU nodes to ${host}, including its redirect and download hosts" ;;
-      60) fail "a proxy changes TLS to ${host}" "let ${host} pass without TLS inspection" ;;
+      60) fail "a proxy changes TLS to ${host}" "let ${host} pass without TLS inspection; the engine's client certificate does not survive it" ;;
       35 | 56)
         if [ "${host}" = "${connect_host}" ]; then
           pass "TLS to ${host} (it asks for the engine's certificate, as expected)"
