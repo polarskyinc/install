@@ -18,24 +18,18 @@ It reports:
 - the Azure CLI: the subscription and user
 - Terraform and OpenTofu, and their versions
 - kubectl, its current context, and whether that context answers
-- Helm and its version (Helm 3 only; Helm 4 is not supported)
+- Helm and its version (Helm 3 or Helm 4)
 - OpenSSL and its version
 
 Do not sign in or install anything to make a line pass. If a needed tool is missing, tell the person what to install and stop until they have it.
 
-If `helm version --short` shows Helm 4, the person needs Helm 3 next to it; Polar Sky tests its charts with Helm 3 only. Give them these commands to put Helm 3.19.0 in the install folder without touching their Helm 4 (use `darwin` or `linux`, and `arm64` or `amd64`, from `uname -s` and `uname -m`):
-
-```bash
-mkdir -p ~/polar-sky-install/bin && cd ~/polar-sky-install/bin && curl -fsSLO https://get.helm.sh/helm-v3.19.0-<os>-<arch>.tar.gz && tar -xzf helm-v3.19.0-<os>-<arch>.tar.gz --strip-components=1 <os>-<arch>/helm && rm helm-v3.19.0-<os>-<arch>.tar.gz && ./helm version --short
-```
-
-Then add `export PATH="$HOME/polar-sky-install/bin:$PATH"` to `values.env`, so every later command uses Helm 3.
+Write how Helm waits into `values.env`: `export HELM_WAIT='--wait'` for Helm 3, or `export HELM_WAIT='--wait=legacy'` for Helm 4. Helm 4's default wait never returns after the Flux chart's install hook finishes, so phase 6 uses the legacy wait with Helm 4.
 
 ## What each install needs
 
 | Need | For |
 | --- | --- |
-| `kubectl`, Helm 3, OpenSSL | Every install |
+| `kubectl`, Helm 3 or 4, OpenSSL | Every install |
 | `gcloud`, signed in | Every install: the Google service accounts live in a Google Cloud project |
 | Terraform or OpenTofu 1.6 or later | A new cluster from Polar Sky's recipe |
 | `aws` signed in | A new EKS cluster, or an existing EKS cluster |
