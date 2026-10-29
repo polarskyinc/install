@@ -74,7 +74,7 @@ cleanup() {
 trap cleanup EXIT
 
 check_cluster() {
-  local context server_version
+  local context server_version minor
   context="$(kubectl config current-context 2>/dev/null)"
   if [ -z "${context}" ]; then
     fail "kubectl has no current context" "point kubectl at the approved cluster (the recipe's credentials command, or your usual one)"
@@ -85,7 +85,14 @@ check_cluster() {
     finish
   fi
   server_version="$(kubectl version 2>/dev/null | sed -n 's/^Server Version: //p')"
-  pass "context ${context}, Kubernetes ${server_version:-unknown}; confirm this minor version with Polar Sky"
+  minor="$(printf '%s' "${server_version}" | sed -n 's/^v1\.\([0-9][0-9]*\).*/\1/p')"
+  if [ -z "${minor}" ]; then
+    warn "context ${context}, Kubernetes version unknown (${server_version:-no answer})" "Polar Sky needs Kubernetes 1.33 or newer; check the version with your cloud console"
+  elif [ "${minor}" -lt 33 ]; then
+    fail "context ${context}, Kubernetes ${server_version} is older than 1.33" "upgrade the cluster to Kubernetes 1.33 or newer"
+  else
+    pass "context ${context}, Kubernetes ${server_version}"
+  fi
 }
 
 check_nodes() {

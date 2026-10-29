@@ -30,7 +30,7 @@ EKS:
 cd <recipe folder> && $IAC init && $IAC plan -var="region=${CLUSTER_REGION}" -var='gpu_node_capacity_type=ON_DEMAND' -out=polar-sky.plan
 ```
 
-`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version and ask the person to confirm it with Polar Sky.
+`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer.
 
 ### Apply
 
@@ -92,7 +92,7 @@ The standard model fleet needs four schedulable NVIDIA GPUs. All Polar Sky nodes
 
 The script checks the cluster against guide section 2 and reports every problem at once, each with its fix. It checks:
 
-- the context and the Kubernetes version (confirm the minor version with Polar Sky)
+- the context and the Kubernetes version (1.33 or newer)
 - every node is Linux `amd64`
 - GPU nodes: label, taint and allocatable GPUs (the NVIDIA device plugin), or a note that the pool is at zero
 - the profile's StorageClass
