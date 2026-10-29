@@ -32,7 +32,7 @@ The skill runs on your machine with your own tools and accounts. It creates or c
 
 - macOS, Linux, or Windows with WSL
 - An administrator account in your Polar Sky organization
-- `kubectl`, Helm 3, OpenSSL and `gcloud`
+- `kubectl`, Helm 3 or 4, OpenSSL and `gcloud`
 - Terraform or OpenTofu 1.6 or later, for a new cluster
 - `aws` for EKS, or `az` for AKS
 
@@ -46,6 +46,8 @@ npx skills@1.7.4 add polarskyinc/install -g
 ```
 
 The first command connects your agent to the Polar Sky Install server. The second adds the skill.
+
+Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install`. Both open Polar Sky's sign-in page in your browser.
 
 ## Use
 

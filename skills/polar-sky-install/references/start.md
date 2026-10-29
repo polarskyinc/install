@@ -10,7 +10,7 @@ npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g
 
 Then ask them to restart their agent and start again. Do not try to go on without the server.
 
-The first call signs the person in to Polar Sky. Only an administrator of the organization can use these tools. If the answer says the person is not an administrator, or no organization is set up for their company domain, stop: tell them to contact their Polar Sky contact.
+The first call signs the person in to Polar Sky. If the tools are listed but the server asks for sign-in, tell the person how to start it: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install` in a terminal. Both open Polar Sky's sign-in page in the browser. Only an administrator of the organization can use these tools. If the answer says the person is not an administrator, or no organization is set up for their company domain, stop: tell them to contact their Polar Sky contact.
 
 The first write call (`request_certificate` or `start_key_upload`) asks the person to approve write access. That is their choice; wait for it.
 
