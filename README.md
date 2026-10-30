@@ -7,7 +7,7 @@ If a person asked you to install Polar Sky from this repository, do these three 
 1. **Add the Polar Sky Install MCP server.** Its address is `https://mcp.polarsky.ai/install`. It uses streamable HTTP and OAuth sign-in. In Claude Code, run:
 
    ```bash
-   claude mcp add --transport http polar-sky-install https://mcp.polarsky.ai/install
+   claude mcp add --scope user --transport http polar-sky-install https://mcp.polarsky.ai/install
    ```
 
    In Codex, run:
@@ -62,6 +62,7 @@ The skill never prints your private keys, service account keys or Kubernetes sec
 | `skills/polar-sky-install/SKILL.md` | The skill: rules and the order of the phases |
 | `skills/polar-sky-install/references/` | One file for each phase |
 | `skills/polar-sky-install/scripts/` | Helper scripts: detection, value check, preflight checks, certificate check |
+| `recipes/` | Polar Sky's OpenTofu/Terraform recipes for a new GKE, EKS or AKS cluster; the skill downloads the one for your platform |
 
 ## Changes
 

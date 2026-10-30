@@ -4,7 +4,15 @@ Use the platform (`POLAR_SKY_INFRA_PROFILE`) and the cluster type the person con
 
 ## New cluster from the recipe (GKE, EKS or AKS)
 
-Ask the person for the path to the recipe folder they got from Polar Sky: `on-prem-infrastructure-gke` for `gke`, `on-prem-infrastructure-eks` for `eks`, `on-prem-infrastructure-aks` for `aks`. Ask which region (and for GKE, which zone) to use; the recipe's defaults are `us-central1` / `us-central1-a` (GKE), `us-east-1` (EKS) and `eastus` (AKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
+The recipe is Polar Sky's OpenTofu/Terraform code for the cluster, published in `recipes/` of `github.com/polarskyinc/install`: `on-prem-infrastructure-gke` for `gke`, `on-prem-infrastructure-eks` for `eks`, `on-prem-infrastructure-aks` for `aks`. The recipe folder is `~/polar-sky-install/on-prem-infrastructure-${POLAR_SKY_INFRA_PROFILE}`. Show and run (it only downloads files; it creates no cloud resource):
+
+```bash
+. ~/polar-sky-install/values.env && cd ~/polar-sky-install && if [ -e "on-prem-infrastructure-${POLAR_SKY_INFRA_PROFILE}" ]; then echo "recipe folder already here"; else curl -fsSL https://github.com/polarskyinc/install/archive/refs/heads/main.tar.gz | tar -xz --strip-components=2 "install-main/recipes/on-prem-infrastructure-${POLAR_SKY_INFRA_PROFILE}"; fi && ls "on-prem-infrastructure-${POLAR_SKY_INFRA_PROFILE}"
+```
+
+If the folder was already there, it may hold the Terraform state of an earlier run: use it as it is and never download over it. If the person got a recipe folder from Polar Sky and wants to use that one, use their folder instead.
+
+Ask which region (and for GKE, which zone) to use; the recipe's defaults are `us-central1` / `us-central1-a` (GKE), `us-east-1` (EKS) and `eastus` (AKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
 
 ### Plan
 
@@ -17,6 +25,14 @@ gcloud services enable cloudbilling.googleapis.com --project="${CLUSTER_PROJECT_
 ```
 
 If it prints `False`, stop: without billing Google refuses to turn on Compute Engine and Kubernetes Engine, and the apply fails part way. Tell the person a billing account must be linked to the project (Cloud Console, Billing), usually by a billing administrator. You may go on with phase 4 and phase 5 while they do it.
+
+For GKE, check that the zone offers NVIDIA L4 GPUs (read only; the first command turns on the Compute Engine API, which costs nothing). It lists the zones in the region that offer L4:
+
+```bash
+. ~/polar-sky-install/values.env && gcloud services enable compute.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud compute accelerator-types list --project="${CLUSTER_PROJECT_ID}" --format='value(name,zone.basename())' | awk -v region="${CLUSTER_REGION}-" '$1 == "nvidia-l4" && index($2, region) == 1 {print $2}'
+```
+
+If `CLUSTER_ZONE` is not in the list, propose a zone that is, and write the person's answer into `values.env`. If the list is empty, propose another region. Tell the person this shows which zones offer L4, not whether one is free right now: a zone can run out. If GPU nodes do not start in phase 6 because the zone is out of resources, the fix is a new cluster in another zone.
 
 For AKS, ask three more things before you plan:
 

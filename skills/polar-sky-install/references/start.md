@@ -2,13 +2,19 @@
 
 ## Check the MCP server
 
-Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Stop, and give the person this command to run in their own terminal:
+Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Stop, and give the person the command for the agent you are, to run in their own terminal. In Claude Code:
 
 ```bash
-npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g
+claude mcp add --scope user --transport http polar-sky-install https://mcp.polarsky.ai/install
 ```
 
-Then ask them to restart their agent and start again. Do not try to go on without the server.
+In Codex:
+
+```bash
+codex mcp add polar-sky-install --url https://mcp.polarsky.ai/install
+```
+
+Give it on one line, as shown. Then tell them how to restart you and keep this conversation: in Claude Code, type `/exit`, then run `claude --continue` in the same folder; in Codex, quit, then run `codex resume --last` in the same folder. After the restart, they sign in as described below and say "Install Polar Sky" again. Do not try to go on without the server.
 
 The first call signs the person in to Polar Sky. If the tools are listed but the server asks for sign-in, tell the person how to start it: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install` in a terminal. Both open Polar Sky's sign-in page in the browser. Only an administrator of the organization can use these tools. If the answer says the person is not an administrator, or no organization is set up for their company domain, stop: tell them to contact their Polar Sky contact.
 
@@ -53,6 +59,6 @@ Write the file with your file tool, not with `echo`. Then check it. The script o
 . ~/polar-sky-install/values.env && <skill folder>/scripts/check-values.sh
 ```
 
-`<skill folder>` is the folder this `SKILL.md` is in. If the script reports a problem, show it to the person and stop: a missing or wrong value comes from Polar Sky, so they contact their Polar Sky contact.
+`<skill folder>` is the folder this `SKILL.md` is in. When you show a command, put the real path in place of `<skill folder>`, so the person sees exactly what runs. If the script reports a problem, show it to the person and stop: a missing or wrong value comes from Polar Sky, so they contact their Polar Sky contact.
 
 Show the person the organization name, and ask them to confirm this is the right organization. The deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.
