@@ -2,21 +2,40 @@
 
 Use the platform (`POLAR_SKY_INFRA_PROFILE`) and the cluster type the person confirmed in phase 2. Use Polar Sky's recipe exactly as supplied: do not change node counts, GPU types, storage classes or other settings.
 
-## New cluster from the recipe (GKE or EKS)
+## New cluster from the recipe (GKE, EKS or AKS)
 
-Ask the person for the path to the recipe folder they got from Polar Sky: `on-prem-infrastructure-gke` for `gke`, `on-prem-infrastructure-eks` for `eks`. Ask which region (and for GKE, which zone) to use; the recipe's defaults are `us-central1` / `us-central1-a` (GKE) and `us-east-1` (EKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
+Ask the person for the path to the recipe folder they got from Polar Sky: `on-prem-infrastructure-gke` for `gke`, `on-prem-infrastructure-eks` for `eks`, `on-prem-infrastructure-aks` for `aks`. Ask which region (and for GKE, which zone) to use; the recipe's defaults are `us-central1` / `us-central1-a` (GKE), `us-east-1` (EKS) and `eastus` (AKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
 
 ### Plan
 
 For GKE, ask which Google Cloud project the cluster goes in. It may be the service-account project from phase 2 or another one. Write it into `values.env` as `CLUSTER_PROJECT_ID`.
 
-Before the plan, check that the project has billing (read only; the first command turns on the Cloud Billing API, which costs nothing). It must print `True`:
+For GKE, before the plan, check that the project has billing (read only; the first command turns on the Cloud Billing API, which costs nothing). It must print `True`:
 
 ```bash
 gcloud services enable cloudbilling.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud billing projects describe "${CLUSTER_PROJECT_ID}" --format='value(billingEnabled)'
 ```
 
 If it prints `False`, stop: without billing Google refuses to turn on Compute Engine and Kubernetes Engine, and the apply fails part way. Tell the person a billing account must be linked to the project (Cloud Console, Billing), usually by a billing administrator. You may go on with phase 4 and phase 5 while they do it.
+
+For AKS, ask three more things before you plan:
+
+1. **Subscription.** Which Azure subscription the cluster goes in. You may propose the subscription `az` is signed in to, saying where it came from. Write its ID into `values.env` as `CLUSTER_SUBSCRIPTION_ID`. The person needs Owner, or Contributor and User Access Administrator, on it: the recipe creates a resource group and assigns a role to the cluster. With Contributor alone, `apply` fails at that role assignment.
+2. **Kubernetes version.** The Kubernetes minor version Polar Sky approved for this install, such as `1.35`. Ask the person for it; do not pick one. Check that the region offers it (read only), then write it into `values.env` as `CLUSTER_KUBERNETES_VERSION`:
+
+   ```bash
+   az aks get-versions --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --output table
+   ```
+
+3. **GPU quota.** Check the region's quota (read only):
+
+   ```bash
+   az vm list-usage --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --output table
+   ```
+
+   AKS adds one extra node to each pool while it upgrades the pool, so the recipe needs 40 free vCPUs in the NCasT4_v3 family for four GPU nodes and that extra node (56 for the pool's maximum of six), 16 to 28 in the Dsv5 family for the system pool, and the total in the regional vCPU limit. If the NCasT4_v3 limit is too low, stop: the person requests more on the subscription's Usage + quotas page in the Azure portal, and you plan once it is granted.
+
+Then run `scripts/check-values.sh` again as in phase 1.
 
 GKE:
 
@@ -50,7 +69,13 @@ EKS:
 cd <recipe folder> && $IAC init && $IAC plan -var="region=${CLUSTER_REGION}" -var='gpu_node_capacity_type=ON_DEMAND' -out=polar-sky.plan
 ```
 
-`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer.
+AKS:
+
+```bash
+cd <recipe folder> && $IAC init && $IAC plan -var="subscription_id=${CLUSTER_SUBSCRIPTION_ID}" -var="location=${CLUSTER_REGION}" -var="kubernetes_version=${CLUSTER_KUBERNETES_VERSION}" -out=polar-sky.plan
+```
+
+`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer. The AKS recipe stays on the minor version you planned and takes only its patch releases while AKS supports that minor. Tell the person that when AKS retires the minor, AKS upgrades the cluster to the next minor by itself, so they agree a new minor with Polar Sky before that date.
 
 ### Apply
 
@@ -68,7 +93,7 @@ It takes 15 to 30 minutes. If your agent stops commands after a time limit, run 
 cd <recipe folder> && $IAC output -raw gke_get_credentials_command
 ```
 
-For EKS use `eks_update_kubeconfig_command`. The output is a `gcloud` or `aws` command. Show it, say it adds the cluster to the kubeconfig and makes it the current context, and run it after a yes.
+For EKS use `eks_update_kubeconfig_command`, and for AKS `aks_get_credentials_command`. The output is a `gcloud`, `aws` or `az` command. Show it, say it adds the cluster to the kubeconfig and makes it the current context, and run it after a yes.
 
 ### GPU pool at zero
 
@@ -84,6 +109,12 @@ EKS:
 
 ```bash
 aws eks describe-nodegroup --cluster-name eks-polar-sky --nodegroup-name gpu --region "${CLUSTER_REGION}" --query 'nodegroup.{instanceTypes:instanceTypes,scaling:scalingConfig,labels:labels,taints:taints}' --output yaml
+```
+
+AKS:
+
+```bash
+az aks nodepool show --subscription "${CLUSTER_SUBSCRIPTION_ID}" --resource-group rg-polar-sky --cluster-name aks-polar-sky --name gpu --query '{vmSize:vmSize,minCount:minCount,maxCount:maxCount,labels:nodeLabels,taints:nodeTaints}' --output yaml
 ```
 
 The pool must have the profile's GPU type, label and taint (table below), and a maximum of at least 4 nodes.

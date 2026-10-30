@@ -148,7 +148,7 @@ check_storage_class() {
   elif kubectl get storageclass "${storage_class}" >/dev/null 2>&1; then
     pass "StorageClass ${storage_class} exists"
   else
-    fail "StorageClass ${storage_class} is missing" "create it as the ${profile} profile needs (the EKS recipe creates it); it must support ReadWriteMany"
+    fail "StorageClass ${storage_class} is missing" "create it as the ${profile} profile needs (the EKS and AKS recipes create it); it must support ReadWriteMany"
   fi
 }
 

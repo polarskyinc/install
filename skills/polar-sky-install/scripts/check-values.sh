@@ -94,6 +94,18 @@ for name in GOOGLE_CLOUD_PROJECT_ID CLUSTER_PROJECT_ID; do
     problem "${name} is not a Google Cloud project ID"
 done
 
+if [ -n "${CLUSTER_SUBSCRIPTION_ID:-}" ]; then
+  show CLUSTER_SUBSCRIPTION_ID "${CLUSTER_SUBSCRIPTION_ID}"
+  printf '%s' "${CLUSTER_SUBSCRIPTION_ID}" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' ||
+    problem "CLUSTER_SUBSCRIPTION_ID is not an Azure subscription ID"
+fi
+
+if [ -n "${CLUSTER_KUBERNETES_VERSION:-}" ]; then
+  show CLUSTER_KUBERNETES_VERSION "${CLUSTER_KUBERNETES_VERSION}"
+  printf '%s' "${CLUSTER_KUBERNETES_VERSION}" | grep -Eq '^1\.[0-9]+$' ||
+    problem "CLUSTER_KUBERNETES_VERSION must be a minor version such as 1.35, without a patch number"
+fi
+
 if [ -n "${GOOGLE_WORKSPACE_ADMIN_EMAIL:-}" ]; then
   show GOOGLE_WORKSPACE_ADMIN_EMAIL "${GOOGLE_WORKSPACE_ADMIN_EMAIL}"
   printf '%s' "${GOOGLE_WORKSPACE_ADMIN_EMAIL}" | grep -Eq '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' ||
