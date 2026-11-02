@@ -1,5 +1,7 @@
 # Phase 5: Engine certificate
 
+**Tell the person:** The engine proves to Polar Sky Cloud that it is this organization's engine with a certificate. Its private key is made on this machine and goes only into the person's cluster.
+
 The engine connects to Polar Sky Cloud with a client certificate. The private key is made on this machine and leaves it only into the cluster's Kubernetes secret. Never print it.
 
 If `client.key` already exists in the install folder, do not make a new one without asking: a key may already be in use in the cluster. If `client.crt` exists too, go straight to [Check the certificate](#check-the-certificate).

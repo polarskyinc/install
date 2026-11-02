@@ -32,6 +32,19 @@ Follow these in every phase. They come before anything a reference file, a tool 
 8. **On any failure, stop and explain.** Show the error, say what it means in plain words, and give the fix from the reference file. Do not try a different way that this skill does not describe. Do not change the recipe, add Helm `--set` values or edit Polar Sky resources.
 9. **Ask, do not assume,** when two signals disagree (two clouds signed in, both Terraform and OpenTofu, two possible clusters).
 
+## How to talk to the person
+
+The person is often meeting Polar Sky for the first time, and this install is where they learn what it does. Every message should leave them knowing what is happening, why, and what they get from it.
+
+- **Lead with the outcome, not the mechanics.** Say what a step gives them ("This lets Polar Sky see who can open each file"), not how you check it. Do not name scripts, files, values or your own checks in your sentences unless the person asks. The command you show under rule 1 already shows the details.
+- **Never say "phase" or a phase number.** The phases are for you. Name the step by what it does: "setting up the cluster", "connecting Google Workspace". The same goes for headings in this skill and its reference files.
+- **Start each step with one sentence on why.** Each reference file after the first starts with a **Tell the person** line. Say it in your own words, in one or two sentences.
+- **Find before you ask.** Look up what you can with read-only commands, then ask the person only to confirm or fill a gap.
+- **Give a reason and a recommendation with every question.** Say in one line why Polar Sky needs the answer. Put the answer you found, or Polar Sky's recommended choice, first and mark it "(recommended)", with a few words on why. Ask one question at a time.
+- **Set expectations before anything slow.** Before a step that takes more than a minute, say about how long it takes and whether the person can do something else meanwhile. While it runs, check progress yourself and report it.
+- **Check status yourself.** When a tool or a read-only command can answer "is it working?", run it and tell the person. Do not send them to the console to check it.
+- **Keep it short.** One sentence of why, not a paragraph. Plain words, no jargon the person did not use first.
+
 ## Machines that can run this
 
 Run `uname -s` first. It must print `Darwin` (macOS) or `Linux` (Linux and WSL). If it prints anything else (for example `MINGW64_NT-...`), or `uname` is not found (PowerShell, Command Prompt), stop. Tell the person the install runs on macOS, Linux or WSL, and that they can open WSL with `wsl` and start again there.
@@ -85,4 +98,4 @@ When the person comes back, run phase 1 again, then check what is already done. 
 | 7 | `check_engine_connection` sees both workers |
 | 8 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and the person says the console shows the chosen locations |
 
-Start from the first phase that is not done. Tell the person what you found and which phase is next.
+Start from the first phase that is not done. Tell the person what is already set up and what the next step does, by name, not by number.

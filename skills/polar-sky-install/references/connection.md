@@ -1,5 +1,7 @@
 # Phase 7: Engine connected
 
+**Tell the person:** Polar Sky checks that the engine has reached Polar Sky Cloud. It usually takes a few minutes, and you check it for the person.
+
 The engine's two workers (Document Discovery and Envelope Creation) connect out to Polar Sky Cloud over mTLS. Polar Sky Cloud must see both before Google Workspace is connected.
 
 ## Check
@@ -13,7 +15,7 @@ Call `check_engine_connection`. It says whether Polar Sky Cloud sees each worker
   kubectl get pods --namespace="${POLAR_SKY_NAMESPACE}"
   ```
 
-Call it at most 10 times, over about 15 minutes. Workers often need a few minutes after their pods are ready.
+Call it at most 10 times, over about 15 minutes. Workers often need a few minutes after their pods are ready. Tell the person you are waiting for the engine to reach Polar Sky Cloud, and report each check in one line.
 
 ## If the workers are still not seen
 

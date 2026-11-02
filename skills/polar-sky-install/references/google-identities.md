@@ -1,5 +1,7 @@
 # Phase 4: Google identities and delegation
 
+**Tell the person:** Polar Sky reads files, sharing and permissions through two Google service accounts that a Workspace super admin approves. No one's password is used, and the accounts get only the access in their delegation entries.
+
 Polar Sky reads Google Workspace through two Google service accounts in the customer's own project (`GOOGLE_CLOUD_PROJECT_ID`):
 
 | Service account | Used by | Key |
@@ -110,6 +112,8 @@ Show the real values, not the names. Always add this warning:
 > **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. If a client ID already has an entry with other scopes it still needs, add them by hand instead.
 
 Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`) needs the **Reports** privilege, and Google can take up to 24 hours to apply delegation changes.
+
+Tell the person that approving the two entries takes the super admin a few minutes, and that while they wait you can go on with the engine's certificate and install.
 
 If the person is a super admin, they can open the links now. If not, write them a message to forward. Fill in every value, with the two links in full:
 

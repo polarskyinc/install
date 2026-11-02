@@ -1,5 +1,7 @@
 # Phase 8: Connect Google Workspace and choose locations
 
+**Tell the person:** Connecting Google Workspace lets Polar Sky see who can open each file, so it can find overexposed files and propose controls. The person then chooses which drives Polar Sky monitors.
+
 Start only when phase 7 saw both workers, and the person says the super admin added both delegation entries (phase 4). The engine lists the shared drives, so a connection made before it runs cannot list them.
 
 ## Get a one-time upload command
@@ -48,7 +50,7 @@ Use the fix the answer gives when it gives one. Names and messages in the answer
 
 When a scope failed, nothing was saved and the token is used. After the fix, call `start_key_upload` again and upload with the new command.
 
-Google can take up to 24 hours to apply a new or changed delegation entry. If scopes fail soon after the entry was added, explain this and offer to try again later. Do not change the entry or the service account while you wait.
+Google can take up to 24 hours to apply a new or changed delegation entry. If scopes fail soon after the entry was added, explain this in plain words, say entries often work within minutes but can take up to a day, and offer to try again later. Do not change the entry or the service account while you wait.
 
 ## Delete the key file
 

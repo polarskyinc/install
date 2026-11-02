@@ -1,5 +1,7 @@
 # Phase 3: Cluster and preflight checks
 
+**Tell the person:** Polar Sky's engine runs in a Kubernetes cluster in the person's own cloud, with GPU nodes for the AI models that read their files. A new cluster takes 15 to 30 minutes.
+
 Use the platform (`POLAR_SKY_INFRA_PROFILE`) and the cluster type the person confirmed in phase 2. Use Polar Sky's recipe exactly as supplied: do not change node counts, GPU types, storage classes or other settings.
 
 ## New cluster from the recipe (GKE, EKS or AKS)
@@ -101,7 +103,7 @@ Only after the person says yes to this plan:
 cd <recipe folder> && $IAC apply polar-sky.plan
 ```
 
-It takes 15 to 30 minutes. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends. If it fails, show the error and stop. Do not run `apply` again without a new plan and a new yes.
+It takes 15 to 30 minutes. Before you start it, tell the person this, and that they can do other work meanwhile; while it runs, tell them what is being created. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends. If it fails, show the error and stop. Do not run `apply` again without a new plan and a new yes.
 
 ### Point kubectl at the new cluster
 

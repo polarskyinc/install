@@ -1,5 +1,7 @@
 # Phase 9: Done
 
+**Tell the person:** After Polar Sky staff finish the last checks below, Polar Sky works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
+
 Give the person a short summary, with real values:
 
 - **Runs in your cluster** (context, namespace `POLAR_SKY_NAMESPACE`): Flux, the Polar Sky chart version `POLAR_SKY_CHART_VERSION` on the `latest` channel, the two workers, the AI Gateway and the model servers on GPU nodes.

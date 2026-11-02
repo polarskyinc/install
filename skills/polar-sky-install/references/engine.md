@@ -1,5 +1,7 @@
 # Phase 6: Engine install
 
+**Tell the person:** This installs the engine: the workers that find and read files, and the AI models that judge how sensitive each file is. It takes 20 to 30 minutes, mostly loading the models.
+
 Installs the Kubernetes secrets, Flux, and the Polar Sky chart in the Polar Sky namespace. Before you start, phase 3 must have passed and `client.crt` must have passed its check in phase 5. Run commands from the install folder.
 
 The Helm commands below pass values with `--set`, where a comma or `=` inside a value would add other chart values. Check the values again first (read only). It must end with `VALUES OK` and show a valid `GOOGLE_WORKSPACE_ADMIN_EMAIL`; if not, stop:
@@ -104,11 +106,11 @@ Then, after the person says yes:
 helm upgrade --install polar-sky oci://us-docker.pkg.dev/polar-sky-public/charts/polar-sky-onprem --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
 ```
 
-Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. It can take 20 minutes. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends.
+Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends.
 
 ## Wait for the release and the pods
 
-Model weights can take 20 minutes to load. If your agent stops long commands, run this with `--timeout=9m` and repeat it up to three more times while it says it timed out:
+Model weights can take 20 minutes to load. Between checks, tell the person which parts are ready and which are still starting. If your agent stops long commands, run this with `--timeout=9m` and repeat it up to three more times while it says it timed out:
 
 ```bash
 kubectl wait helmrelease/polar-sky --for=condition=ready --timeout=30m --namespace="${POLAR_SKY_NAMESPACE}"
