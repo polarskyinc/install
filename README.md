@@ -38,14 +38,25 @@ The skill runs on your machine with your own tools and accounts. It creates or c
 
 ## Install
 
-Run these two commands in a terminal, then restart your agent:
+Run two commands in a terminal, then restart your agent.
+
+First, connect your agent to the Polar Sky Install server. In Claude Code:
 
 ```bash
-npx add-mcp@2.6.0 https://mcp.polarsky.ai/install -g
-npx skills@1.7.4 add polarskyinc/install -g
+claude mcp add --scope user --transport http polar-sky-install https://mcp.polarsky.ai/install
 ```
 
-The first command connects your agent to the Polar Sky Install server. The second adds the skill.
+In Codex:
+
+```bash
+codex mcp add polar-sky-install --url https://mcp.polarsky.ai/install
+```
+
+Then add the skill:
+
+```bash
+npx skills@1.7.4 add polarskyinc/install -g
+```
 
 Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install`. Both open Polar Sky's sign-in page in your browser.
 
