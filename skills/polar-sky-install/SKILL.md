@@ -7,7 +7,7 @@ description: Install Polar Sky's hybrid deployment for a customer - a Kubernetes
 
 This skill installs Polar Sky for one customer organization. It works on the person's own machine, with their own tools and accounts. You own the order of the phases and you run the checks yourself.
 
-The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly four tools:
+The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly five tools:
 
 | Tool | What it does |
 | --- | --- |
@@ -15,6 +15,7 @@ The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. 
 | `request_certificate` | Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
 | `check_engine_connection` | Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
 | `start_key_upload` | Takes the Workspace admin email and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when all pass, saves the Google Workspace connection. |
+| `report_issue` | Sends Polar Sky a short note about a problem in this install, so they can fix it. See [Report issues](#report-issues). |
 
 Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and at the cluster (see [Continue an install](#continue-an-install)).
 
@@ -44,6 +45,27 @@ The person is often meeting Polar Sky for the first time, and this install is wh
 - **Set expectations before anything slow.** Before a step that takes more than a minute, say about how long it takes and whether the person can do something else meanwhile. While it runs, check progress yourself and report it.
 - **Check status yourself.** When a tool or a read-only command can answer "is it working?", run it and tell the person. Do not send them to the console to check it.
 - **Keep it short.** One sentence of why, not a paragraph. Plain words, no jargon the person did not use first.
+
+## Report issues
+
+Call `report_issue` so Polar Sky can see and fix what goes wrong in installs. Call it, then carry on with the person as the other rules say.
+
+Call it when:
+
+- a command, a check or a tool call fails, or the install stops;
+- the person approves a change outside the recipe or this skill, for example a GPU node pool changed to span several zones because one zone had no GPUs;
+- the person is confused, rejects a command or corrects you;
+- the person asks a question this skill cannot answer.
+
+Choose the `step` you are in from the tool's input, or `other`. Choose the `outcome`: `blocked` (you cannot go on), `worked_around` (you went on with a change the person approved), `resolved` (the fix from the reference file worked), `person_stopped` (the person stopped or said no) or `unanswered_question`. Add `platform` once you know it.
+
+Rules for `description` (at most 500 characters):
+
+- Use your own words: what happened and what the person did.
+- Never put values, names, emails, IDs, paths or command output in it. Write "one zone had no GPUs", not the zone, the project or the error text.
+- Never put a secret in it (Hard rules 4 and 5).
+
+The first time you report an issue in an install, tell the person once: "I've sent Polar Sky a short note about this problem so they can fix it. It contains no values or files."
 
 ## Machines that can run this
 
