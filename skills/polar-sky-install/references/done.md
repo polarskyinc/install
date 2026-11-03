@@ -10,6 +10,7 @@ Give the person a short summary, with real values:
 - **Google:** the service accounts `GOOGLE_ON_PREM_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and their two delegation entries. Polar Sky keeps the cloud account's key, encrypted.
 - **Certificate:** the subject and the end date from `scripts/check-certificate.sh`. It must be renewed before that date: run phase 5 again with a new key, and replace the `polar-sky-mtls` secret.
 - **Monitoring:** the locations the person chose in the console.
+- **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
 ## What Polar Sky staff still do
 

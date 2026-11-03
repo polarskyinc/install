@@ -15,6 +15,11 @@ if have gcloud; then
   project="$(gcloud config get-value project 2>/dev/null | first_line)"
   line "gcloud account" "${account:-not signed in}"
   line "gcloud project" "${project:-none set}"
+  if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+    line "gcloud ADC" "works"
+  else
+    line "gcloud ADC" "not signed in, or the sign-in has expired"
+  fi
 else
   line "gcloud" "not found"
 fi

@@ -9,7 +9,9 @@ Polar Sky reads Google Workspace through two Google service accounts in the cust
 | `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster |
 | `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 8, then deleted |
 
-Show the active gcloud account (`gcloud config get-value account`) and ask the person to confirm it is the one to use. They need to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs.
+Use the gcloud account and project the person confirmed in the install plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs.
+
+This stage needs only the project, not the cluster, so start it as soon as the plan is agreed, before or during the cluster build. Its plan: turn on two APIs, create the two service accounts and their key files, then prepare the super admin's request. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
 
 ## Enable the APIs
 
@@ -17,7 +19,7 @@ Show the active gcloud account (`gcloud config get-value account`) and ask the p
 gcloud services enable admin.googleapis.com drive.googleapis.com --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
-This turns on the Admin SDK and Google Drive APIs in the project. Run it after a yes.
+This turns on the Admin SDK and Google Drive APIs in the project.
 
 ## When the service accounts already exist
 
@@ -31,9 +33,11 @@ If `service-accounts create` answers that the account already exists (an earlier
 
 - If they don't have it, create a new key as below, and tell them the old key stays active until their administrator deletes it.
 
+If a key file is already in the install folder, never create a key over it: check it as above, or ask the person.
+
 ## On-premises service account and its key
 
-Show both commands, say they create one service account and one key file, and run them after a yes:
+Show both commands, say they create one service account and one key file, and run them:
 
 ```bash
 gcloud iam service-accounts create polar-sky-on-prem-dpe --display-name="Polar Sky On-Premises" --project="${GOOGLE_CLOUD_PROJECT_ID}"
@@ -62,7 +66,7 @@ export GOOGLE_ONPREM_KEY_FILE="$HOME/polar-sky-install/on-prem-key.json"
 
 ## Cloud service account and its key
 
-Show both commands, say they create one service account and one key file, and run them after a yes:
+Show both commands, say they create one service account and one key file, and run them:
 
 ```bash
 gcloud iam service-accounts create polar-sky-cloud-integration --display-name="Polar Sky Cloud" --project="${GOOGLE_CLOUD_PROJECT_ID}"
@@ -111,11 +115,30 @@ Show the real values, not the names. Always add this warning:
 
 > **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. If a client ID already has an entry with other scopes it still needs, add them by hand instead.
 
-Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`) needs the **Reports** privilege, and Google can take up to 24 hours to apply delegation changes.
+Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`) needs the **Reports** privilege.
 
-Tell the person that approving the two entries takes the super admin a few minutes, and that while they wait you can go on with the engine's certificate and install.
+## What each entry lets Polar Sky do
 
-If the person is a super admin, they can open the links now. If not, write them a message to forward. Fill in every value, with the two links in full:
+A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry, from this table. If an entry has a scope that is not in the table, say Polar Sky can explain it; never guess.
+
+| Scope (after `https://www.googleapis.com/auth/`) | Entry | What it lets Polar Sky do, and why |
+| --- | --- | --- |
+| `admin.directory.user.readonly` | Polar Sky Cloud | Read the list of users, to know who owns and who can open each file |
+| `admin.directory.group.readonly` | Polar Sky Cloud | Read groups and their members, to work out who gets access through a group |
+| `admin.directory.customer.readonly` | Polar Sky Cloud | Read the Workspace account's ID and primary domain, to check the connection is for this company |
+| `drive.metadata.readonly` | Polar Sky Cloud | Read file names, owners and sharing, but not file content, to find overexposed files |
+| `admin.reports.audit.readonly` | Polar Sky Cloud | Read the Drive audit log, to see who changed sharing and when |
+| `admin.directory.group` | Only if an entry lists it | Create groups and change their members, for the access groups of controls the team approves |
+| `drive.readonly` | Engine | Read file content and list shared drives, so the engine can judge how sensitive each file is inside the company's own cloud |
+| `drive` | Engine | Change sharing on files and shared drives, to apply the controls the team approves. Before a change in a shared drive, the engine may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays |
+
+Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
+
+## Send the request and keep going
+
+Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so, and recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile."
+
+If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the two links in full and the lines from the table above:
 
 ```text
 Hello,
@@ -125,6 +148,13 @@ Open each link while signed in as a super admin, check the client ID and scopes,
 
 1. <link for GOOGLE_CLOUD_CLIENT_ID>
 2. <link for GOOGLE_ON_PREM_CLIENT_ID>
+
+What each entry lets Polar Sky do:
+
+1. Polar Sky Cloud (no access to file content):
+   - <one line per scope in POLAR_SKY_CLOUD_SCOPES>
+2. Polar Sky engine, which runs in our own cloud:
+   - <one line per scope in POLAR_SKY_ON_PREM_SCOPES>
 
 If a link does not open the dialog, add the entries by hand
 (Security > Access and data control > API controls > Domain-wide delegation > Manage all):
@@ -143,4 +173,4 @@ Please also make sure <GOOGLE_WORKSPACE_ADMIN_EMAIL> has the Reports admin privi
 Thank you.
 ```
 
-Ask the person to tell you when the entries are added. You can go on with phase 5 while you wait.
+Ask the person to tell you when the super admin has added the entries, and go on with the next step meanwhile.

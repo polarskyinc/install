@@ -4,19 +4,26 @@
 
 Before your first command, tell the person in two or three sentences what Polar Sky is and what this install sets up. For example:
 
-> Polar Sky is a data protection agent. AI assistants can read everything a person can reach, and most people can reach far more than they need. Polar Sky works out who needs to see what, finds overexposed files, and proposes controls your team approves. This install sets up Polar Sky's engine in your own cloud: it reads your files there, so Polar Sky Cloud never sees their raw content. Then it connects your Google Workspace.
+> Polar Sky is a data protection agent. AI assistants can read everything a person can reach, and most people can reach far more than they need. Polar Sky works out who needs to see what, finds overexposed files, and proposes controls your team approves.
+
+Then give a short picture of the setup, in a few lines:
+
+- **The engine runs in your own cloud,** in a Kubernetes cluster with GPU nodes. It reads your files there, with AI models that run in the cluster.
+- **Polar Sky Cloud gets the results,** and reads users, groups and sharing. It never sees the raw content of your files.
+- **Google Workspace connects through two service accounts** in your Google Cloud project, one for the engine and one for Polar Sky Cloud. A Workspace super admin approves their access. No one's password is used.
+- **Who else you may need:** a Workspace super admin, for a few minutes, and sometimes Polar Sky staff, for example to sign the engine's certificate.
 
 Then show the steps and how long each usually takes, so the person can plan:
 
 | Step | Usually takes |
 | --- | --- |
-| Sign in to Polar Sky and check this machine's tools | 5 minutes |
-| Set up the Kubernetes cluster the engine runs on | 15 to 30 minutes for a new cluster |
+| Sign in to Polar Sky, look at this machine and your cloud, and agree the plan | 5 to 10 minutes |
 | Create the Google service accounts, and a super admin approves their access | 10 minutes, plus the super admin's time |
+| Set up the Kubernetes cluster the engine runs on | 15 to 30 minutes for a new cluster |
 | Get the engine's certificate and install the engine | 20 to 30 minutes, mostly loading AI models |
 | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
 
-Say you will show each command and ask before anything changes. Then start.
+Say that the service accounts and the cluster can be set up at the same time, so the super admin's approval does not hold up the rest. Say you will show every command, and ask once for the whole plan and once for each step. Then start.
 
 ## Check the MCP server
 
@@ -101,4 +108,4 @@ Write the file with your file tool, not with `echo`. Then check it. The script o
 
 `<skill folder>` is the folder this `SKILL.md` is in. When you show a command, put the real path in place of `<skill folder>`, so the person sees exactly what runs. If the script reports a problem, show it to the person and stop: a missing or wrong value comes from Polar Sky, so they contact their Polar Sky contact.
 
-Tell the person which organization they are signed in to, by name, and ask them to confirm it is theirs. For example: "You are signed in to Polar Sky as **Acme Corp**. Is that your organization?" Do not mention the values file or the check. The deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.
+Tell the person which organization they are signed in to, by name, for example "You are signed in to Polar Sky as **Acme Corp**." They confirm it with the install plan in phase 2. Do not mention the values file or the check. The deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.

@@ -14,21 +14,21 @@ The recipe is Polar Sky's OpenTofu/Terraform code for the cluster, published in 
 
 If the folder was already there, it may hold the Terraform state of an earlier run: use it as it is and never download over it. If the person got a recipe folder from Polar Sky and wants to use that one, use their folder instead.
 
-Ask which region (and for GKE, which zone) to use; the recipe's defaults are `us-central1` / `us-central1-a` (GKE), `us-east-1` (EKS) and `eastus` (AKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
+Use the region, and for GKE the zone, from the install plan; if the plan did not settle them, ask. The recipe's defaults are `us-central1` / `us-central1-a` (GKE), `us-east-1` (EKS) and `eastus` (AKS). Write the answers into `values.env` as `CLUSTER_REGION` and, for GKE, `CLUSTER_ZONE`.
 
 ### Plan
 
-For GKE, ask which Google Cloud project the cluster goes in. It may be the service-account project from phase 2 or another one. Write it into `values.env` as `CLUSTER_PROJECT_ID`.
+For GKE, use the cluster's Google Cloud project from the install plan. It may be the service-account project or another one. Write it into `values.env` as `CLUSTER_PROJECT_ID`.
 
-For GKE, before the plan, check that the project has billing (read only; the first command turns on the Cloud Billing API, which costs nothing). It must print `True`:
+For GKE, before the plan, check that the project has billing. The first command turns on the Cloud Billing API, which costs nothing; name it in the install plan, so the plan's yes covers it. It must print `True`:
 
 ```bash
 gcloud services enable cloudbilling.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud billing projects describe "${CLUSTER_PROJECT_ID}" --format='value(billingEnabled)'
 ```
 
-If it prints `False`, stop: without billing Google refuses to turn on Compute Engine and Kubernetes Engine, and the apply fails part way. Tell the person a billing account must be linked to the project (Cloud Console, Billing), usually by a billing administrator. You may go on with phase 4 and phase 5 while they do it.
+If it prints `False`, stop: without billing Google refuses to turn on Compute Engine and Kubernetes Engine, and the apply fails part way. Tell the person a billing account must be linked to the project (Cloud Console, Billing), usually by a billing administrator. Nothing else waits on billing, so recommend going on with the Google service accounts and the certificate while they do it.
 
-For GKE, check that the zone offers NVIDIA L4 GPUs (read only; the first command turns on the Compute Engine API, which costs nothing). It lists the zones in the region that offer L4:
+For GKE, check that the zone offers NVIDIA L4 GPUs. The first command turns on the Compute Engine API, which costs nothing; name it in the install plan too. It lists the zones in the region that offer L4:
 
 ```bash
 . ~/polar-sky-install/values.env && gcloud services enable compute.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud compute accelerator-types list --project="${CLUSTER_PROJECT_ID}" --format='value(name,zone.basename())' | awk -v region="${CLUSTER_REGION}-" '$1 == "nvidia-l4" && index($2, region) == 1 {print $2}'
@@ -36,9 +36,17 @@ For GKE, check that the zone offers NVIDIA L4 GPUs (read only; the first command
 
 If `CLUSTER_ZONE` is not in the list, propose a zone that is, and write the person's answer into `values.env`. If the list is empty, propose another region. Tell the person this shows which zones offer L4, not whether one is free right now: a zone can run out. If GPU nodes do not start in phase 6 because the zone is out of resources, the fix is a new cluster in another zone.
 
-For AKS, ask three more things before you plan:
+For GKE, check that OpenTofu and Terraform can sign in to Google. They use application default credentials, not the gcloud account, and a plan on a new cluster can pass without them, so only the apply would fail. This only reads, and prints no token, because the token goes to `/dev/null`:
 
-1. **Subscription.** Which Azure subscription the cluster goes in. You may propose the subscription `az` is signed in to, saying where it came from. Write its ID into `values.env` as `CLUSTER_SUBSCRIPTION_ID`. The person needs Owner, or Contributor and User Access Administrator, on it: the recipe creates a resource group and assigns a role to the cluster. With Contributor alone, `apply` fails at that role assignment.
+```bash
+gcloud auth application-default print-access-token >/dev/null && echo ADC OK
+```
+
+If it does not print `ADC OK`, tell the person to run `gcloud auth application-default login` in their own terminal, and to choose the Google account that may create the cluster in `CLUSTER_PROJECT_ID`. It opens a browser. Run the check again when they are done.
+
+For AKS, check three more things before you plan. Use the answers from the install plan, and ask only for what it did not settle:
+
+1. **Subscription.** Which Azure subscription the cluster goes in. Propose the subscription `az` is signed in to, saying where it came from. Write its ID into `values.env` as `CLUSTER_SUBSCRIPTION_ID`. The person needs Owner, or Contributor and User Access Administrator, on it: the recipe creates a resource group and assigns a role to the cluster. With Contributor alone, `apply` fails at that role assignment.
 2. **Kubernetes version.** The Kubernetes minor version Polar Sky approved for this install, such as `1.35`. Ask the person for it; do not pick one. Check that the region offers it (read only), then write it into `values.env` as `CLUSTER_KUBERNETES_VERSION`:
 
    ```bash
@@ -97,13 +105,13 @@ cd <recipe folder> && $IAC init && $IAC plan -var="subscription_id=${CLUSTER_SUB
 
 ### Apply
 
-Only after the person says yes to this plan:
+The plan is this stage's yes. When you show it, say that after the apply you will point kubectl at the new cluster, create the Polar Sky namespace and run the preflight checks below (their short-lived test pods), with no new yes. Ask: "Does this plan look right? Any changes, or shall I go ahead?" Then:
 
 ```bash
 cd <recipe folder> && $IAC apply polar-sky.plan
 ```
 
-It takes 15 to 30 minutes. Before you start it, tell the person this, and that they can do other work meanwhile; while it runs, tell them what is being created. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends. If it fails, show the error and stop. Do not run `apply` again without a new plan and a new yes.
+It takes 15 to 30 minutes. Before you start it, tell the person this, and that they can do other work meanwhile. Run it in the background if your agent can; if your agent stops commands after a time limit and cannot, ask the person to run it in their own terminal and tell you when it ends. While it runs, check its output every few minutes and tell the person in one line what is being created. Recommend using the time for the Google service accounts and the certificate (phases 4 and 5), which do not need the cluster. If it fails, show the error and stop. Do not run `apply` again without a new plan and a new yes; show what the new plan changes compared with the one the person approved.
 
 ### Point kubectl at the new cluster
 
@@ -111,7 +119,7 @@ It takes 15 to 30 minutes. Before you start it, tell the person this, and that t
 cd <recipe folder> && $IAC output -raw gke_get_credentials_command
 ```
 
-For EKS use `eks_update_kubeconfig_command`, and for AKS `aks_get_credentials_command`. The output is a `gcloud`, `aws` or `az` command. Show it, say it adds the cluster to the kubeconfig and makes it the current context, and run it after a yes.
+For EKS use `eks_update_kubeconfig_command`, and for AKS `aks_get_credentials_command`. The output is a `gcloud`, `aws` or `az` command. Show it, say it adds the cluster to the kubeconfig and makes it the current context, and run it. It is part of this stage. This is the cluster this install built: do not ask the person to confirm it.
 
 ### GPU pool at zero
 
@@ -143,7 +151,7 @@ On GKE, also check that the GPU pool's instance groups exist (read only). When a
 . ~/polar-sky-install/values.env && urls=$(gcloud container node-pools describe gpu --cluster gke-polar-sky --location "${CLUSTER_ZONE}" --project "${CLUSTER_PROJECT_ID}" --format='value(instanceGroupUrls)') && if [ -z "$urls" ]; then echo "MISSING no instance groups"; else echo "$urls" | tr ';' '\n' | while read -r url; do zone=$(echo "$url" | awk -F/ '{print $(NF-2)}'); name=${url##*/}; if out=$(gcloud compute instance-groups managed describe "$name" --zone "$zone" --project "${CLUSTER_PROJECT_ID}" --format='value(name)' 2>&1); then echo "found   $zone $name"; elif echo "$out" | grep -q 'was not found'; then echo "MISSING $zone $name"; else echo "ERROR   $zone $name: $out"; fi; done; fi
 ```
 
-It must print at least one line, and every line must say `found`. If a line says `ERROR`, or the command fails, show the error and stop: it is usually a missing permission, not a GPU problem. If one says `MISSING`, stop and tell the person: "The GPU pool was created while the zone had no free GPUs, so it cannot start GPU nodes." Report it with `report_issue`. The fix is a new cluster in another zone that offers L4 (recommended), or, if the person wants to keep this cluster, a new plan that replaces only the GPU pool (`-replace=google_container_node_pool.gpu`) when the zone has GPUs again. Either way, show the plan and wait for a yes.
+It must print at least one line, and every line must say `found`. If a line says `ERROR`, or the command fails, show the error and stop: it is usually a missing permission, not a GPU problem. If one says `MISSING`, stop and tell the person: "The GPU pool was created while the zone had no free GPUs, so it cannot start GPU nodes." Report it with `report_issue`. The fix is a new cluster in another zone that offers L4 (recommended), or, if the person wants to keep this cluster, a new plan that replaces only the GPU pool (`-replace=google_container_node_pool.gpu`) when the zone has GPUs again. Either way, show the plan and wait for a yes: it deletes or replaces resources.
 
 ## Existing cluster (AKS, EKS or GKE)
 
@@ -153,7 +161,7 @@ Polar Sky approves an existing cluster before the install. Show and run (read on
 kubectl config current-context && kubectl get nodes && kubectl get storageclass
 ```
 
-Ask the person to confirm the context is the approved cluster. For Entra-integrated AKS, `kubelogin` must be installed. Preflight warns when the cluster already runs Flux outside the Polar Sky namespace, or Argo CD. Then tell the person to agree the install path with Polar Sky before phase 6: Argo CD must not take over Flux resources, and an existing Flux needs a review.
+Check that the context is the cluster the person named in the install plan; ask only if it is not. For Entra-integrated AKS, `kubelogin` must be installed. Preflight warns when the cluster already runs Flux outside the Polar Sky namespace, or Argo CD. Then tell the person to agree the install path with Polar Sky before phase 6: Argo CD must not take over Flux resources, and an existing Flux needs a review.
 
 ## What the profile needs
 
@@ -178,12 +186,12 @@ The script checks the cluster against guide section 2 and reports every problem 
 - that the cluster enforces NetworkPolicy: two test pods in a new temporary namespace `polar-sky-preflight-<time>`, first allowed to talk, then blocked by a policy
 - outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host; for the Polar Sky host it trusts the Polar Sky CA in [scripts/polar-sky-ca.crt](../scripts/polar-sky-ca.crt), because that host's certificate is not from a public CA
 
-It changes the cluster in two ways, so ask before running it:
+It changes the cluster in two ways. On a new cluster, the plan's yes covers them. On an existing cluster, this is the stage's yes: tell the person both, and ask "Any concerns, or shall I go ahead?"
 
 1. It creates a new namespace `polar-sky-preflight-<time>` with three short-lived `busybox` pods and one NetworkPolicy, and deletes only that namespace at the end.
 2. It runs one `curlimages/curl` pod in the Polar Sky namespace and deletes it at the end. The Polar Sky namespace must exist first.
 
-Create the Polar Sky namespace if it is missing, after a dry run and a yes:
+Create the Polar Sky namespace if it is missing, after a dry run:
 
 ```bash
 kubectl create namespace "${POLAR_SKY_NAMESPACE}" --dry-run=server
@@ -201,6 +209,22 @@ Then run the checks:
 
 It ends with `PREFLIGHT PASSED` or `PREFLIGHT FAILED` and a list of every failure and its fix. Show the whole list to the person in one message. Lines marked `WARN` need the person's attention but do not block.
 
-If a check fails, the person fixes the cluster or the network, and you run the script again. Do not go to phase 4 until it passes. A blocked host is usually opened by the network team: give them the host list from the script output, and say pulls may follow HTTPS redirects to download hosts, so a proxy or allowlist must allow the whole chain.
+If a check fails, the person fixes the cluster or the network, and you run the script again. A blocked host is usually opened by the network team: give them the host list from the script output, and say pulls may follow HTTPS redirects to download hosts, so a proxy or allowlist must allow the whole chain. Do not install the engine (phase 6) until preflight passes, or every failure left is one the person chose to skip.
+
+### When a check fails on an existing cluster
+
+Explain each failure: what it means and what can go wrong if the install goes on. Some failures the person may choose to accept, with a reason they state. Record each one with `report_issue`, outcome `worked_around`, and say it again in the summary at the end.
+
+| Failure | May the person go on? |
+| --- | --- |
+| The cluster does not enforce NetworkPolicy | Yes. Risk: Polar Sky's network policies do not limit traffic to and from the engine, so the namespace is less isolated. Recommend asking the platform team first |
+| The NetworkPolicy test did not finish | Run the script again first. If it fails again, the same as above |
+| A GPU node has no allocatable GPU, or lacks the profile's taint | Yes. Risk: the AI models may not run, or other pods may use the GPU nodes. Phase 6 then says the models are not ready |
+| No HTTPS to `huggingface.co` (EKS and AKS only) | Yes. Risk: the AI models cannot download, as above |
+| Kubernetes older than 1.33, a missing StorageClass, missing permissions | No: the install cannot work. The cluster must be fixed first |
+| A node that is not Linux `amd64` | No, unless Polar Sky agrees with the person how to keep Polar Sky pods off that node |
+| No DNS, no HTTPS or TLS inspection for any other host (on GKE including `storage.googleapis.com`, which image downloads may also use), or the egress test could not run or be read | No: the engine cannot pull its images, reach Google or reach Polar Sky Cloud. The network must be fixed first |
+
+Warnings never block; explain them the same way.
 
 On a new recipe cluster the GPU checks may only say the pool is at zero. Then run the GPU pool check above. Real GPU placement is checked in phase 6.

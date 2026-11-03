@@ -1,8 +1,10 @@
 # Polar Sky install skill
 
+This skill lets your own AI agent install Polar Sky for your organization. It works with Claude Code and Codex.
+
 ## For AI agents
 
-If a person asked you to install Polar Sky from this repository, do these three steps.
+If a person asked you to install Polar Sky from this repository, start a conversation, not a script. First tell them, in a few short sentences, what will happen: you will connect to the Polar Sky Install server, add the install skill, and then they may need to restart you so the server loads. Then do these three steps.
 
 1. **Add the Polar Sky Install MCP server.** Its address is `https://mcp.polarsky.ai/install`. It uses streamable HTTP and OAuth sign-in. In Claude Code, run:
 
@@ -18,15 +20,17 @@ If a person asked you to install Polar Sky from this repository, do these three 
 
    Polar Sky supports Claude Code and Codex. In another agent, tell the person that Polar Sky does not support it yet, and stop.
 2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
-3. **Start.** Tell the person that they may need to restart you before the MCP server loads. Then start phase 1 of the skill.
+3. **Start.** Tell the person that they may need to restart you before the MCP server loads, and how. Then start phase 1 of the skill.
 
 The skill's hard rules apply from the first command. Read them in the "Hard rules" section of `SKILL.md` before you run anything.
 
-## What this is
+## What Polar Sky installs
 
-The Polar Sky install skill lets your own AI agent install Polar Sky for your organization. It works with Claude Code and Codex.
+Polar Sky finds files that too many people can open, and proposes controls your team approves. This install sets up:
 
-The skill runs on your machine with your own tools and accounts. It creates or checks your Kubernetes cluster, creates the Google service accounts, gets the engine certificate, installs the Polar Sky Document Processing Engine, and connects Google Workspace. It shows you every command first and asks before it changes anything.
+- **The Polar Sky engine, in your own cloud.** It runs in a Kubernetes cluster with GPU nodes, on GKE, EKS or AKS. The agent can build a new cluster from Polar Sky's recipe, or use one you have. The engine reads your files there, so Polar Sky Cloud never sees their raw content.
+- **Two Google service accounts** in your Google Cloud project, one for the engine and one for Polar Sky Cloud. A Google Workspace super admin approves what each one may do. No one's password is used.
+- **The connection to Google Workspace.** At the end, you choose in the Polar Sky console which drives Polar Sky monitors.
 
 ## What you need
 
@@ -35,6 +39,16 @@ The skill runs on your machine with your own tools and accounts. It creates or c
 - `kubectl`, Helm 3 or 4, OpenSSL and `gcloud`
 - Terraform or OpenTofu 1.6 or later, for a new cluster
 - `aws` for EKS, or `az` for AKS
+- A Google Workspace super admin, for a few minutes, to approve the service accounts
+
+## What will happen, and how long it takes
+
+The whole install usually takes one to two hours, most of it waiting for the cluster and the AI models.
+
+1. The agent signs you in to Polar Sky and looks at your machine and your cloud. It only reads.
+2. It shows you one plan: what it found, what it will create, and how long each step takes. You check it and say yes, or change it.
+3. It works step by step. Before each step it shows you that step's plan, such as the cluster plan, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, and before it uploads the cloud service account key.
+4. Slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin.
 
 ## Install
 
