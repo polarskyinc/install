@@ -113,7 +113,11 @@ The super admin opens each link signed in to the Admin console, checks the clien
 | Polar Sky Cloud | `GOOGLE_CLOUD_CLIENT_ID` | `POLAR_SKY_CLOUD_SCOPES` |
 | Polar Sky On-Premises | `GOOGLE_ON_PREM_CLIENT_ID` | `POLAR_SKY_ON_PREM_SCOPES` |
 
-Show the real values, not the names. Always add this warning:
+Show the real values, not the names. There are no optional scopes: every scope is required by one of the two entries, and each item in the `scopes` list of `get_install_values` says which in `required_for`. The engine's entry holds the Drive content scopes so that Polar Sky Cloud never needs them. Polar Sky Cloud's entry must not list `drive.readonly` or `drive`.
+
+`admin.directory.group` is on Polar Sky Cloud's line, because the Polar Sky Cloud key is what writes groups. It stays on the line even when the organization does not need it today. The `scopes` item for it has `needed_now` and `needed_now_reason`. If `needed_now` is false, say what `needed_now_reason` says, in one plain sentence: "Polar Sky does not use it with your current settings. It is on the line so a later change to group settings needs no second admin visit." If `needed_now` is true, say Polar Sky uses it today. Do not call it optional, and do not drop it from the line.
+
+Always add this warning:
 
 > **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. If a client ID already has an entry with other scopes it still needs, add them by hand instead.
 
@@ -130,7 +134,7 @@ A super admin should know what they approve. In the message, under each entry, g
 | `admin.directory.customer.readonly` | Polar Sky Cloud | Read the Workspace account's ID and primary domain, to check the connection is for this company |
 | `drive.metadata.readonly` | Polar Sky Cloud | Read file names, owners and sharing, but not file content, to find overexposed files |
 | `admin.reports.audit.readonly` | Polar Sky Cloud | Read the Drive audit log, to see who changed sharing and when |
-| `admin.directory.group` | Only if an entry lists it | Create groups and change their members, for the access groups of controls the team approves |
+| `admin.directory.group` | Polar Sky Cloud | Create groups and change their members, for the access groups of controls the team approves. Polar Sky uses it only when it manages those groups in Google Workspace; when it does not, say it is not used with the current settings and is on the line so a later change to group settings needs no second admin visit (see `needed_now` above) |
 | `drive.readonly` | Engine | Read file content and list shared drives, so the engine can judge how sensitive each file is inside the company's own cloud |
 | `drive` | Engine | Change sharing on files and shared drives, to apply the controls the team approves. Before a change in a shared drive, the engine may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays |
 

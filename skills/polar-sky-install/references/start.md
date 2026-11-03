@@ -83,7 +83,7 @@ If the last line names a Git repository, stop: ask the person for another folder
 
 ## Get the install values
 
-Call `get_install_values`. Write each value from the answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. If the answer has a value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Do not write the request ID or `refused`. Leave out every value that is empty or null.
+Call `get_install_values`. Write each value from the answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. The `scopes` list explains each delegation scope for the person; do not write it to the file. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Do not write the request ID or `refused`. Leave out every value that is empty or null.
 
 | Name | Value from `get_install_values` |
 | --- | --- |
