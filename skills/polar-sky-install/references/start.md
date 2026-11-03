@@ -38,6 +38,28 @@ The first call signs the person in to Polar Sky. If the tools are listed but the
 
 The first write call (`request_certificate` or `start_key_upload`) asks the person to approve write access. That is their choice; wait for it.
 
+## Check that your commands can reach the network
+
+The install downloads from GitHub and calls the cloud, Helm and Terraform registries, so your shell commands need network access. Polar Sky tools can work while your shell has none. Show and run (it only reads):
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://github.com
+```
+
+A number such as `200` or `301` means the network works. An error such as `Could not resolve host` or `Operation not permitted` means your sandbox blocks it.
+
+If you are Codex and the network is blocked, stop. Do not work around it with other tools, connectors or another folder. Tell the person: "Codex's sandbox blocks network access for my commands, and the install needs it. Quit Codex (press Ctrl+C twice), then run this command in the same folder. It opens this conversation again with network access, and I will continue from here." Then give this command on one line:
+
+```bash
+umask 077 && mkdir -p ~/polar-sky-install ~/.kube ~/.config/gcloud && codex resume --last -a on-request -c sandbox_workspace_write.network_access=true --add-dir ~/polar-sky-install --add-dir ~/.kube --add-dir ~/.config/gcloud
+```
+
+It keeps Codex's sandbox and lets your commands reach the network and write to the install folder, the kubeconfig and the gcloud settings. `-a on-request` lets you ask the person before a command goes outside the sandbox. If Codex says the conversation is open in another app, the old Codex is still running: they quit it fully and run the command again.
+
+If you are another agent and the network is blocked, tell the person what failed and ask them to allow network access for your commands, then run the check again.
+
+Later in the install, if a command fails the same way, or cannot write to `~/polar-sky-install`, `~/.kube` or the gcloud settings, stop and do the same. Never move the install folder somewhere else to get around it.
+
 ## Make the install folder
 
 Show and run (it only creates an empty folder):

@@ -137,6 +137,14 @@ az aks nodepool show --subscription "${CLUSTER_SUBSCRIPTION_ID}" --resource-grou
 
 The pool must have the profile's GPU type, label and taint (table below), and a maximum of at least 4 nodes.
 
+On GKE, also check that the GPU pool's instance groups exist (read only). When a zone has no L4 GPUs while the pool is created, GKE can still show the pool as running but leave it without instance groups, and then no GPU node ever starts:
+
+```bash
+. ~/polar-sky-install/values.env && urls=$(gcloud container node-pools describe gpu --cluster gke-polar-sky --location "${CLUSTER_ZONE}" --project "${CLUSTER_PROJECT_ID}" --format='value(instanceGroupUrls)') && if [ -z "$urls" ]; then echo "MISSING no instance groups"; else echo "$urls" | tr ';' '\n' | while read -r url; do zone=$(echo "$url" | awk -F/ '{print $(NF-2)}'); name=${url##*/}; if out=$(gcloud compute instance-groups managed describe "$name" --zone "$zone" --project "${CLUSTER_PROJECT_ID}" --format='value(name)' 2>&1); then echo "found   $zone $name"; elif echo "$out" | grep -q 'was not found'; then echo "MISSING $zone $name"; else echo "ERROR   $zone $name: $out"; fi; done; fi
+```
+
+It must print at least one line, and every line must say `found`. If a line says `ERROR`, or the command fails, show the error and stop: it is usually a missing permission, not a GPU problem. If one says `MISSING`, stop and tell the person: "The GPU pool was created while the zone had no free GPUs, so it cannot start GPU nodes." Report it with `report_issue`. The fix is a new cluster in another zone that offers L4 (recommended), or, if the person wants to keep this cluster, a new plan that replaces only the GPU pool (`-replace=google_container_node_pool.gpu`) when the zone has GPUs again. Either way, show the plan and wait for a yes.
+
 ## Existing cluster (AKS, EKS or GKE)
 
 Polar Sky approves an existing cluster before the install. Show and run (read only):

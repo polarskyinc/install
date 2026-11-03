@@ -8,7 +8,7 @@ The engine's two workers (Document Discovery and Envelope Creation) connect out 
 
 Call `check_engine_connection`. It says whether Polar Sky Cloud sees each worker and when it last saw it.
 
-- **Both seen:** tell the person, and go to phase 8.
+- **Both seen:** tell the person, and go to phase 8. Both seen means the workers reach Polar Sky Cloud. It does not mean the AI models run: if phase 6 found a model pod not ready, say that too.
 - **Not both seen:** wait about one minute and call it again. Between calls, you may show the pods (read only) so the person sees progress:
 
   ```bash

@@ -34,11 +34,15 @@ If the token has expired or was used (`upload_token_expired`, `upload_token_used
 
 ## Read the answer
 
-The answer lists every scope with `passed`, and a `fix` for each one that failed. Show the person each scope, one line each, with its fix.
+The answer lists every scope with `required` and `passed`, and a `fix` for each one that failed. Show the person each scope, one line each, with its fix:
+
+- A scope with `required` true passed when Google gave Polar Sky that access. Say what it lets Polar Sky read, for example "read users and groups: works".
+- A scope with `required` false is a Drive scope that reaches file content. It passed when Google **refused** it. Do not call it optional. Say "Polar Sky Cloud cannot read file content: confirmed" once for all of them.
 
 | Result | What it usually means | Fix |
 | --- | --- | --- |
 | `connected` is true | The connection is saved | Go to [Delete the key file](#delete-the-key-file) |
+| `subject_not_admin` | `GOOGLE_WORKSPACE_ADMIN_EMAIL` is not a Workspace administrator | Ask the person for an administrator account, as in phase 2. Write it into `values.env` and run `scripts/check-values.sh`. The engine uses the same email, so run the `helm template` and `helm upgrade` from phase 6 again with the new value, after a yes. Then upload again. Fix both: if only the upload uses the new email, the engine cannot list the shared drives |
 | Every scope fails with `entry_missing` | The cloud entry is missing or has the wrong client ID, or Google has not applied it yet | Check the entry's client ID is `GOOGLE_CLOUD_CLIENT_ID`, then wait |
 | Some scopes fail with `scope_missing` | The cloud entry's scope line is not complete | The super admin enters the full `POLAR_SKY_CLOUD_SCOPES` line again, as one line |
 | `reports_privilege_missing` | The admin lacks the Reports privilege | The super admin gives `GOOGLE_WORKSPACE_ADMIN_EMAIL` the Reports privilege |
@@ -70,6 +74,12 @@ Polar Sky monitors nothing until the person chooses. Send them to the console li
 2. Tick the shared drives Polar Sky may monitor. To include every person's own My Drive, tick **Also monitor everyone's personal drive**.
 3. Press **Start monitoring these**. Monitoring starts only then.
 
-If the list never appears, or says **No shared drives found** when they have some, they press **Look again** and tell their Polar Sky contact. To start with only some folders in a shared drive, they tell Polar Sky before choosing.
+If the page still shows **Looking for shared drives** after a few minutes, the engine probably cannot list the drives as `GOOGLE_WORKSPACE_ADMIN_EMAIL`. Check that the engine uses the same email as the upload (read only):
+
+```bash
+kubectl get deployments --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="GOOGLE_ADMIN_EMAIL")].value}{"\n"}{end}'
+```
+
+If a worker shows another email, or none, fix it with the `subject_not_admin` row above. If the list never appears, or says **No shared drives found** when they have some, they press **Look again** and tell their Polar Sky contact. To start with only some folders in a shared drive, they tell Polar Sky before choosing.
 
 Ask the person to tell you when they have chosen.

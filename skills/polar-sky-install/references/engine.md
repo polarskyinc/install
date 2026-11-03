@@ -106,11 +106,11 @@ Then, after the person says yes:
 helm upgrade --install polar-sky oci://us-docker.pkg.dev/polar-sky-public/charts/polar-sky-onprem --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
 ```
 
-Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. If your agent stops commands after a time limit, run it in the background, or ask the person to run it in their own terminal and tell you when it ends.
+Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. Run it in the background if your agent can, so you can check progress while it runs. If you cannot, ask the person to run it in their own terminal and tell you when it ends, and check progress meanwhile.
 
 ## Wait for the release and the pods
 
-Model weights can take 20 minutes to load. Between checks, tell the person which parts are ready and which are still starting. If your agent stops long commands, run this with `--timeout=9m` and repeat it up to three more times while it says it timed out:
+Model weights can take 20 minutes to load. Do not wait in silence, and do not stop to wait for the person. Every two or three minutes, check the pods yourself with the pod list below (read only) and tell the person in one line what changed: for example "the workers are ready, 2 of 4 AI models are loading". If nothing changed, say so in a few words. Keep checking on your own until everything is ready or a check below fails. If your agent stops long commands, run this with `--timeout=9m` and repeat it up to three more times while it says it timed out:
 
 ```bash
 kubectl wait helmrelease/polar-sky --for=condition=ready --timeout=30m --namespace="${POLAR_SKY_NAMESPACE}"
@@ -142,4 +142,6 @@ If something is not ready, show the person the pod's events (read only, no secre
 kubectl describe pod <pod name> --namespace="${POLAR_SKY_NAMESPACE}"
 ```
 
-Name the cause you see (for example, an image it cannot pull, or no GPU node to schedule on) and stop. Do not change Polar Sky resources to work around it.
+Name the cause you see (for example, an image it cannot pull, or no GPU node to schedule on) and stop. Do not change Polar Sky resources to work around it. If a GPU pod waits for a node on GKE, run the instance group check from phase 3 ([GPU pool at zero](cluster.md#gpu-pool-at-zero)).
+
+If the person chooses to go on while model pods are not ready, you may do phases 7 and 8. Tell them clearly: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot process documents until the AI models run." Never call the install done or working while a model pod is not ready.

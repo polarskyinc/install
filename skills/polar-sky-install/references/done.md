@@ -2,6 +2,8 @@
 
 **Tell the person:** After Polar Sky staff finish the last checks below, Polar Sky works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
+First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes. If a model pod is still not ready, say: "Everything is set up except the AI models, which are not running yet. Polar Sky cannot process documents until they do." Name the cause from phase 6, report it with `report_issue`, and give the summary below with that line at the top.
+
 Give the person a short summary, with real values:
 
 - **Runs in your cluster** (context, namespace `POLAR_SKY_NAMESPACE`): Flux, the Polar Sky chart version `POLAR_SKY_CHART_VERSION` on the `latest` channel, the two workers, the AI Gateway and the model servers on GPU nodes.
@@ -11,7 +13,7 @@ Give the person a short summary, with real values:
 
 ## What Polar Sky staff still do
 
-- Add the organization to Polar Sky's model-serving allowlist (Nexus), if not done yet.
+- Finish the engine's setup on Polar Sky's side, if not done yet.
 - Run the go-live checks with the person: the workers read Google Workspace and process an agreed test document inside a chosen location, local inference and embedding work, and the results show in Polar Sky Cloud.
 
 Tell the person their Polar Sky contact will arrange these.
