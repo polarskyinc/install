@@ -27,7 +27,11 @@ Say that the service accounts and the cluster can be set up at the same time, so
 
 ## Check the MCP server
 
-Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Stop, and give the person the command for the agent you are, to run in their own terminal. In Claude Code:
+Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Find out why before you give the person anything to run. In Claude Code, `claude mcp list` (read only) shows each registered server and its state.
+
+If it lists `polar-sky-install` as disabled for this project (`Disabled for this project (re-enable via /mcp)`), the server is registered but turned off in this folder. Tell the person to type `/mcp`, choose `polar-sky-install` and turn it back on, then **Authenticate** if it asks. Do not add it again.
+
+If it is not listed, stop, and give the person the command for the agent you are, to run in their own terminal. In Claude Code:
 
 ```bash
 claude mcp add --scope user --transport http polar-sky-install https://mcp.polarsky.ai/install
@@ -39,7 +43,7 @@ In Codex:
 codex mcp add polar-sky-install --url https://mcp.polarsky.ai/install
 ```
 
-Give it on one line, as shown. Then tell them how to restart you and keep this conversation: in Claude Code, type `/exit`, then run `claude --continue` in the same folder; in Codex, quit, then run `codex resume --last` in the same folder. After the restart, they sign in as described below and say "Install Polar Sky" again. Do not try to go on without the server.
+Give it on one line, as shown. In Claude Code, they then type `/mcp`: if `polar-sky-install` is listed there, they choose it and **Authenticate**, and the tools load in this conversation without a restart; look for them again. If it is not listed, or in Codex, tell them how to restart you and keep this conversation: in Claude Code, type `/exit`, then run `claude --continue` in the same folder; in Codex, quit, then run `codex resume --last` in the same folder. After the restart, they sign in as described below and say "Install Polar Sky" again. Do not try to go on without the server.
 
 The first call signs the person in to Polar Sky. If the tools are listed but the server asks for sign-in, tell the person how to start it: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install` in a terminal. Both open Polar Sky's sign-in page in the browser. Only an administrator of the organization can use these tools. If the answer says the person is not an administrator, or no organization is set up for their company domain, stop: tell them to contact their Polar Sky contact.
 

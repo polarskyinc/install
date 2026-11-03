@@ -20,7 +20,7 @@ If a person asked you to install Polar Sky from this repository, start a convers
 
    Polar Sky supports Claude Code and Codex. In another agent, tell the person that Polar Sky does not support it yet, and stop.
 2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
-3. **Start.** Tell the person that they may need to restart you before the MCP server loads, and how. Then start phase 1 of the skill.
+3. **Start.** In Claude Code, the person first types `/mcp`: if `polar-sky-install` is listed, they choose it and **Authenticate**, and the tools load without a restart. Otherwise, or in Codex, tell the person that they need to restart you before the MCP server loads, and how. Then start phase 1 of the skill.
 
 The skill's hard rules apply from the first command. Read them in the "Hard rules" section of `SKILL.md` before you run anything.
 
@@ -52,7 +52,7 @@ The whole install usually takes one to two hours, most of it waiting for the clu
 
 ## Install
 
-Run two commands in a terminal, then restart your agent.
+Run two commands in a terminal. If your agent was already running and `/mcp` does not list the server, restart it. Restart Codex in any case.
 
 First, connect your agent to the Polar Sky Install server. In Claude Code:
 

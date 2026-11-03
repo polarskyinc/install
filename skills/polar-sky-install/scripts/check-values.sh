@@ -51,10 +51,10 @@ if [ -n "${POLAR_SKY_INFRA_PROFILE:-}" ]; then
   show POLAR_SKY_INFRA_PROFILE "${POLAR_SKY_INFRA_PROFILE}"
   case "${POLAR_SKY_INFRA_PROFILE}" in
     gke | eks | aks) ;;
-    *) problem "POLAR_SKY_INFRA_PROFILE must be gke, eks or aks" ;;
+    *) problem "POLAR_SKY_INFRA_PROFILE must be the setting value gke, eks or aks (for GKE, EKS or AKS)" ;;
   esac
 else
-  show POLAR_SKY_INFRA_PROFILE "<not chosen yet: phase 2 sets it>"
+  show POLAR_SKY_INFRA_PROFILE "<not chosen yet: the plan sets it>"
 fi
 
 if require POLAR_SKY_CHART_VERSION; then
@@ -106,11 +106,19 @@ if [ -n "${CLUSTER_KUBERNETES_VERSION:-}" ]; then
     problem "CLUSTER_KUBERNETES_VERSION must be a minor version such as 1.35, without a patch number"
 fi
 
-if [ -n "${GOOGLE_WORKSPACE_ADMIN_EMAIL:-}" ]; then
-  show GOOGLE_WORKSPACE_ADMIN_EMAIL "${GOOGLE_WORKSPACE_ADMIN_EMAIL}"
-  printf '%s' "${GOOGLE_WORKSPACE_ADMIN_EMAIL}" | grep -Eq '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' ||
-    problem "GOOGLE_WORKSPACE_ADMIN_EMAIL is not a plain email address"
+if [ -n "${CLUSTER_GPU_ZONES:-}" ]; then
+  show CLUSTER_GPU_ZONES "${CLUSTER_GPU_ZONES}"
+  printf '%s' "${CLUSTER_GPU_ZONES}" | grep -Eq '^\["[a-z0-9-]+"(,"[a-z0-9-]+")*\]$' ||
+    problem 'CLUSTER_GPU_ZONES must be a list of zones such as ["us-central1-a","us-central1-b"]'
 fi
+
+for name in GOOGLE_WORKSPACE_ADMIN_EMAIL GOOGLE_CLOUD_ACCOUNT; do
+  value="${!name:-}"
+  [ -n "${value}" ] || continue
+  show "${name}" "${value}"
+  printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' ||
+    problem "${name} is not a plain email address"
+done
 
 if [ "${problems}" -eq 0 ]; then
   printf 'VALUES OK\n'

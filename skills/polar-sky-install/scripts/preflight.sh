@@ -36,31 +36,34 @@ finish() {
 }
 
 if [ -z "${namespace}" ] || [ -z "${profile}" ]; then
-  printf 'Load values.env first: POLAR_SKY_NAMESPACE and POLAR_SKY_INFRA_PROFILE (from phase 2) must be set.\n'
+  printf 'Load values.env first: POLAR_SKY_NAMESPACE and POLAR_SKY_INFRA_PROFILE (the platform setting value gke, eks or aks) must be set.\n'
   exit 2
 fi
 
 case "${profile}" in
   gke)
+    platform="GKE"
     gpu_selector="cloud.google.com/gke-accelerator=nvidia-l4"
     gpu_taint="nvidia.com/gpu=*:NoSchedule"
     storage_class=""
     model_host="storage.googleapis.com"
     ;;
   eks)
+    platform="EKS"
     gpu_selector="workload-type=gpu,gpu-type=t4"
     gpu_taint="nvidia.com/gpu=*:NoSchedule"
     storage_class="efs-polarsky-retain"
     model_host="huggingface.co"
     ;;
   aks)
+    platform="AKS"
     gpu_selector="accelerator=nvidia"
     gpu_taint="sku=gpu:NoSchedule"
     storage_class="premium-azurefile-retain"
     model_host="huggingface.co"
     ;;
   *)
-    printf 'POLAR_SKY_INFRA_PROFILE must be gke, eks or aks.\n'
+    printf 'POLAR_SKY_INFRA_PROFILE must be the setting value gke, eks or aks (for GKE, EKS or AKS).\n'
     exit 2
     ;;
 esac
@@ -128,13 +131,13 @@ check_gpu_nodes() {
     esac
     case ";${taints}" in
       *";"${gpu_taint}";"*) ;;
-      *) fail "GPU node ${name} lacks the taint ${gpu_taint}" "add the taint to the GPU pool, as the ${profile} profile needs" ;;
+      *) fail "GPU node ${name} lacks the taint ${gpu_taint}" "add the taint to the GPU pool, as Polar Sky needs on ${platform}" ;;
     esac
   done <<EOF
 ${gpu_nodes}
 EOF
   if [ "${count}" -eq 0 ]; then
-    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero; check the pool's settings as cluster.md says. Otherwise label the GPU nodes as the ${profile} profile needs"
+    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type, label and taint, and can grow to at least 4 nodes. Otherwise label the GPU nodes as Polar Sky needs on ${platform}"
   elif [ "${total}" -lt 4 ]; then
     warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs 4; fine if the pool can grow to 4"
   else
@@ -144,11 +147,11 @@ EOF
 
 check_storage_class() {
   if [ -z "${storage_class}" ]; then
-    pass "no StorageClass needed for the ${profile} profile"
+    pass "no StorageClass needed on ${platform}"
   elif kubectl get storageclass "${storage_class}" >/dev/null 2>&1; then
     pass "StorageClass ${storage_class} exists"
   else
-    fail "StorageClass ${storage_class} is missing" "create it as the ${profile} profile needs (the EKS and AKS recipes create it); it must support ReadWriteMany"
+    fail "StorageClass ${storage_class} is missing" "create it as Polar Sky needs on ${platform} (Polar Sky's EKS and AKS recipes create it); it must support ReadWriteMany"
   fi
 }
 
@@ -181,7 +184,7 @@ check_gitops() {
   flux_namespaces="$(kubectl get deployments --all-namespaces --field-selector metadata.name=helm-controller -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' 2>/dev/null | sort -u)"
   other="$(printf '%s\n' "${flux_namespaces}" | grep -v -x -e "${namespace}" -e '' | tr '\n' ' ')"
   if [ -n "${other}" ]; then
-    warn "Flux already runs in this cluster (namespace ${other% })" "a second Flux in ${namespace} must not share custom resource definitions of another version with it; agree the install path with Polar Sky before phase 6"
+    warn "Flux already runs in this cluster (namespace ${other% })" "a second Flux in ${namespace} must not share custom resource definitions of another version with it; agree the install path with Polar Sky before the engine is installed"
   elif [ -n "${flux_namespaces}" ]; then
     pass "Flux runs only in ${namespace}, from an earlier Polar Sky install"
   else
@@ -189,7 +192,7 @@ check_gitops() {
   fi
   argo="$(kubectl get customresourcedefinitions applications.argoproj.io -o name 2>/dev/null)"
   if [ -n "${argo}" ]; then
-    warn "Argo CD is installed in this cluster" "make sure no Argo CD Application manages ${namespace} or Flux's resources; Argo CD would undo what Flux deploys. Agree the install path with Polar Sky before phase 6"
+    warn "Argo CD is installed in this cluster" "make sure no Argo CD Application manages ${namespace} or Flux's resources; Argo CD would undo what Flux deploys. Agree the install path with Polar Sky before the engine is installed"
   else
     pass "no Argo CD in the cluster"
   fi
@@ -298,7 +301,7 @@ check_egress() {
   ca_pem="$(awk '{printf "%s\\n", $0}' "$(dirname "$0")/polar-sky-ca.crt")"
   hosts="${connect_host} us-docker.pkg.dev fluxcd-community.github.io ghcr.io registry-1.docker.io auth.docker.io oauth2.googleapis.com admin.googleapis.com www.googleapis.com ${model_host}"
   if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
-    fail "namespace ${namespace} does not exist, so egress is not tested" "create the namespace as cluster.md says, then run this again"
+    fail "namespace ${namespace} does not exist, so egress is not tested" "create the namespace (kubectl create namespace ${namespace}), then run this again"
     return
   fi
   kubectl delete pod polar-sky-egress-check --namespace "${namespace}" --ignore-not-found --wait=true --timeout=60s >/dev/null 2>&1
@@ -335,11 +338,11 @@ check_egress() {
   done <<EOF
 ${results}
 EOF
-  warn "redirects to download hosts were not followed" "image and model pulls may be sent on to other download hosts; with a proxy or hostname allowlist, the whole chain must be allowed. Phase 6 shows any pull that still fails"
+  warn "redirects to download hosts were not followed" "image and model pulls may be sent on to other download hosts; with a proxy or hostname allowlist, the whole chain must be allowed. the engine install shows any pull that still fails"
   warn "egress was tested from a CPU node only" "GPU nodes need the same outbound access; if they use another subnet or firewall, check it there too"
 }
 
-printf 'Polar Sky preflight, profile %s, namespace %s\n\n' "${profile}" "${namespace}"
+printf 'Polar Sky preflight for %s (setting value %s), namespace %s\n\n' "${platform}" "${profile}" "${namespace}"
 check_cluster
 check_nodes
 check_gpu_nodes

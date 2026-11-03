@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the tools, cloud accounts and Kubernetes context on this machine; reads only and prints no secret.
+# Prints the tools, cloud accounts and Kubernetes context on this machine; reads only, and tests sign-ins by exit status so no token is printed.
 set -u
 
 line() { printf '%-22s %s\n' "$1" "$2"; }
@@ -15,6 +15,13 @@ if have gcloud; then
   project="$(gcloud config get-value project 2>/dev/null | first_line)"
   line "gcloud account" "${account:-not signed in}"
   line "gcloud project" "${project:-none set}"
+  if [ -n "${account}" ]; then
+    if gcloud auth print-access-token </dev/null >/dev/null 2>&1; then
+      line "gcloud sign-in" "works"
+    else
+      line "gcloud sign-in" "expired or refused"
+    fi
+  fi
   if gcloud auth application-default print-access-token >/dev/null 2>&1; then
     line "gcloud ADC" "works"
   else
@@ -34,6 +41,13 @@ fi
 if have az; then
   subscription="$(az account show --query '[name, user.name]' -o tsv 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')"
   line "az subscription" "${subscription:-not signed in}"
+  if [ -n "${subscription}" ]; then
+    if az account get-access-token </dev/null >/dev/null 2>&1; then
+      line "az sign-in" "works"
+    else
+      line "az sign-in" "expired or refused"
+    fi
+  fi
 else
   line "az" "not found"
 fi

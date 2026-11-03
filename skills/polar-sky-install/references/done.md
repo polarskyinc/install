@@ -2,7 +2,11 @@
 
 **Tell the person:** After Polar Sky staff finish the last checks below, Polar Sky works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
-First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes. If a model pod is still not ready, say: "Everything is set up except the AI models, which are not running yet. Polar Sky cannot process documents until they do." Name the cause from phase 6, report it with `report_issue`, and give the summary below with that line at the top.
+First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes.
+
+If model pods still wait for GPU capacity, do not call the install complete. Say instead: "Everything is set up except the AI models, which are waiting for a free GPU machine in your cloud. They start on their own when one is free. Meanwhile the engine and Google Workspace are connected, and Polar Sky finds your files and who can open them, but it cannot judge how sensitive they are until the models run." Give the summary below with that line at the top, and offer to check the models again later.
+
+If a model pod is not ready for another reason, say: "Everything is set up except the AI models, which are not running yet. Polar Sky cannot process documents until they do." Name the cause from phase 6, report it with `report_issue`, and give the summary below with that line at the top.
 
 Give the person a short summary, with real values:
 

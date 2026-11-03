@@ -110,6 +110,8 @@ Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_in
 
 ## Wait for the release and the pods
 
+The release does not wait for the AI models. It shows `Ready` once Polar Sky has applied its configuration, even while model pods wait for a GPU node, and the model pods start on their own when one appears. So when the cloud has no GPU capacity yet, the model pods stay `Pending` and the install still succeeds.
+
 Model weights can take 20 minutes to load. Do not wait in silence, and do not stop to wait for the person. Every two or three minutes, check the pods yourself with the pod list below (read only) and tell the person in one line what changed: for example "the workers are ready, 2 of 4 AI models are loading". If nothing changed, say so in a few words. If a pod stays `Pending` for more than a few minutes, look at its events at once (below) rather than waiting for the timeout: a zone without free GPUs shows there. Keep checking on your own until everything is ready or a check below fails. If your agent stops long commands, run this with `--timeout=9m` and repeat it up to three more times while it says it timed out:
 
 ```bash
@@ -127,21 +129,41 @@ kubectl get pods --namespace="${POLAR_SKY_NAMESPACE}" -o custom-columns='POD:.me
 ```
 
 ```bash
-kubectl get nodes -l "<GPU label from the profile table in cluster.md>" -o custom-columns='NODE:.metadata.name,GPUS:.status.allocatable.nvidia\.com/gpu'
+kubectl get nodes -l "<GPU label from the platform table in cluster.md>" -o custom-columns='NODE:.metadata.name,GPUS:.status.allocatable.nvidia\.com/gpu'
 ```
 
 Check, and tell the person each result:
 
 - [ ] The HelmRelease is `Ready`.
-- [ ] Every worker, AI Gateway and model-serving pod is ready.
-- [ ] Every pod that asks for an NVIDIA GPU runs on a node in the GPU node list.
+- [ ] Every worker and AI Gateway pod is ready.
+- [ ] Every model-serving pod is ready on a node in the GPU node list, or `Pending` only because no GPU node is free yet (below).
 
-If something is not ready, show the person the pod's events (read only, no secrets):
+If a worker or the AI Gateway is not ready, or a model pod fails for any other reason than GPU capacity, show the person the pod's events (read only, no secrets):
 
 ```bash
 kubectl describe pod <pod name> --namespace="${POLAR_SKY_NAMESPACE}"
 ```
 
-Name the cause you see (for example, an image it cannot pull, or no GPU node to schedule on) and stop. Do not change Polar Sky resources to work around it. If a GPU pod waits for a node on GKE, run the instance group check from phase 3 ([GPU pool at zero](cluster.md#gpu-pool-at-zero)).
+Name the cause you see (for example, an image it cannot pull) and stop. Do not change Polar Sky resources to work around it.
 
-If the person chooses to go on while model pods are not ready, you may do phases 7 and 8. Tell them clearly: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot process documents until the AI models run." Never call the install done or working while a model pod is not ready.
+## Model pods waiting for GPU capacity
+
+Look at a `Pending` model pod's events with `kubectl describe pod` (above). When they say the pod needs a GPU node that is not there, for example `FailedScheduling` with `Insufficient nvidia.com/gpu`, or that the cluster could not add one (`FailedScaleUp`, "out of resources"), and the GPU pool can still grow (it autoscales and is below its maximum, as the pool check in phase 3 shows), no GPU node is free yet. If the pool cannot grow, for example an existing cluster without GPU autoscaling or a pool at its maximum, the models will not start on their own: that is a failure, so name it and stop. Any other reason, such as an unbound PersistentVolumeClaim or an image it cannot pull, is a failure: name it and stop, as above. A GPU shortage does not stop the install: go on with phases 7 and 8. While the models wait, the workers run and connect to Polar Sky Cloud, and Polar Sky finds the files and who can open them. Judging how sensitive each file is waits for the models. Tell the person this plainly: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot judge how sensitive files are until the AI models run. They start on their own when a GPU machine is free."
+
+Report the shortage once with `report_issue`, outcome `worked_around`. On GKE, run the instance group check from phase 3 ([GPU pool at zero](cluster.md#gpu-pool-at-zero)), and see [When GPU nodes cannot start](cluster.md#when-gpu-nodes-cannot-start). Keep checking the model pods while you go on, and tell the person when they start. Never call the install done or working while a model pod is not ready (phase 9).
+
+## A stalled release
+
+A cluster installed with an older chart can end with the release stalled: the HelmRelease shows `Stalled=True` with the reason `MissingRollbackTarget`, and `Ready=False`. Flux does not retry a stalled release on its own. The workers keep running, but updates stop. Check (read only):
+
+```bash
+kubectl get helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{"\n"}{end}'
+```
+
+The fix is in the chart's README, in the section "Recover a stalled release". Read it from the chart itself (read only):
+
+```bash
+helm show readme oci://us-docker.pkg.dev/polar-sky-public/charts/polar-sky-onprem --version "${POLAR_SKY_CHART_VERSION}"
+```
+
+It patches the HelmRelease so the release no longer waits for pods and retries on failure, without remediation, then asks Flux to reconcile and reset its failure count. Offer it to the person, and show its commands with `"${POLAR_SKY_NAMESPACE}"` as the namespace. It changes a Polar Sky resource, so it needs its own yes. Do not wait for auto-update instead: a new chart revision can clear a stall by itself, but its first upgrade still runs under the old settings and waits 20 minutes again while model pods are `Pending`.

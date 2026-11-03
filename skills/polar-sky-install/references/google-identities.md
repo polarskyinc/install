@@ -9,7 +9,7 @@ Polar Sky reads Google Workspace through two Google service accounts in the cust
 | `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster |
 | `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 8, then deleted |
 
-Use the gcloud account and project the person confirmed in the install plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs.
+Use the gcloud account and project the person confirmed in the install plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
 
 This stage needs only the project, not the cluster, so start it as soon as the plan is agreed, before or during the cluster build. Its plan: turn on two APIs, create the two service accounts and their key files, then prepare the super admin's request. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
 
@@ -34,6 +34,8 @@ If `service-accounts create` answers that the account already exists (an earlier
 - If they don't have it, create a new key as below, and tell them the old key stays active until their administrator deletes it.
 
 If a key file is already in the install folder, never create a key over it: check it as above, or ask the person.
+
+If the person does not trust an existing account, or cannot use it, they may choose a new account with another name instead; never delete the old one without its own yes, since something may still use it. Google needs 6 to 30 characters: lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. Check the name before you run anything. Then use it in place of `polar-sky-on-prem-dpe` or `polar-sky-cloud-integration` in every command and `values.env` line below, so the account email becomes `<new name>@<project>.iam.gserviceaccount.com`. Later steps read the emails from `values.env`, so nothing after this stage changes. Report it with `report_issue`, outcome `worked_around`.
 
 ## On-premises service account and its key
 
