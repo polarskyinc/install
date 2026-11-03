@@ -11,7 +11,7 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "GCP zone for the zonal GKE cluster (must offer G2 machine types with NVIDIA L4)"
+  description = "GCP zone for the zonal GKE cluster, its control plane and the system node pool"
   type        = string
   default     = "us-central1-a"
 }
@@ -28,8 +28,19 @@ variable "cluster_name" {
 }
 
 # GPU Node Pool Configuration
+variable "gpu_zones" {
+  description = "Zones for the GPU node pool, all in the region and all offering NVIDIA L4 (list them with gcloud compute accelerator-types list). Empty keeps the pool in the zone variable only. The autoscaler places nodes in whichever listed zone has capacity."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.gpu_zones) == length(distinct(var.gpu_zones))
+    error_message = "gpu_zones must not list a zone twice"
+  }
+}
+
 variable "gpu_node_min_count" {
-  description = "Minimum number of GPU nodes in the autoscaling pool (0 for cost savings)"
+  description = "Minimum number of GPU nodes in the autoscaling pool, counted across all GPU zones (0 for cost savings)"
   type        = number
   default     = 0
 
@@ -40,7 +51,7 @@ variable "gpu_node_min_count" {
 }
 
 variable "gpu_node_max_count" {
-  description = "Maximum number of GPU nodes in the autoscaling pool"
+  description = "Maximum number of GPU nodes in the autoscaling pool, counted across all GPU zones"
   type        = number
   default     = 6
 

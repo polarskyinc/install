@@ -2,13 +2,18 @@
 #
 # Creates a zonal VPC-native GKE cluster with:
 # - System node pool: e2-standard-4 (4 vCPU, 16 GiB) - on-demand, autoscaling 3-6
-# - GPU node pool: g2-standard-8 (1x NVIDIA L4) - spot (default), autoscaling
+# - GPU node pool: g2-standard-8 (1x NVIDIA L4) - spot (default), autoscaling,
+#   spread across var.gpu_zones so a stockout in one zone does not block it
 #
 # GKE manages the cluster autoscaler, NVIDIA drivers, and device plugin
 # natively, so no Helm-deployed add-ons are required.
 # GPU nodes are automatically labeled cloud.google.com/gke-accelerator=nvidia-l4;
 # the matching nvidia.com/gpu=present:NoSchedule taint is declared explicitly
 # on the GPU pool rather than relying on GKE's auto-taint.
+
+locals {
+  gpu_zones = length(var.gpu_zones) > 0 ? var.gpu_zones : [var.zone]
+}
 
 resource "google_container_cluster" "polar_sky" {
   name     = var.cluster_name
@@ -59,6 +64,8 @@ resource "google_container_node_pool" "system" {
   cluster  = google_container_cluster.polar_sky.name
   location = var.zone
 
+  node_locations = [var.zone]
+
   depends_on = [google_project_iam_member.gke_node]
 
   initial_node_count = 3
@@ -88,13 +95,26 @@ resource "google_container_node_pool" "gpu" {
   cluster  = google_container_cluster.polar_sky.name
   location = var.zone
 
+  node_locations = local.gpu_zones
+
   depends_on = [google_project_iam_member.gke_node]
 
-  initial_node_count = var.gpu_node_min_count
+  # Per zone and ForceNew, so it is ignored on live pools; with several zones it starts at zero so the autoscaler picks the zones that have capacity.
+  initial_node_count = length(local.gpu_zones) > 1 ? 0 : var.gpu_node_min_count
 
   autoscaling {
-    min_node_count = var.gpu_node_min_count
-    max_node_count = var.gpu_node_max_count
+    total_min_node_count = var.gpu_node_min_count
+    total_max_node_count = var.gpu_node_max_count
+    location_policy      = "ANY"
+  }
+
+  lifecycle {
+    ignore_changes = [initial_node_count]
+
+    precondition {
+      condition     = alltrue([for gpu_zone in local.gpu_zones : startswith(gpu_zone, "${var.region}-")])
+      error_message = "every gpu_zones entry must be inside region (e.g. region us-central1 with zone us-central1-b)"
+    }
   }
 
   management {
