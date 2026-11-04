@@ -2,7 +2,7 @@
 
 ## Open the install
 
-Before your first command, tell the person one line: "I'll take a quick look at this machine first; it only reads." Then do the look around below, and give the preview. The install has three steps: the preview, the questions, and the final plan for one approval.
+Before your first command, tell the person one line: "First, I'll look around this machine without changing anything." Say no other line about it. Then do the look around below, and give the preview. The install has three steps: the preview, the questions, and the final plan for one approval.
 
 ## Check the MCP server
 
@@ -52,9 +52,9 @@ Later in the install, if a command fails the same way, or cannot write to `~/pol
 
 ## Look around
 
-**Tell the person:** Polar Sky first checks what is already here, so the preview fits this organization. Nothing is changed.
+Look around so the preview fits this organization. Everything here only reads. Do not tell the person about it again: the opening line already did.
 
-Call `get_install_values` with no `deployment_model`. It only reads. It answers for hybrid, the default, and tells you whether the organization already has an engine, in `has_engine`. Write no value from this answer yet.
+Call `get_install_values` with no `deployment_model`. It only reads. It answers for On-Prem, the default, and tells you whether the organization already has an engine, in `has_engine`. Write no value from this answer yet.
 
 Run the detection script with no argument. It only reads, and prints the tools and sign-ins on this machine:
 
@@ -75,10 +75,10 @@ Write one message, in this order. Ask nothing in it except the model question at
    > Polar Sky is a data protection agent. AI assistants can read everything a person can reach, and most people can reach far more than they need. Polar Sky works out who needs to see what, finds overexposed files, and proposes controls your team approves.
 
 2. **The deployment models,** in plain words:
-   - **If `has_engine` is true,** the organization already runs Polar Sky's hybrid deployment, with an engine in its own cluster. Say so, and do not offer Cloud.
+   - **If `has_engine` is true,** the organization already runs Polar Sky's On-Prem deployment, with an engine in its own cluster. Say so, and do not offer Cloud.
    - **If `has_engine` is false,** give both, one plain line each, and do not recommend either one:
      - **Cloud:** Polar Sky Cloud reads file content, and nothing runs in your cloud.
-     - **hybrid:** an engine in your own Kubernetes cluster reads file content, so Polar Sky Cloud never sees it. It needs a Kubernetes cluster with GPUs.
+     - **On-Prem:** an engine in your own Kubernetes cluster reads file content, so Polar Sky Cloud never sees it. It needs a Kubernetes cluster with GPUs.
 
 3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes, and an Okta super admin if the company manages its groups in Okta. In both models, Okta adds one step, before connecting Google Workspace: Polar Sky connects to Okta through an Okta app whose key only Polar Sky holds, so it can create the groups for approved controls there.
 
@@ -91,7 +91,7 @@ Write one message, in this order. Ask nothing in it except the model question at
    | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
 
-   Hybrid:
+   On-Prem:
 
    | Step | Usually takes |
    | --- | --- |
@@ -102,13 +102,13 @@ Write one message, in this order. Ask nothing in it except the model question at
    | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
 
-   In Cloud, the super admin's approval is the longest wait. In hybrid, the service accounts and the cluster can be set up at the same time, so the approval does not hold up the rest.
+   In Cloud, the super admin's approval is the longest wait. In On-Prem, the service accounts and the cluster can be set up at the same time, so the approval does not hold up the rest.
 
-4. **The model question, as the last line.** If `has_engine` is false, end with: "Which deployment does your organization want?" If it is true, end with: "Shall I go ahead with the hybrid install?"
+4. **The model question, as the last line.** If `has_engine` is false, end with: "Which deployment does your organization want: Cloud or On-Prem?" If it is true, end with: "Shall I go ahead with the On-Prem install?"
 
 The preview sets expectations only. It is not the plan and needs no approval.
 
-When the answer comes: if `has_engine` is true and the person wants Cloud, tell them: "Moving an organization that has an engine to Cloud is not part of this install, so I cannot do it here. I will tell Polar Sky, so they can help." Then call `report_issue`, as in [Report issues](../SKILL.md#report-issues), and stop. Otherwise record the model the person names, `cloud` or `hybrid`. Then make the install folder and get the install values for that model, as below. These steps only create files and read values, so they run without a yes. After them, go on to the questions in [Look up what the model needs](discover.md).
+When the answer comes: if `has_engine` is true and the person wants Cloud, tell them: "Moving an organization that has an engine to Cloud is not part of this install, so I cannot do it here. I will tell Polar Sky, so they can help." Then call `report_issue`, as in [Report issues](../SKILL.md#report-issues), and stop. Otherwise record the model the person names, `cloud` for Cloud or `on_prem` for On-Prem. Then make the install folder and get the install values for that model, as below. These steps only create files and read values, so they run without a yes. After them, go on to the questions in [Look up what the model needs](discover.md).
 
 ## Make the install folder
 
@@ -122,23 +122,23 @@ If the last line names a Git repository, stop: ask the person for another folder
 
 ## Get the install values
 
-Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `hybrid`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. Do not write `okta_connected`, `okta_org_url`, `provisioning_mode`, `managed_group_materialization` or `managed_group_prefix` either: they tell you whether Okta is connected and how groups are set up, for the questions and phase 8. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
+Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `on_prem`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. Do not write `okta_connected`, `okta_org_url`, `provisioning_mode`, `managed_group_materialization` or `managed_group_prefix` either: they tell you whether Okta is connected and how groups are set up, for the questions and phase 8. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
 
 | Name | Value from `get_install_values` | Models |
 | --- | --- | --- |
-| `POLAR_SKY_DEPLOYMENT_MODEL` | The model the person chose, `cloud` or `hybrid` | Both |
+| `POLAR_SKY_DEPLOYMENT_MODEL` | The model the person chose, `cloud` or `on_prem` | Both |
 | `POLAR_SKY_ORGANIZATION_ID` | The organization ID | Both |
 | `POLAR_SKY_ORGANIZATION_NAME` | The organization name | Both |
 | `POLAR_SKY_CONSOLE_URL` | The Polar Sky console address | Both |
 | `POLAR_SKY_CLOUD_SCOPES` | The delegation scopes for the cloud service account, as one comma-separated line. In Cloud, this is the `cloud_scopes` answer | Both |
-| `POLAR_SKY_CHART_VERSION` | The Polar Sky chart version | Hybrid |
-| `POLAR_SKY_RELEASE_CHANNEL` | The release channel, `latest` | Hybrid |
-| `POLAR_SKY_HOST` | The Polar Sky Cloud endpoint the engine connects to | Hybrid |
-| `POLAR_SKY_ON_PREM_SCOPES` | The delegation scopes for the on-premises service account, as one comma-separated line | Hybrid |
+| `POLAR_SKY_CHART_VERSION` | The Polar Sky chart version | On-Prem |
+| `POLAR_SKY_RELEASE_CHANNEL` | The release channel, `latest` | On-Prem |
+| `POLAR_SKY_HOST` | The Polar Sky Cloud endpoint the engine connects to | On-Prem |
+| `POLAR_SKY_ON_PREM_SCOPES` | The delegation scopes for the on-premises service account, as one comma-separated line | On-Prem |
 
 A Cloud answer has no chart, host or on-premises values, so write none of them.
 
-In hybrid, also add this line, which is the same for every hybrid install:
+In On-Prem, also add this line, which is the same for every On-Prem install:
 
 ```bash
 export POLAR_SKY_NAMESPACE='polar-sky-on-prem'
@@ -156,4 +156,4 @@ Write the file with your file tool, not with `echo`. Then check it. The script o
 
 `<skill folder>` is the folder this `SKILL.md` is in. When you show a command, put the real path in place of `<skill folder>`, so the person sees exactly what runs. If the script reports a problem, show it to the person and stop: a missing or wrong value comes from Polar Sky, so they contact their Polar Sky contact.
 
-Tell the person which organization they are signed in to, by name, for example "You are signed in to Polar Sky as **Acme Corp**." They confirm it with the final plan in phase 2. Do not mention the values file or the check. In hybrid, the deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.
+Tell the person which organization they are signed in to, by name, for example "You are signed in to Polar Sky as **Acme Corp**." They confirm it with the final plan in phase 2. Do not mention the values file or the check. In On-Prem, the deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.

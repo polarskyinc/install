@@ -29,11 +29,11 @@ The skill's hard rules apply from the first command. Read them in the "Hard rule
 Polar Sky finds files that too many people can open, and proposes controls your team approves. You choose one of two deployments when the install starts:
 
 - **Cloud.** Polar Sky Cloud reads your files' content, and nothing runs in your cloud. This install sets up one Google service account in your Google Cloud project, its delegation entry, and the connection to Google Workspace. There is no cluster to build.
-- **Hybrid.** An engine in your own cloud reads your files' content, so Polar Sky Cloud never sees it. This install sets up a Kubernetes cluster with GPU nodes (on GKE, EKS or AKS), the engine certificate, the engine, two Google service accounts (one for the engine and one for Polar Sky Cloud), and the connection to Google Workspace. The agent can build a new cluster from Polar Sky's recipe, or use one you have.
+- **On-Prem.** An engine in your own cloud reads your files' content, so Polar Sky Cloud never sees it. This install sets up a Kubernetes cluster with GPU nodes (on GKE, EKS or AKS), the engine certificate, the engine, two Google service accounts (one for the engine and one for Polar Sky Cloud), and the connection to Google Workspace. The agent can build a new cluster from Polar Sky's recipe, or use one you have.
 
 In both, a Google Workspace super admin approves what each service account may do, and no one's password is used. At the end, you choose in the Polar Sky console which drives Polar Sky monitors.
 
-If your organization already has an engine, its install is hybrid, and the agent says so.
+If your organization already has an engine, its install is On-Prem, and the agent says so.
 
 ## What you need
 
@@ -44,7 +44,7 @@ For a Cloud install:
 - `gcloud`, signed in to a Google Cloud project you can use
 - A Google Workspace super admin, for a few minutes, to add the delegation entry
 
-For a hybrid install, in addition to the above:
+For an On-Prem install, in addition to the above:
 
 - `kubectl`, Helm 3 or 4, and OpenSSL
 - Terraform or OpenTofu 1.6 or later, for a new cluster
@@ -54,13 +54,13 @@ For a hybrid install, in addition to the above:
 
 A Cloud install is much shorter. It has no cluster to build and no AI models to load, so most of its time is the super admin's approval.
 
-A hybrid install usually takes one to two hours, most of it waiting for the cluster and the AI models.
+An On-Prem install usually takes one to two hours, most of it waiting for the cluster and the AI models.
 
 1. The agent signs you in to Polar Sky and looks at your machine and your cloud. It only reads.
 2. It asks which deployment you want, then asks any open questions in one message.
 3. It shows you one final plan: what it found, what it will create, and how long each step takes. You check it and say yes, or change it.
-4. It works step by step. Before each step it shows you that step's plan, such as the cluster plan in a hybrid install, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, and before it uploads the cloud service account key.
-5. In a hybrid install, slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin.
+4. It works step by step. Before each step it shows you that step's plan, such as the cluster plan in an On-Prem install, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, and before it uploads the cloud service account key.
+5. In an On-Prem install, slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin.
 
 ## Install
 
@@ -88,7 +88,7 @@ Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-instal
 
 ## Use
 
-Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar Sky, reading your organization's install values and looking at your machine. Then it asks whether you want a Cloud or a hybrid deployment.
+Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar Sky, reading your organization's install values and looking at your machine. Then it asks whether you want a Cloud or an On-Prem deployment.
 
 The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
 

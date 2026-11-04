@@ -2,7 +2,7 @@
 
 **Tell the person:** When the team approves a control, Polar Sky creates the group for it and keeps its members right. Connecting Okta lets Polar Sky do this in their Okta org, through an Okta app whose key only Polar Sky holds.
 
-Run this stage only when the install plan has it: the organization manages its groups in Okta. It is the same in Cloud and hybrid, and needs only the install values, so it can run early: in Cloud while the super admin approves the Polar Sky Cloud entry, in hybrid while the cluster builds. It must be done before connecting Google Workspace (phase 9): the key upload there tests the group scope with the organization's final group settings.
+Run this stage only when the install plan has it: the organization manages its groups in Okta. It is the same in Cloud and On-Prem, and needs only the install values, so it can run early: in Cloud while the super admin approves the Polar Sky Cloud entry, in On-Prem while the cluster builds. It must be done before connecting Google Workspace (phase 9): the key upload there tests the group scope with the organization's final group settings.
 
 If the super admin's request from phase 4 went out before this stage, call `get_install_values` again, with the same `deployment_model`, when this stage is done. If `needed_now` of `admin.directory.group` changed, tell the person in one line what its `needed_now_reason` now says. The scope is already on Polar Sky Cloud's line, so the super admin changes nothing.
 

@@ -1,27 +1,27 @@
 ---
 name: polar-sky-install
-description: Install Polar Sky for a customer, as a Cloud deployment (Google Workspace connected to Polar Sky Cloud) or a hybrid deployment (adds a Kubernetes cluster, the engine certificate and the Polar Sky Document Processing Engine in the customer's own cloud), and in either one the Okta connection when groups live in Okta, using the Polar Sky Install MCP server and the person's own tools (gcloud, and for hybrid kubectl, Helm, Terraform or OpenTofu, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
+description: Install Polar Sky for a customer, as a Cloud deployment (Google Workspace connected to Polar Sky Cloud) or an On-Prem deployment (adds a Kubernetes cluster, the engine certificate and the Polar Sky Document Processing Engine in the customer's own cloud), and in either one the Okta connection when groups live in Okta, using the Polar Sky Install MCP server and the person's own tools (gcloud, and for On-Prem kubectl, Helm, Terraform or OpenTofu, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
 ---
 
 # Polar Sky install
 
 This skill installs Polar Sky for one customer organization. It works on the person's own machine, with their own tools and accounts. You own the order of the phases and you run the checks yourself.
 
-The person chooses one of two deployment models when the install begins. In **Cloud**, Google Workspace connects to Polar Sky Cloud, and nothing runs in the customer's cloud. In **hybrid**, an engine in the customer's own Kubernetes cluster reads file content as well, so the install also builds or uses that cluster and installs the engine. The choice is saved in `values.env` as `POLAR_SKY_DEPLOYMENT_MODEL`. Phases marked hybrid only do not run in Cloud.
+The person chooses one of two deployment models when the install begins. In **Cloud**, Google Workspace connects to Polar Sky Cloud, and nothing runs in the customer's cloud. In **On-Prem**, an engine in the customer's own Kubernetes cluster reads file content as well, so the install also builds or uses that cluster and installs the engine. The choice is saved in `values.env` as `POLAR_SKY_DEPLOYMENT_MODEL`. Phases marked On-Prem only do not run in Cloud.
 
 The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly seven tools:
 
 | Tool | What it does |
 | --- | --- |
-| `get_install_values` | Returns this organization's install values for the chosen deployment model (`deployment_model`, which defaults to `hybrid`), and whether the organization already has an engine (`has_engine`). Read only. |
-| `request_certificate` | Hybrid only. Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
-| `check_engine_connection` | Hybrid only. Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
+| `get_install_values` | Returns this organization's install values for the chosen deployment model (`deployment_model`, which defaults to `on_prem`), and whether the organization already has an engine (`has_engine`). Read only. |
+| `request_certificate` | On-Prem only. Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
+| `check_engine_connection` | On-Prem only. Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
 | `start_key_upload` | Takes the Workspace admin email and the deployment model, and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
 | `start_okta_connection` | Both models, only when groups live in Okta. Makes the key for the Okta app that lets Polar Sky manage groups, and returns only its public key. Polar Sky keeps the private key, for one hour. |
 | `finish_okta_connection` | Both models, only when groups live in Okta. Takes the Okta org URL, the app's client ID and the key ID. Polar Sky signs in to Okta as the app, reads its groups and, when that works, saves the Okta connection and the group settings. |
 | `report_issue` | Sends Polar Sky a short note about a problem in this install, so they can fix it. See [Report issues](#report-issues). |
 
-Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and, for hybrid, at the cluster (see [Continue an install](#continue-an-install)).
+Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and, for On-Prem, at the cluster (see [Continue an install](#continue-an-install)).
 
 ## Hard rules
 
@@ -57,6 +57,7 @@ The person is often meeting Polar Sky for the first time, and this install is wh
 - **Set expectations before anything slow.** Before a step that takes more than a minute, say about how long it takes and whether the person can do something else meanwhile. While it runs, check progress yourself and report it.
 - **Check status yourself.** When a tool or a read-only command can answer "is it working?", run it and tell the person. Do not send them to the console to check it.
 - **Keep it short.** One sentence of why, not a paragraph. Plain words, no jargon the person did not use first.
+- **Call the two deployment models Cloud and On-Prem,** with these words and capitals, and by no other name.
 - **Use the names people know:** GKE, EKS, AKS, OpenTofu, Terraform, Kubernetes, Google Workspace, Microsoft 365. When you show a setting value such as `gke`, call it a setting value.
 - **Do not use Polar Sky's internal names.** Never say Nexus, Temporal, task queue, phase or tool names such as `check_engine_connection`. Say what happens instead: "the engine has reached Polar Sky Cloud", "Polar Sky is checking the connection".
 
@@ -97,14 +98,14 @@ All files live in one folder on this machine, by default `~/polar-sky-install`, 
 | --- | --- | --- |
 | `values.env` | No | [Start](references/start.md) and later phases |
 | `cloud-key.json` (deleted after phase 9 uploads it) | **Yes** | [Google identities](references/google-identities.md) |
-| `on-prem-key.json` (hybrid only) | **Yes** | [Google identities](references/google-identities.md) |
-| `client.key` (hybrid only) | **Yes** | [Certificate](references/certificate.md) |
-| `client.csr`, `client.crt`, `ca-chain.crt` (hybrid only) | No | [Certificate](references/certificate.md) |
-| `aws-config` (hybrid only, and only for an `aws login` sign-in) | No | [Cluster](references/cluster.md) |
+| `on-prem-key.json` (On-Prem only) | **Yes** | [Google identities](references/google-identities.md) |
+| `client.key` (On-Prem only) | **Yes** | [Certificate](references/certificate.md) |
+| `client.csr`, `client.crt`, `ca-chain.crt` (On-Prem only) | No | [Certificate](references/certificate.md) |
+| `aws-config` (On-Prem only, and only for an `aws login` sign-in) | No | [Cluster](references/cluster.md) |
 | `okta-admin-header` (only with Okta; deleted at the end of phase 8) | **Yes** | [Okta](references/okta.md) |
 | `okta-public-key.json`, `okta-app-request.json` (only with Okta) | No | [Okta](references/okta.md) |
 
-`values.env` holds only `export NAME='value'` lines with public values. It always holds `POLAR_SKY_DEPLOYMENT_MODEL`, and in hybrid it also holds `HELM_WAIT` from phase 2. For an `aws login` sign-in on EKS, phase 3 adds `AWS_CONFIG_FILE` and `AWS_PROFILE`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
+`values.env` holds only `export NAME='value'` lines with public values. It always holds `POLAR_SKY_DEPLOYMENT_MODEL`, and in On-Prem it also holds `HELM_WAIT` from phase 2. For an `aws login` sign-in on EKS, phase 3 adds `AWS_CONFIG_FILE` and `AWS_PROFILE`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
 
 ## Phases
 
@@ -120,18 +121,18 @@ If an answer raises a new question, ask it before the final plan, never inside i
 | --- | --- | --- | --- |
 | 1 | Start: MCP server, deployment model, install values | Yes | [references/start.md](references/start.md) |
 | 2 | Questions and the final plan: lookups, questions, plan | Yes (gcloud and the project only) | [references/discover.md](references/discover.md) |
-| 3 | Cluster and preflight checks (hybrid only) | No | [references/cluster.md](references/cluster.md) |
+| 3 | Cluster and preflight checks (On-Prem only) | No | [references/cluster.md](references/cluster.md) |
 | 4 | Google identities and delegation | Yes (one account and one entry) | [references/google-identities.md](references/google-identities.md) |
-| 5 | Engine certificate (hybrid only) | No | [references/certificate.md](references/certificate.md) |
-| 6 | Engine install (hybrid only) | No | [references/engine.md](references/engine.md) |
-| 7 | Engine connected to Polar Sky Cloud (hybrid only) | No | [references/connection.md](references/connection.md) |
+| 5 | Engine certificate (On-Prem only) | No | [references/certificate.md](references/certificate.md) |
+| 6 | Engine install (On-Prem only) | No | [references/engine.md](references/engine.md) |
+| 7 | Engine connected to Polar Sky Cloud (On-Prem only) | No | [references/connection.md](references/connection.md) |
 | 8 | Connect Okta, only when the organization manages its groups in Okta | Yes, the same stage | [references/okta.md](references/okta.md) |
 | 9 | Connect Google Workspace and choose locations | Yes | [references/workspace.md](references/workspace.md) |
 | 10 | Done: the summary for the chosen model | Yes (Cloud summary) | [references/done.md](references/done.md) |
 
 After the plan, do not wait idle. The slowest part is the super admin's approval, so start phase 4 early, and work on the next phase whose needs are met while something runs or waits.
 
-In hybrid:
+In On-Prem:
 
 - Phase 4 needs only the confirmed project. Start it before or during the cluster build, so the super admin's request goes out early.
 - Phase 5 needs only the install values; it does not need the cluster.
@@ -143,15 +144,15 @@ In Cloud there is no cluster to build, so phases 4 and 8 are the only work befor
 
 In both models, phase 8 comes before phase 9: the key upload in phase 9 tests the group scope with the group settings phase 8 saves.
 
-Recommend this order to the person with its reason. In hybrid, for example: "The cluster takes 15 to 30 minutes to build. I recommend creating the Google service accounts meanwhile, so your super admin can approve them while we wait." In Cloud: "The super admin's approval is the longest wait, so I recommend creating the Google service account now, so they can approve it while we check the rest."
+Recommend this order to the person with its reason. In On-Prem, for example: "The cluster takes 15 to 30 minutes to build. I recommend creating the Google service accounts meanwhile, so your super admin can approve them while we wait." In Cloud: "The super admin's approval is the longest wait, so I recommend creating the Google service account now, so they can approve it while we check the rest."
 
 ## Continue an install
 
-When the person comes back, run the server and network checks of phase 1 again, then check what is already done. Skip the preview and the model question: the person already chose the model. If the install folder or its `values.env` does not exist, nothing was started: say so, and begin a new install with the preview ([Start](references/start.md)). The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access. For Okta, `get_install_values` answers whether it is connected; do not call `start_okta_connection` only to check.
+When the person comes back, run the server and network checks of phase 1 again, then check what is already done. Skip the preview and the model question: the person already chose the model. If the install folder or its `values.env` does not exist, nothing was started. Tell the person exactly this one line, in place of the opening line in [Start](references/start.md#open-the-install), not added to it: "There's no Polar Sky install on this machine yet, so I'll start one. First, I'll look around without changing anything." Then go straight to the [look around](references/start.md#look-around) and the preview. The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access. For Okta, `get_install_values` answers whether it is connected; do not call `start_okta_connection` only to check.
 
-First read `POLAR_SKY_DEPLOYMENT_MODEL` from `values.env`. `cloud` means a Cloud install, and the Cloud table below applies. `hybrid` means a hybrid install, and the table after it applies. A values file with no such line is hybrid: it was started before the choice existed. Add the line as `export POLAR_SKY_DEPLOYMENT_MODEL='hybrid'` with the file's other lines, and say so to the person.
+First read `POLAR_SKY_DEPLOYMENT_MODEL` from `values.env`. `cloud` means a Cloud install, and the Cloud table below applies. `on_prem` means an On-Prem install, and the table after it applies. An older install may have written `'hybrid'` in that line, or no such line at all: both mean an On-Prem install. Rewrite the line as `export POLAR_SKY_DEPLOYMENT_MODEL='on_prem'`, keeping the file's other lines, and go on with the On-Prem table. Call it an On-Prem install when you talk to the person, and never say "hybrid".
 
-Hybrid install:
+On-Prem install:
 
 | Phase | Done when |
 | --- | --- |
@@ -175,4 +176,4 @@ Cloud install:
 
 Phases 3, 5, 6 and 7 do not apply to a Cloud install. Phase 8 applies to both models when the plan has Okta.
 
-Start from the first phase that is not done; in hybrid, phases 4, 5 and 8 may be done before phase 3. Tell the person what is already set up and what the next steps do, by name, not by number, and confirm the plan for the rest.
+Start from the first phase that is not done; in On-Prem, phases 4, 5 and 8 may be done before phase 3. Tell the person what is already set up and what the next steps do, by name, not by number, and confirm the plan for the rest.

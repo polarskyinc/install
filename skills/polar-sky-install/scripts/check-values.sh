@@ -40,15 +40,23 @@ check_scopes() {
   done
 }
 
-if [ -n "${POLAR_SKY_DEPLOYMENT_MODEL:-}" ]; then
-  show POLAR_SKY_DEPLOYMENT_MODEL "${POLAR_SKY_DEPLOYMENT_MODEL}"
-else
-  show POLAR_SKY_DEPLOYMENT_MODEL "hybrid (no line in values.env)"
-fi
-deployment_model="${POLAR_SKY_DEPLOYMENT_MODEL:-hybrid}"
+deployment_model="${POLAR_SKY_DEPLOYMENT_MODEL:-}"
 case "${deployment_model}" in
-  cloud | hybrid) ;;
-  *) problem "POLAR_SKY_DEPLOYMENT_MODEL must be cloud or hybrid" ;;
+  cloud | on_prem)
+    show POLAR_SKY_DEPLOYMENT_MODEL "${deployment_model}"
+    ;;
+  "")
+    show POLAR_SKY_DEPLOYMENT_MODEL "on_prem (no line in values.env yet)"
+    deployment_model=on_prem
+    ;;
+  hybrid)
+    show POLAR_SKY_DEPLOYMENT_MODEL "on_prem (values.env has an older name for it)"
+    deployment_model=on_prem
+    ;;
+  *)
+    show POLAR_SKY_DEPLOYMENT_MODEL "${deployment_model}"
+    problem "POLAR_SKY_DEPLOYMENT_MODEL must be cloud or on_prem"
+    ;;
 esac
 
 if require POLAR_SKY_ORGANIZATION_ID; then

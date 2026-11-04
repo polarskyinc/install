@@ -2,7 +2,7 @@
 
 **Tell the person:** Polar Sky now works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
-## Hybrid
+## On-Prem
 
 First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes.
 
@@ -34,7 +34,7 @@ Give the person a short summary, with real values:
 
 Polar Sky's team checks the install on its own side, later and without the person.
 
-- **Hybrid:** the workers read Google Workspace and process documents in the chosen locations, local inference and embedding work, and the results show in Polar Sky Cloud.
+- **On-Prem:** the workers read Google Workspace and process documents in the chosen locations, local inference and embedding work, and the results show in Polar Sky Cloud.
 - **Cloud:** Polar Sky Cloud reads Google Workspace in the chosen locations, and the results show in Polar Sky Cloud. No models run in the customer's cloud, so there is no local inference to check.
 
 Tell the person in one line that Polar Sky checks the install on its side and contacts them only if something needs their help. The person has nothing to arrange.
@@ -43,9 +43,9 @@ Tell the person in one line that Polar Sky checks the install on its side and co
 
 Ask the person before deleting anything. Suggest:
 
-- Hybrid: move `on-prem-key.json` and `client.key` to their approved secrets store, or delete them: the cluster already holds them in the `gws-creds` and `polar-sky-mtls` secrets.
-- Keep `values.env` for their records. In hybrid, also keep `client.crt` and the rendered files.
+- On-Prem: move `on-prem-key.json` and `client.key` to their approved secrets store, or delete them: the cluster already holds them in the `gws-creds` and `polar-sky-mtls` secrets.
+- Keep `values.env` for their records. In On-Prem, also keep `client.crt` and the rendered files.
 - With Okta: if `okta-admin-header` is still there, the Okta API token was not cleaned up. Ask the person to revoke the token in Okta (**Security** > **API** > **Tokens**) and delete the file, as in phase 8.
 - Cloud: the key file is already deleted after the upload, so `values.env` is the only file to keep.
 
-Hybrid only: remind them that Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.
+On-Prem only: remind them that Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.

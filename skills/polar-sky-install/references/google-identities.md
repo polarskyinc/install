@@ -1,17 +1,17 @@
 # Phase 4: Google identities and delegation
 
-**Tell the person:** Polar Sky reads files, sharing and permissions through Google service accounts that a Workspace super admin approves. No one's password is used, and each account gets only the access in its delegation entry. A Cloud install needs one account; a hybrid install needs two.
+**Tell the person:** Polar Sky reads files, sharing and permissions through Google service accounts that a Workspace super admin approves. No one's password is used, and each account gets only the access in its delegation entry. A Cloud install needs one account; an On-Prem install needs two.
 
 Polar Sky reads Google Workspace through Google service accounts in the customer's own project (`GOOGLE_CLOUD_PROJECT_ID`):
 
 | Service account | Used by | Key | Models |
 | --- | --- | --- | --- |
 | `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 9, then deleted | Both |
-| `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster | Hybrid only |
+| `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster | On-Prem only |
 
 Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
 
-This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in hybrid. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
+This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in On-Prem. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
 
 ## Enable the APIs
 
@@ -65,7 +65,7 @@ export GOOGLE_CLOUD_SERVICE_ACCOUNT='polar-sky-cloud-integration@<project>.iam.g
 
 ## On-premises service account and its key
 
-Hybrid only. Skip this section in a Cloud install.
+On-Prem only. Skip this section in a Cloud install.
 
 Show both commands, say they create one service account and one key file, and run them:
 
@@ -102,13 +102,13 @@ Get the Polar Sky Cloud account's numeric client ID (read only, public):
 gcloud iam service-accounts describe "${GOOGLE_CLOUD_SERVICE_ACCOUNT}" --format='value(oauth2ClientId)' --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
-Hybrid only, also get the engine account's client ID:
+On-Prem only, also get the engine account's client ID:
 
 ```bash
 gcloud iam service-accounts describe "${GOOGLE_ON_PREM_SERVICE_ACCOUNT}" --format='value(oauth2ClientId)' --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
-Write them into `values.env` as `GOOGLE_CLOUD_CLIENT_ID` and, in hybrid, `GOOGLE_ON_PREM_CLIENT_ID`. Never read a client ID from a key file.
+Write them into `values.env` as `GOOGLE_CLOUD_CLIENT_ID` and, in On-Prem, `GOOGLE_ON_PREM_CLIENT_ID`. Never read a client ID from a key file.
 
 A Google Workspace super admin adds the entries in the Google Admin console. Make a link for each entry that opens the console's "Add a new client ID" dialog with the client ID and scopes already filled in (read only).
 
@@ -118,7 +118,7 @@ Cloud: one link, for Polar Sky Cloud's entry:
 . ~/polar-sky-install/values.env && enc() { printf '%s' "$1" | sed 's/:/%3A/g; s#/#%2F#g; s/,/%2C/g'; } && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_CLOUD_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_CLOUD_SCOPES}")&overwriteClientId=true"
 ```
 
-Hybrid: two links, one for each entry:
+On-Prem: two links, one for each entry:
 
 ```bash
 . ~/polar-sky-install/values.env && enc() { printf '%s' "$1" | sed 's/:/%3A/g; s#/#%2F#g; s/,/%2C/g'; } && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_CLOUD_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_CLOUD_SCOPES}")&overwriteClientId=true" && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_ON_PREM_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_ON_PREM_SCOPES}")&overwriteClientId=true"
@@ -132,7 +132,7 @@ Cloud:
 | --- | --- | --- |
 | Polar Sky Cloud | `GOOGLE_CLOUD_CLIENT_ID` | `POLAR_SKY_CLOUD_SCOPES` |
 
-Hybrid:
+On-Prem:
 
 | Entry | Client ID | Scopes (one line, comma-separated, no spaces) |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ Hybrid:
 Show the real values, not the names. There are no optional scopes: every scope the install uses is on an entry, and each item in the `scopes` list of `get_install_values` says which one in `required_for`.
 
 - **Cloud:** Polar Sky Cloud's entry is the only entry. It holds Polar Sky Cloud's scopes plus `drive.readonly` and `drive`, because Polar Sky Cloud reads file content and applies the access changes the team approves. Give the full line from `POLAR_SKY_CLOUD_SCOPES`, as one line.
-- **Hybrid:** the engine's entry holds the Drive content scopes so that Polar Sky Cloud never needs them. Polar Sky Cloud's entry must not list `drive.readonly` or `drive`.
+- **On-Prem:** the engine's entry holds the Drive content scopes so that Polar Sky Cloud never needs them. Polar Sky Cloud's entry must not list `drive.readonly` or `drive`.
 
 `admin.directory.group` is on Polar Sky Cloud's line, because the Polar Sky Cloud key is what writes groups. It stays on the line even when the organization does not need it today. The `scopes` item for it has `needed_now` and `needed_now_reason`. If `needed_now` is false, say what `needed_now_reason` says, in one plain sentence: "Polar Sky does not use it with your current settings. It is on the line so a later change to group settings needs no second admin visit." If `needed_now` is true, say Polar Sky uses it today. Do not call it optional, and do not drop it from the line.
 
@@ -156,13 +156,13 @@ Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`)
 
 A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: its `purpose` from the `scopes` list of `get_install_values`. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, Polar Sky may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
 
-In hybrid, Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
+In On-Prem, Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
 
 In Cloud, Polar Sky Cloud's entry holds the two content scopes, so Polar Sky Cloud reads file content itself and makes the approved access changes. Nothing runs in the customer's cloud.
 
 ## Send the request and keep going
 
-Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so. In hybrid, recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile." In Cloud, there is nothing else to run, so say that the connection waits for the entry.
+Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so. In On-Prem, recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile." In Cloud, there is nothing else to run, so say that the connection waits for the entry.
 
 If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the links in full and the scope lines from [What each entry lets Polar Sky do](#what-each-entry-lets-polar-sky-do).
 
@@ -193,7 +193,7 @@ Please also make sure <GOOGLE_WORKSPACE_ADMIN_EMAIL> has the Reports admin privi
 Thank you.
 ```
 
-Hybrid:
+On-Prem:
 
 ```text
 Hello,
