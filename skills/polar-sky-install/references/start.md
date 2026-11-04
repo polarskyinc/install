@@ -11,7 +11,7 @@ Then give a short picture of the setup, in a few lines:
 - **The engine runs in your own cloud,** in a Kubernetes cluster with GPU nodes. It reads your files there, with AI models that run in the cluster.
 - **Polar Sky Cloud gets the results,** and reads users, groups and sharing. It never sees the raw content of your files.
 - **Google Workspace connects through two service accounts** in your Google Cloud project, one for the engine and one for Polar Sky Cloud. A Workspace super admin approves their access. No one's password is used.
-- **Who else you may need:** a Workspace super admin, for a few minutes, and sometimes Polar Sky staff, for example to sign the engine's certificate.
+- **Who else you may need:** a Workspace super admin, for a few minutes.
 
 Then show the steps and how long each usually takes, so the person can plan:
 

@@ -1,6 +1,6 @@
 # Phase 9: Done
 
-**Tell the person:** After Polar Sky staff finish the last checks below, Polar Sky works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
+**Tell the person:** Polar Sky now works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
 First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes.
 
@@ -16,12 +16,9 @@ Give the person a short summary, with real values:
 - **Monitoring:** the locations the person chose in the console.
 - **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
-## What Polar Sky staff still do
+## What Polar Sky checks afterwards
 
-- Finish the engine's setup on Polar Sky's side, if not done yet.
-- Run the go-live checks with the person: the workers read Google Workspace and process an agreed test document inside a chosen location, local inference and embedding work, and the results show in Polar Sky Cloud.
-
-Tell the person their Polar Sky contact will arrange these.
+Polar Sky's team checks the install on its own side, later and without the person: the workers read Google Workspace and process documents in the chosen locations, local inference and embedding work, and the results show in Polar Sky Cloud. The person has nothing to arrange. Tell them in one line that Polar Sky checks the install on its side and contacts them only if something needs their help.
 
 ## Clean up the install folder
 
