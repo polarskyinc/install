@@ -1,8 +1,8 @@
-# Phase 8: Connect Google Workspace and choose locations
+# Phase 9: Connect Google Workspace and choose locations
 
 **Tell the person:** Connecting Google Workspace lets Polar Sky see who can open each file, so it can find overexposed files and propose controls. The person then chooses which drives Polar Sky monitors.
 
-Start only when the super admin has added the Polar Sky Cloud delegation entry, and the person says so. In hybrid, also start only when phase 7 saw both workers, and the super admin added both delegation entries (phase 4). In hybrid, the engine lists the shared drives, so a connection made before it runs cannot list them.
+Start only when the super admin has added the Polar Sky Cloud delegation entry, and the person says so. When the plan has Okta, in either model, also start only when phase 8 connected it: the upload tests the group scope with the group settings phase 8 saves. In hybrid, also start only when phase 7 saw both workers, and the super admin added both delegation entries (phase 4). In hybrid, the engine lists the shared drives, so a connection made before it runs cannot list them.
 
 ## Get a one-time upload command
 

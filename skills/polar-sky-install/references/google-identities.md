@@ -6,7 +6,7 @@ Polar Sky reads Google Workspace through Google service accounts in the customer
 
 | Service account | Used by | Key | Models |
 | --- | --- | --- | --- |
-| `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 8, then deleted | Both |
+| `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 9, then deleted | Both |
 | `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster | Hybrid only |
 
 Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
@@ -55,7 +55,7 @@ Google can take a minute before a new service account can get a key. Before each
 for attempt in 1 2 3 4 5 6; do gcloud iam service-accounts describe "<account email>" --project="${GOOGLE_CLOUD_PROJECT_ID}" --format='value(email)' && break; sleep 10; done
 ```
 
-The key goes straight into `cloud-key.json`. Never open, print or send this file, and never pass it to a tool or the chat. In phase 8 it goes to Polar Sky once, uploaded with the one-time `curl` command from `start_key_upload`, and then you delete it. If Google refuses to create the key because of an organization policy (`iam.disableServiceAccountKeyCreation`), stop. Tell the person their organization blocks service account keys, and that their Google Cloud administrator must allow a key for this service account, or they contact Polar Sky.
+The key goes straight into `cloud-key.json`. Never open, print or send this file, and never pass it to a tool or the chat. In phase 9 it goes to Polar Sky once, uploaded with the one-time `curl` command from `start_key_upload`, and then you delete it. If Google refuses to create the key because of an organization policy (`iam.disableServiceAccountKeyCreation`), stop. Tell the person their organization blocks service account keys, and that their Google Cloud administrator must allow a key for this service account, or they contact Polar Sky.
 
 Add to `values.env`:
 

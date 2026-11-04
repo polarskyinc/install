@@ -6,7 +6,7 @@ Before your first command, tell the person one line: "I'll take a quick look at 
 
 ## Check the MCP server
 
-Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `check_engine_connection`, `start_key_upload` and `report_issue`. If any of them is missing, the server is not connected. Find out why before you give the person anything to run. In Claude Code, `claude mcp list` (read only) shows each registered server and its state.
+Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `check_engine_connection`, `start_key_upload`, `start_okta_connection`, `finish_okta_connection` and `report_issue`. If any of them is missing, the server is not connected. Find out why before you give the person anything to run. In Claude Code, `claude mcp list` (read only) shows each registered server and its state.
 
 If it lists `polar-sky-install` as disabled for this project (`Disabled for this project (re-enable via /mcp)`), the server is registered but turned off in this folder. Tell the person to type `/mcp`, choose `polar-sky-install` and turn it back on, then **Authenticate** if it asks. Do not add it again.
 
@@ -26,7 +26,7 @@ Give it on one line, as shown. In Claude Code, they then type `/mcp`: if `polar-
 
 The first call signs the person in to Polar Sky. If the tools are listed but the server asks for sign-in, tell the person how to start it: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install` in a terminal. Both open Polar Sky's sign-in page in the browser. Only an administrator of the organization can use these tools. If the answer says the person is not an administrator, or no organization is set up for their company domain, stop: tell them to contact their Polar Sky contact.
 
-The first write call (`request_certificate` or `start_key_upload`) asks the person to approve write access. That is their choice; wait for it.
+The first write call (`request_certificate`, `start_key_upload` or `start_okta_connection`) asks the person to approve write access. That is their choice; wait for it.
 
 ## Check that your commands can reach the network
 
@@ -80,7 +80,7 @@ Write one message, in this order. Ask nothing in it except the model question at
      - **Cloud:** Polar Sky Cloud reads file content, and nothing runs in your cloud.
      - **hybrid:** an engine in your own Kubernetes cluster reads file content, so Polar Sky Cloud never sees it. It needs a Kubernetes cluster with GPUs.
 
-3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes.
+3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes, and an Okta super admin if the company manages its groups in Okta. In both models, Okta adds one step, before connecting Google Workspace: Polar Sky connects to Okta through an Okta app whose key only Polar Sky holds, so it can create the groups for approved controls there.
 
    Cloud:
 
@@ -88,6 +88,7 @@ Write one message, in this order. Ask nothing in it except the model question at
    | --- | --- |
    | Sign in to Polar Sky, look at this machine and your Google Cloud project, and agree the plan | 5 to 10 minutes |
    | Create the Google service account, and a super admin approves its access | 10 minutes, plus the super admin's time |
+   | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
 
    Hybrid:
@@ -98,6 +99,7 @@ Write one message, in this order. Ask nothing in it except the model question at
    | Create the Google service accounts, and a super admin approves their access | 10 minutes, plus the super admin's time |
    | Set up the Kubernetes cluster the engine runs on | 15 to 30 minutes for a new cluster |
    | Get the engine's certificate and install the engine | 20 to 30 minutes, mostly loading AI models |
+   | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
 
    In Cloud, the super admin's approval is the longest wait. In hybrid, the service accounts and the cluster can be set up at the same time, so the approval does not hold up the rest.
@@ -120,7 +122,7 @@ If the last line names a Git repository, stop: ask the person for another folder
 
 ## Get the install values
 
-Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `hybrid`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
+Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `hybrid`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. Do not write `okta_connected`, `okta_org_url`, `provisioning_mode`, `managed_group_materialization` or `managed_group_prefix` either: they tell you whether Okta is connected and how groups are set up, for the questions and phase 8. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
 
 | Name | Value from `get_install_values` | Models |
 | --- | --- | --- |

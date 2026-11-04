@@ -33,6 +33,7 @@ Hybrid only: write how Helm waits into `values.env`: `export HELM_WAIT='--wait'`
 | Terraform or OpenTofu 1.6 or later | No | Yes, for a new cluster from Polar Sky's recipe | Building the cluster |
 | `aws` signed in | No | Yes, for EKS | An EKS cluster, new or existing |
 | `az` signed in, and `kubelogin` for an Entra-integrated AKS cluster | No | Yes, for AKS | An AKS cluster |
+| `jq` | Yes, with Okta | Yes, with Okta | Connecting Okta |
 
 ### Look up more before you ask
 
@@ -68,6 +69,8 @@ The answers the plan needs:
 5. **Google Cloud project** (both) for the Polar Sky service accounts. Why: the service accounts that read Google Workspace live in it. Recommend a project in the Workspace domain's organization if there is one, saying how you found it, and offer the other projects you found. Record it only after the person names or confirms it. Write `export GOOGLE_CLOUD_PROJECT_ID='...'` into `values.env`.
 6. **Workspace admin email** (both). The Google Workspace administrator Polar Sky acts as. Why: Polar Sky reads who can open each file as this admin. It must be an active, monitored Workspace administrator account that can manage all shared drives and has the Reports privilege; a super admin has both. Being in the company's domain is not enough: the account you or Polar Sky are signed in as is often not an administrator. Offer the candidates you found, and ask the person to confirm the one they choose is an administrator in the Google Admin console. Write `export GOOGLE_WORKSPACE_ADMIN_EMAIL='...'` into `values.env`. If they are not sure, go on: the connection step tests the account, and the fix for a wrong one is there.
 7. **Who is the Google Workspace super admin** (both)? Why: a super admin must approve the Polar Sky service accounts' access in the Google Admin console, which takes them a few minutes. If it is not the person, you prepare a message for them.
+8. **Does the company manage its groups in Okta** (both)? Why: when it does, Polar Sky creates the groups for approved controls in Okta, so the plan adds the step that connects Okta (phase 8), in either model. Always ask, unless `get_install_values` answered `okta_connected` true: then say Okta is already connected, with `okta_org_url`, and ask only whether to keep it. If they do not use Okta, leave the stage out.
+9. **Only with Okta: the Okta org URL, and who is an Okta Super Administrator** (both)? Why: creating Polar Sky's app in Okta and giving it an admin role needs a super admin, for a few minutes. If it is not the person, they do the Okta part from a message you prepare. Say in the same item that Polar Sky names its groups starting with `ps-`, and that the person can tell you if they want their own naming convention instead. Do not ask how groups reach Google Workspace: phase 8 finds out.
 
 Record only answers the person has confirmed.
 
@@ -85,6 +88,8 @@ Once the answers are in, write one message with the final plan:
    - what they will have at the end.
 
    For Cloud, the stages are: turn on the two Google APIs and create the Polar Sky Cloud service account and its key (no cluster, so no cluster cost); the super admin adds the Polar Sky Cloud delegation entry (a few minutes for them); connect Google Workspace with the one-time upload; choose what Polar Sky monitors in the console. At the end they have Polar Sky Cloud connected to Google Workspace, and chosen locations.
+
+   With Okta, in either model, add the Okta stage before the Google Workspace connection: an Okta super admin's short-lived API token, the Okta app, and the read-only Group Push check (10 to 15 minutes). In Cloud it runs while the super admin approves the entry; in hybrid, while the cluster builds.
 
    For hybrid, the stages are the cluster, the Google service accounts, the engine certificate, the engine, the connection check, and the Google Workspace connection with the locations. For a new GKE cluster, name the free preparation steps: turning on the Cloud Billing and Compute Engine APIs in the cluster's project, and the Kubernetes Engine and IAM APIs if the name check in phase 3 needs them. Say which steps run at the same time, as the phase order in [SKILL.md](../SKILL.md#phases) says.
 3. **One approval question,** last: "Does this look right? Any changes, or shall I go ahead?"

@@ -1,4 +1,4 @@
-# Phase 9: Done
+# Phase 10: Done
 
 **Tell the person:** Polar Sky now works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
@@ -15,6 +15,7 @@ Give the person a short summary, with real values:
 - **Runs in your cluster** (context, namespace `POLAR_SKY_NAMESPACE`): Flux, the Polar Sky chart version `POLAR_SKY_CHART_VERSION` on the `latest` channel, the two workers, the AI Gateway and the model servers on GPU nodes.
 - **Google:** the service accounts `GOOGLE_ON_PREM_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and their two delegation entries. Polar Sky keeps the cloud account's key, encrypted.
 - **Certificate:** the subject and the end date from `scripts/check-certificate.sh`. It must be renewed before that date: run phase 5 again with a new key, and replace the `polar-sky-mtls` secret.
+- **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
 - **Monitoring:** the locations the person chose in the console.
 - **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
@@ -26,6 +27,7 @@ Give the person a short summary, with real values:
 
 - **Runs in Polar Sky Cloud:** the reading of Google Workspace, with the content scopes on the Polar Sky Cloud entry. Nothing runs in your cloud.
 - **Google:** the service account `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and its delegation entry with the scopes in `POLAR_SKY_CLOUD_SCOPES`. Polar Sky keeps the account's key, encrypted.
+- **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
 - **Monitoring:** the locations the person chose in the console.
 
 ## What Polar Sky checks afterwards
@@ -43,6 +45,7 @@ Ask the person before deleting anything. Suggest:
 
 - Hybrid: move `on-prem-key.json` and `client.key` to their approved secrets store, or delete them: the cluster already holds them in the `gws-creds` and `polar-sky-mtls` secrets.
 - Keep `values.env` for their records. In hybrid, also keep `client.crt` and the rendered files.
+- With Okta: if `okta-admin-header` is still there, the Okta API token was not cleaned up. Ask the person to revoke the token in Okta (**Security** > **API** > **Tokens**) and delete the file, as in phase 8.
 - Cloud: the key file is already deleted after the upload, so `values.env` is the only file to keep.
 
 Hybrid only: remind them that Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.
