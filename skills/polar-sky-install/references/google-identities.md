@@ -125,18 +125,7 @@ Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`)
 
 ## What each entry lets Polar Sky do
 
-A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry, from this table. If an entry has a scope that is not in the table, say Polar Sky can explain it; never guess.
-
-| Scope (after `https://www.googleapis.com/auth/`) | Entry | What it lets Polar Sky do, and why |
-| --- | --- | --- |
-| `admin.directory.user.readonly` | Polar Sky Cloud | Read the list of users, to know who owns and who can open each file |
-| `admin.directory.group.readonly` | Polar Sky Cloud | Read groups and their members, to work out who gets access through a group |
-| `admin.directory.customer.readonly` | Polar Sky Cloud | Read the Workspace account's ID and primary domain, to check the connection is for this company |
-| `drive.metadata.readonly` | Polar Sky Cloud | Read file names, owners and sharing, but not file content, to find overexposed files |
-| `admin.reports.audit.readonly` | Polar Sky Cloud | Read the Drive audit log, to see who changed sharing and when |
-| `admin.directory.group` | Polar Sky Cloud | Create groups and change their members, for the access groups of controls the team approves. Polar Sky uses it only when it manages those groups in Google Workspace; when it does not, say it is not used with the current settings and is on the line so a later change to group settings needs no second admin visit (see `needed_now` above) |
-| `drive.readonly` | Engine | Read file content and list shared drives, so the engine can judge how sensitive each file is inside the company's own cloud |
-| `drive` | Engine | Change sharing on files and shared drives, to apply the controls the team approves. Before a change in a shared drive, the engine may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays |
+A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: its `purpose` from the `scopes` list of `get_install_values`. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, the engine may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
 
 Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
 
@@ -144,7 +133,7 @@ Polar Sky Cloud's entry has no scope that reaches file content. Only the engine,
 
 Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so, and recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile."
 
-If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the two links in full and the lines from the table above:
+If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the two links in full and the scope lines from [What each entry lets Polar Sky do](#what-each-entry-lets-polar-sky-do):
 
 ```text
 Hello,

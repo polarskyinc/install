@@ -14,7 +14,7 @@ The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. 
 | `get_install_values` | Returns this organization's install values. Read only. |
 | `request_certificate` | Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
 | `check_engine_connection` | Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
-| `start_key_upload` | Takes the Workspace admin email and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when all pass, saves the Google Workspace connection. |
+| `start_key_upload` | Takes the Workspace admin email and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
 | `report_issue` | Sends Polar Sky a short note about a problem in this install, so they can fix it. See [Report issues](#report-issues). |
 
 Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and at the cluster (see [Continue an install](#continue-an-install)).
@@ -126,7 +126,7 @@ Recommend this order to the person with its reason, for example: "The cluster ta
 
 ## Continue an install
 
-When the person comes back, run phase 1 again, then check what is already done. Each check only reads.
+When the person comes back, run phase 1 again, then check what is already done. The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access.
 
 | Phase | Done when |
 | --- | --- |

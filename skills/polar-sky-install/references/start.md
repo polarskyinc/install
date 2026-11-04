@@ -27,7 +27,7 @@ Say that the service accounts and the cluster can be set up at the same time, so
 
 ## Check the MCP server
 
-Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `start_key_upload` and `check_engine_connection`. If any of them is missing, the server is not connected. Find out why before you give the person anything to run. In Claude Code, `claude mcp list` (read only) shows each registered server and its state.
+Look for the Polar Sky Install tools: `get_install_values`, `request_certificate`, `check_engine_connection`, `start_key_upload` and `report_issue`. If any of them is missing, the server is not connected. Find out why before you give the person anything to run. In Claude Code, `claude mcp list` (read only) shows each registered server and its state.
 
 If it lists `polar-sky-install` as disabled for this project (`Disabled for this project (re-enable via /mcp)`), the server is registered but turned off in this folder. Tell the person to type `/mcp`, choose `polar-sky-install` and turn it back on, then **Authenticate** if it asks. Do not add it again.
 
