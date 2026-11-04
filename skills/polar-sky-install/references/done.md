@@ -2,6 +2,8 @@
 
 **Tell the person:** Polar Sky now works on the locations the person chose: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
 
+## Hybrid
+
 First run the pod checks from phase 6 again (read only). Say the install is done only if every check there passes.
 
 If model pods still wait for GPU capacity, do not call the install complete. Say instead: "Everything is set up except the AI models, which are waiting for a free GPU machine in your cloud. They start on their own when one is free. Meanwhile the engine and Google Workspace are connected, and Polar Sky finds your files and who can open them, but it cannot judge how sensitive they are until the models run." Give the summary below with that line at the top, and offer to check the models again later.
@@ -16,15 +18,31 @@ Give the person a short summary, with real values:
 - **Monitoring:** the locations the person chose in the console.
 - **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
+## Cloud
+
+There is no cluster, no engine and no AI model to check, so skip the pod checks. Say the install is done once the person has chosen the locations in the console.
+
+Give the person a short summary, with real values:
+
+- **Runs in Polar Sky Cloud:** the reading of Google Workspace, with the content scopes on the Polar Sky Cloud entry. Nothing runs in your cloud.
+- **Google:** the service account `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and its delegation entry with the scopes in `POLAR_SKY_CLOUD_SCOPES`. Polar Sky keeps the account's key, encrypted.
+- **Monitoring:** the locations the person chose in the console.
+
 ## What Polar Sky checks afterwards
 
-Polar Sky's team checks the install on its own side, later and without the person: the workers read Google Workspace and process documents in the chosen locations, local inference and embedding work, and the results show in Polar Sky Cloud. The person has nothing to arrange. Tell them in one line that Polar Sky checks the install on its side and contacts them only if something needs their help.
+Polar Sky's team checks the install on its own side, later and without the person.
+
+- **Hybrid:** the workers read Google Workspace and process documents in the chosen locations, local inference and embedding work, and the results show in Polar Sky Cloud.
+- **Cloud:** Polar Sky Cloud reads Google Workspace in the chosen locations, and the results show in Polar Sky Cloud. No models run in the customer's cloud, so there is no local inference to check.
+
+Tell the person in one line that Polar Sky checks the install on its side and contacts them only if something needs their help. The person has nothing to arrange.
 
 ## Clean up the install folder
 
 Ask the person before deleting anything. Suggest:
 
-- Move `on-prem-key.json` and `client.key` to their approved secrets store, or delete them: the cluster already holds them in the `gws-creds` and `polar-sky-mtls` secrets.
-- Keep `values.env`, `client.crt` and the rendered files for their records.
+- Hybrid: move `on-prem-key.json` and `client.key` to their approved secrets store, or delete them: the cluster already holds them in the `gws-creds` and `polar-sky-mtls` secrets.
+- Keep `values.env` for their records. In hybrid, also keep `client.crt` and the rendered files.
+- Cloud: the key file is already deleted after the upload, so `values.env` is the only file to keep.
 
-Remind them: Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.
+Hybrid only: remind them that Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.

@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# Prints the tools, cloud accounts and Kubernetes context on this machine; reads only, and tests sign-ins by exit status so no token is printed.
+# Prints the tools, cloud accounts and Kubernetes context on this machine; reads only, and tests sign-ins by exit status so no token is printed. With cloud, it prints only what a Cloud install needs.
 set -u
+
+model="${1:-hybrid}"
+case "${model}" in
+  cloud | hybrid) ;;
+  *)
+    printf 'usage: detect.sh [cloud|hybrid]\n' >&2
+    exit 2
+    ;;
+esac
 
 line() { printf '%-22s %s\n' "$1" "$2"; }
 
@@ -22,13 +31,19 @@ if have gcloud; then
       line "gcloud sign-in" "expired or refused"
     fi
   fi
-  if gcloud auth application-default print-access-token >/dev/null 2>&1; then
-    line "gcloud ADC" "works"
-  else
-    line "gcloud ADC" "not signed in, or the sign-in has expired"
+  if [ "${model}" = hybrid ]; then
+    if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+      line "gcloud ADC" "works"
+    else
+      line "gcloud ADC" "not signed in, or the sign-in has expired"
+    fi
   fi
 else
   line "gcloud" "not found"
+fi
+
+if [ "${model}" = cloud ]; then
+  exit 0
 fi
 
 if have aws; then

@@ -1,17 +1,17 @@
 # Phase 4: Google identities and delegation
 
-**Tell the person:** Polar Sky reads files, sharing and permissions through two Google service accounts that a Workspace super admin approves. No one's password is used, and the accounts get only the access in their delegation entries.
+**Tell the person:** Polar Sky reads files, sharing and permissions through Google service accounts that a Workspace super admin approves. No one's password is used, and each account gets only the access in its delegation entry. A Cloud install needs one account; a hybrid install needs two.
 
-Polar Sky reads Google Workspace through two Google service accounts in the customer's own project (`GOOGLE_CLOUD_PROJECT_ID`):
+Polar Sky reads Google Workspace through Google service accounts in the customer's own project (`GOOGLE_CLOUD_PROJECT_ID`):
 
-| Service account | Used by | Key |
-| --- | --- | --- |
-| `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster |
-| `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 8, then deleted |
+| Service account | Used by | Key | Models |
+| --- | --- | --- | --- |
+| `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 8, then deleted | Both |
+| `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster | Hybrid only |
 
-Use the gcloud account and project the person confirmed in the install plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
+Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
 
-This stage needs only the project, not the cluster, so start it as soon as the plan is agreed, before or during the cluster build. Its plan: turn on two APIs, create the two service accounts and their key files, then prepare the super admin's request. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
+This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in hybrid. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
 
 ## Enable the APIs
 
@@ -37,7 +37,35 @@ If a key file is already in the install folder, never create a key over it: chec
 
 If the person does not trust an existing account, or cannot use it, they may choose a new account with another name instead; never delete the old one without its own yes, since something may still use it. Google needs 6 to 30 characters: lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. Check the name before you run anything. Then use it in place of `polar-sky-on-prem-dpe` or `polar-sky-cloud-integration` in every command and `values.env` line below, so the account email becomes `<new name>@<project>.iam.gserviceaccount.com`. Later steps read the emails from `values.env`, so nothing after this stage changes. Report it with `report_issue`, outcome `worked_around`.
 
+## Cloud service account and its key
+
+Show both commands, say they create one service account and one key file, and run them:
+
+```bash
+gcloud iam service-accounts create polar-sky-cloud-integration --display-name="Polar Sky Cloud" --project="${GOOGLE_CLOUD_PROJECT_ID}"
+```
+
+```bash
+cd ~/polar-sky-install && umask 077 && gcloud iam service-accounts keys create cloud-key.json --iam-account="polar-sky-cloud-integration@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com" --project="${GOOGLE_CLOUD_PROJECT_ID}"
+```
+
+Google can take a minute before a new service account can get a key. Before each `keys create`, wait until the account is readable (read only), and if `keys create` still answers `NOT_FOUND`, delete the empty key file it left (`[ ! -s <file> ] && rm <file>`) and try again after a minute:
+
+```bash
+for attempt in 1 2 3 4 5 6; do gcloud iam service-accounts describe "<account email>" --project="${GOOGLE_CLOUD_PROJECT_ID}" --format='value(email)' && break; sleep 10; done
+```
+
+The key goes straight into `cloud-key.json`. Never open, print or send this file, and never pass it to a tool or the chat. In phase 8 it goes to Polar Sky once, uploaded with the one-time `curl` command from `start_key_upload`, and then you delete it. If Google refuses to create the key because of an organization policy (`iam.disableServiceAccountKeyCreation`), stop. Tell the person their organization blocks service account keys, and that their Google Cloud administrator must allow a key for this service account, or they contact Polar Sky.
+
+Add to `values.env`:
+
+```bash
+export GOOGLE_CLOUD_SERVICE_ACCOUNT='polar-sky-cloud-integration@<project>.iam.gserviceaccount.com'
+```
+
 ## On-premises service account and its key
+
+Hybrid only. Skip this section in a Cloud install.
 
 Show both commands, say they create one service account and one key file, and run them:
 
@@ -66,54 +94,55 @@ export GOOGLE_ON_PREM_SERVICE_ACCOUNT='polar-sky-on-prem-dpe@<project>.iam.gserv
 export GOOGLE_ONPREM_KEY_FILE="$HOME/polar-sky-install/on-prem-key.json"
 ```
 
-## Cloud service account and its key
-
-Show both commands, say they create one service account and one key file, and run them:
-
-```bash
-gcloud iam service-accounts create polar-sky-cloud-integration --display-name="Polar Sky Cloud" --project="${GOOGLE_CLOUD_PROJECT_ID}"
-```
-
-```bash
-cd ~/polar-sky-install && umask 077 && gcloud iam service-accounts keys create cloud-key.json --iam-account="polar-sky-cloud-integration@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com" --project="${GOOGLE_CLOUD_PROJECT_ID}"
-```
-
-The key goes straight into `cloud-key.json`. Never open, print or send this file, and never pass it to a tool or the chat. In phase 8 it goes to Polar Sky once, uploaded with the one-time `curl` command from `start_key_upload`, and then you delete it. The same organization policy as above can block this key; handle it the same way.
-
-Add to `values.env`:
-
-```bash
-export GOOGLE_CLOUD_SERVICE_ACCOUNT='polar-sky-cloud-integration@<project>.iam.gserviceaccount.com'
-```
-
 ## Delegation entries
 
-Get each account's numeric client ID (read only, public):
+Get the Polar Sky Cloud account's numeric client ID (read only, public):
 
 ```bash
 gcloud iam service-accounts describe "${GOOGLE_CLOUD_SERVICE_ACCOUNT}" --format='value(oauth2ClientId)' --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
+Hybrid only, also get the engine account's client ID:
+
 ```bash
 gcloud iam service-accounts describe "${GOOGLE_ON_PREM_SERVICE_ACCOUNT}" --format='value(oauth2ClientId)' --project="${GOOGLE_CLOUD_PROJECT_ID}"
 ```
 
-Write them into `values.env` as `GOOGLE_CLOUD_CLIENT_ID` and `GOOGLE_ON_PREM_CLIENT_ID`. Never read a client ID from a key file.
+Write them into `values.env` as `GOOGLE_CLOUD_CLIENT_ID` and, in hybrid, `GOOGLE_ON_PREM_CLIENT_ID`. Never read a client ID from a key file.
 
-A Google Workspace super admin adds two entries in the Google Admin console. Make a link for each entry that opens the console's "Add a new client ID" dialog with the client ID and scopes already filled in (read only, prints two links):
+A Google Workspace super admin adds the entries in the Google Admin console. Make a link for each entry that opens the console's "Add a new client ID" dialog with the client ID and scopes already filled in (read only).
+
+Cloud: one link, for Polar Sky Cloud's entry:
+
+```bash
+. ~/polar-sky-install/values.env && enc() { printf '%s' "$1" | sed 's/:/%3A/g; s#/#%2F#g; s/,/%2C/g'; } && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_CLOUD_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_CLOUD_SCOPES}")&overwriteClientId=true"
+```
+
+Hybrid: two links, one for each entry:
 
 ```bash
 . ~/polar-sky-install/values.env && enc() { printf '%s' "$1" | sed 's/:/%3A/g; s#/#%2F#g; s/,/%2C/g'; } && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_CLOUD_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_CLOUD_SCOPES}")&overwriteClientId=true" && echo "https://admin.google.com/ac/owl/domainwidedelegation?clientIdToAdd=${GOOGLE_ON_PREM_CLIENT_ID}&clientScopeToAdd=$(enc "${POLAR_SKY_ON_PREM_SCOPES}")&overwriteClientId=true"
 ```
 
-The super admin opens each link signed in to the Admin console, checks the client ID and scopes in the dialog, and clicks **Authorize**. Give the two links and, as the fallback if a link does not open the dialog, both entries with the exact values to add by hand under **Security** > **Access and data control** > **API controls** > **Domain-wide delegation** > **Manage all**:
+The super admin opens each link signed in to the Admin console, checks the client ID and scopes in the dialog, and clicks **Authorize**. Give the links and, as the fallback if a link does not open the dialog, the entries with the exact values to add by hand under **Security** > **Access and data control** > **API controls** > **Domain-wide delegation** > **Manage all**.
+
+Cloud:
+
+| Entry | Client ID | Scopes (one line, comma-separated, no spaces) |
+| --- | --- | --- |
+| Polar Sky Cloud | `GOOGLE_CLOUD_CLIENT_ID` | `POLAR_SKY_CLOUD_SCOPES` |
+
+Hybrid:
 
 | Entry | Client ID | Scopes (one line, comma-separated, no spaces) |
 | --- | --- | --- |
 | Polar Sky Cloud | `GOOGLE_CLOUD_CLIENT_ID` | `POLAR_SKY_CLOUD_SCOPES` |
 | Polar Sky On-Premises | `GOOGLE_ON_PREM_CLIENT_ID` | `POLAR_SKY_ON_PREM_SCOPES` |
 
-Show the real values, not the names. There are no optional scopes: every scope is required by one of the two entries, and each item in the `scopes` list of `get_install_values` says which in `required_for`. The engine's entry holds the Drive content scopes so that Polar Sky Cloud never needs them. Polar Sky Cloud's entry must not list `drive.readonly` or `drive`.
+Show the real values, not the names. There are no optional scopes: every scope the install uses is on an entry, and each item in the `scopes` list of `get_install_values` says which one in `required_for`.
+
+- **Cloud:** Polar Sky Cloud's entry is the only entry. It holds Polar Sky Cloud's scopes plus `drive.readonly` and `drive`, because Polar Sky Cloud reads file content and applies the access changes the team approves. Give the full line from `POLAR_SKY_CLOUD_SCOPES`, as one line.
+- **Hybrid:** the engine's entry holds the Drive content scopes so that Polar Sky Cloud never needs them. Polar Sky Cloud's entry must not list `drive.readonly` or `drive`.
 
 `admin.directory.group` is on Polar Sky Cloud's line, because the Polar Sky Cloud key is what writes groups. It stays on the line even when the organization does not need it today. The `scopes` item for it has `needed_now` and `needed_now_reason`. If `needed_now` is false, say what `needed_now_reason` says, in one plain sentence: "Polar Sky does not use it with your current settings. It is on the line so a later change to group settings needs no second admin visit." If `needed_now` is true, say Polar Sky uses it today. Do not call it optional, and do not drop it from the line.
 
@@ -125,15 +154,46 @@ Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`)
 
 ## What each entry lets Polar Sky do
 
-A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: its `purpose` from the `scopes` list of `get_install_values`. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, the engine may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
+A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: its `purpose` from the `scopes` list of `get_install_values`. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, Polar Sky may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
 
-Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
+In hybrid, Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
+
+In Cloud, Polar Sky Cloud's entry holds the two content scopes, so Polar Sky Cloud reads file content itself and makes the approved access changes. Nothing runs in the customer's cloud.
 
 ## Send the request and keep going
 
-Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so, and recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile."
+Google can take up to 24 hours to apply delegation changes, though it is often minutes. Nothing waits on this until connecting Google Workspace, where Polar Sky tests each scope. Say so. In hybrid, recommend going on: "I recommend getting the engine's certificate and installing the engine meanwhile." In Cloud, there is nothing else to run, so say that the connection waits for the entry.
 
-If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the two links in full and the scope lines from [What each entry lets Polar Sky do](#what-each-entry-lets-polar-sky-do):
+If the person is a super admin, they can open the links now. If not, write a message for them to forward to the super admin they named. Fill in every value, with the links in full and the scope lines from [What each entry lets Polar Sky do](#what-each-entry-lets-polar-sky-do).
+
+Cloud:
+
+```text
+Hello,
+
+We are installing Polar Sky. Please add one domain-wide delegation entry in the Google Admin console.
+Open the link while signed in as a super admin, check the client ID and scopes, and click Authorize:
+
+1. <link for GOOGLE_CLOUD_CLIENT_ID>
+
+What the entry lets Polar Sky do (Polar Sky Cloud reads file content and makes the access changes our team approves):
+   - <one line per scope in POLAR_SKY_CLOUD_SCOPES>
+
+If the link does not open the dialog, add the entry by hand
+(Security > Access and data control > API controls > Domain-wide delegation > Manage all):
+
+   Client ID: <GOOGLE_CLOUD_CLIENT_ID>
+   Scopes: <POLAR_SKY_CLOUD_SCOPES>
+
+Each link, and each edit by hand, replaces the entry's entire scope list, so if the client ID already has
+an entry, keep every scope it needs.
+
+Please also make sure <GOOGLE_WORKSPACE_ADMIN_EMAIL> has the Reports admin privilege.
+
+Thank you.
+```
+
+Hybrid:
 
 ```text
 Hello,

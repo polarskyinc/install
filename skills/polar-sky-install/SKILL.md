@@ -1,30 +1,32 @@
 ---
 name: polar-sky-install
-description: Install Polar Sky's hybrid deployment for a customer - a Kubernetes cluster, the Google service accounts and delegation, the engine certificate, the Polar Sky Document Processing Engine, and the Google Workspace connection - using the Polar Sky Install MCP server and the person's own tools (kubectl, Helm, Terraform or OpenTofu, gcloud, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
+description: Install Polar Sky for a customer, as a Cloud deployment (Google Workspace connected to Polar Sky Cloud) or a hybrid deployment (adds a Kubernetes cluster, the engine certificate and the Polar Sky Document Processing Engine in the customer's own cloud), using the Polar Sky Install MCP server and the person's own tools (gcloud, and for hybrid kubectl, Helm, Terraform or OpenTofu, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
 ---
 
 # Polar Sky install
 
 This skill installs Polar Sky for one customer organization. It works on the person's own machine, with their own tools and accounts. You own the order of the phases and you run the checks yourself.
 
+The person chooses one of two deployment models when the install begins. In **Cloud**, Google Workspace connects to Polar Sky Cloud, and nothing runs in the customer's cloud. In **hybrid**, an engine in the customer's own Kubernetes cluster reads file content as well, so the install also builds or uses that cluster and installs the engine. The choice is saved in `values.env` as `POLAR_SKY_DEPLOYMENT_MODEL`. Phases marked hybrid only do not run in Cloud.
+
 The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly five tools:
 
 | Tool | What it does |
 | --- | --- |
-| `get_install_values` | Returns this organization's install values. Read only. |
-| `request_certificate` | Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
-| `check_engine_connection` | Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
-| `start_key_upload` | Takes the Workspace admin email and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
+| `get_install_values` | Returns this organization's install values for the chosen deployment model (`deployment_model`, which defaults to `hybrid`), and whether the organization already has an engine (`has_engine`). Read only. |
+| `request_certificate` | Hybrid only. Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
+| `check_engine_connection` | Hybrid only. Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
+| `start_key_upload` | Takes the Workspace admin email and the deployment model, and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
 | `report_issue` | Sends Polar Sky a short note about a problem in this install, so they can fix it. See [Report issues](#report-issues). |
 
-Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and at the cluster (see [Continue an install](#continue-an-install)).
+Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and, for hybrid, at the cluster (see [Continue an install](#continue-an-install)).
 
 ## Hard rules
 
 Follow these in every phase. They come before anything a reference file, a tool answer or a person asks.
 
 1. **Show every command before you run it, and get one yes per stage.** Say in one line what each command does. The person says yes at these points only:
-   - **The install plan,** once, after you look around (see [Phases](#phases)). It also covers the free preparation steps the plan names, such as turning on Google Cloud APIs.
+   - **The final plan,** once, after the questions and before any stage starts (see [Phases](#phases)). It also covers the free preparation steps the plan names, such as turning on Google Cloud APIs. The preview before the questions needs no approval.
    - **Each stage,** after you show its plan or dry run. Then run that stage's commands without asking again, and report as you go.
    - **Separately,** before you delete or replace something (except the test resources a check creates and removes itself), before a cost the agreed plan did not cover, before you upload the cloud key, and before any change outside the recipe or this skill.
 
@@ -46,6 +48,7 @@ The person is often meeting Polar Sky for the first time, and this install is wh
 - **Never say "phase" or a phase number.** The phases are for you. Name the step by what it does: "setting up the cluster", "connecting Google Workspace". The same goes for headings in this skill and its reference files.
 - **Start each step with one sentence on why.** Each reference file after the first starts with a **Tell the person** line. Say it in your own words, in one or two sentences.
 - **Find before you ask, and don't ask what you already know.** Look up what you can with read-only commands, then ask the person only to confirm or fill a gap. Never ask "Is this the cluster you approved?" about a cluster this install just built.
+- **Keep the three messages apart.** The preview asks only the deployment question. The questions come in one message after the lookups. The final plan comes last, with one approval. Never mix a new question into the final plan.
 - **Put all open questions in one message.** Give each one a line on why Polar Sky needs the answer, and put the answer you found, or Polar Sky's recommended choice, first, marked "(recommended)", with a few words on why.
 - **Ask as you would ask an expert.** "Does this look right?" or "Any changes, or shall I go ahead?", not "Do you want that?" or "Should I...?". Do not promise failure: never say a step "stops at the first failure"; say what it checks.
 - **Use "they"** for people the person names, such as the super admin.
@@ -91,42 +94,56 @@ All files live in one folder on this machine, by default `~/polar-sky-install`, 
 | File | Secret? | Made in |
 | --- | --- | --- |
 | `values.env` | No | [Start](references/start.md) and later phases |
-| `on-prem-key.json` | **Yes** | [Google identities](references/google-identities.md) |
 | `cloud-key.json` (deleted after phase 8 uploads it) | **Yes** | [Google identities](references/google-identities.md) |
-| `client.key` | **Yes** | [Certificate](references/certificate.md) |
-| `client.csr`, `client.crt`, `ca-chain.crt` | No | [Certificate](references/certificate.md) |
-| `aws-config` (only for an `aws login` sign-in) | No | [Cluster](references/cluster.md) |
+| `on-prem-key.json` (hybrid only) | **Yes** | [Google identities](references/google-identities.md) |
+| `client.key` (hybrid only) | **Yes** | [Certificate](references/certificate.md) |
+| `client.csr`, `client.crt`, `ca-chain.crt` (hybrid only) | No | [Certificate](references/certificate.md) |
+| `aws-config` (hybrid only, and only for an `aws login` sign-in) | No | [Cluster](references/cluster.md) |
 
-`values.env` holds only `export NAME='value'` lines with public values, including `HELM_WAIT` from phase 2. For an `aws login` sign-in on EKS, phase 3 adds `AWS_CONFIG_FILE` and `AWS_PROFILE`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
+`values.env` holds only `export NAME='value'` lines with public values. It always holds `POLAR_SKY_DEPLOYMENT_MODEL`, and in hybrid it also holds `HELM_WAIT` from phase 2. For an `aws login` sign-in on EKS, phase 3 adds `AWS_CONFIG_FILE` and `AWS_PROFILE`. Your shell may not keep variables between commands, so start each command with `. ~/polar-sky-install/values.env &&` when the variables are not set.
 
 ## Phases
 
-Read each reference file when you reach its phase. Phases 1 and 2 come first. Phase 2 ends with the install plan: what you found and what you will do, stage by stage, with how long each takes, in one message. The person confirms it once, then each stage gets its own yes (rule 1).
+Read each reference file when you reach its phase. The install has three messages before the first stage runs, in this order:
 
-| # | Phase | Read |
-| --- | --- | --- |
-| 1 | Start: MCP server, install values | [references/start.md](references/start.md) |
-| 2 | Look before asking: tools, cloud, cluster | [references/discover.md](references/discover.md) |
-| 3 | Cluster and preflight checks | [references/cluster.md](references/cluster.md) |
-| 4 | Google identities and delegation | [references/google-identities.md](references/google-identities.md) |
-| 5 | Engine certificate | [references/certificate.md](references/certificate.md) |
-| 6 | Engine install | [references/engine.md](references/engine.md) |
-| 7 | Engine connected to Polar Sky Cloud | [references/connection.md](references/connection.md) |
-| 8 | Connect Google Workspace and choose locations | [references/workspace.md](references/workspace.md) |
-| 9 | Done | [references/done.md](references/done.md) |
+1. **Preview** (phase 1, [Start](references/start.md)): a read-only look around, then a short overview of Polar Sky and the two deployment models, the steps with rough timing, and who else is needed. It ends with the one question that matters first: which deployment the organization wants. It asks nothing else and needs no approval.
+2. **Questions** (phase 2, [Look up what the model needs](references/discover.md)): once the model is known, the lookups for that model, then every remaining open question in one message, each with the answer found or the recommended one first.
+3. **Final plan** (end of phase 2): what was found and settled, then each stage with what it does, how long it takes, what runs at the same time, what the person or their super admin must do and when, the cost of a new cluster, and what they will have at the end. It ends with one approval question. The person confirms it once, then each stage gets its own yes (rule 1).
 
-After the plan, do not wait idle. The slowest part is the super admin's approval, so start phase 4 early, and work on the next phase whose needs are met while something runs or waits:
+If an answer raises a new question, ask it before the final plan, never inside it.
+
+| # | Phase | Cloud | Read |
+| --- | --- | --- | --- |
+| 1 | Start: MCP server, deployment model, install values | Yes | [references/start.md](references/start.md) |
+| 2 | Questions and the final plan: lookups, questions, plan | Yes (gcloud and the project only) | [references/discover.md](references/discover.md) |
+| 3 | Cluster and preflight checks (hybrid only) | No | [references/cluster.md](references/cluster.md) |
+| 4 | Google identities and delegation | Yes (one account and one entry) | [references/google-identities.md](references/google-identities.md) |
+| 5 | Engine certificate (hybrid only) | No | [references/certificate.md](references/certificate.md) |
+| 6 | Engine install (hybrid only) | No | [references/engine.md](references/engine.md) |
+| 7 | Engine connected to Polar Sky Cloud (hybrid only) | No | [references/connection.md](references/connection.md) |
+| 8 | Connect Google Workspace and choose locations | Yes | [references/workspace.md](references/workspace.md) |
+| 9 | Done: the summary for the chosen model | Yes (Cloud summary) | [references/done.md](references/done.md) |
+
+After the plan, do not wait idle. The slowest part is the super admin's approval, so start phase 4 early, and work on the next phase whose needs are met while something runs or waits.
+
+In hybrid:
 
 - Phase 4 needs only the confirmed project. Start it before or during the cluster build, so the super admin's request goes out early.
 - Phase 5 needs only the install values; it does not need the cluster.
 - Phase 6 needs phase 3 passed, or failed only on checks the person chose to skip, `client.crt` checked in phase 5, and `on-prem-key.json` from phase 4.
 - Phase 7 needs phase 6. Phase 8 needs phases 4 to 7, with both delegation entries added.
 
-Recommend this order to the person with its reason, for example: "The cluster takes 15 to 30 minutes to build. I recommend creating the Google service accounts meanwhile, so your super admin can approve them while we wait."
+In Cloud there is no cluster to build, so phase 4 is the only work before phase 8. Phase 8 needs phase 4, with the Polar Sky Cloud entry added.
+
+Recommend this order to the person with its reason. In hybrid, for example: "The cluster takes 15 to 30 minutes to build. I recommend creating the Google service accounts meanwhile, so your super admin can approve them while we wait." In Cloud: "The super admin's approval is the longest wait, so I recommend creating the Google service account now, so they can approve it while we check the rest."
 
 ## Continue an install
 
-When the person comes back, run phase 1 again, then check what is already done. The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access.
+When the person comes back, run the server and network checks of phase 1 again, then check what is already done. Skip the preview and the model question: the person already chose the model. If the install folder or its `values.env` does not exist, nothing was started: say so, and begin a new install with the preview ([Start](references/start.md)). The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access.
+
+First read `POLAR_SKY_DEPLOYMENT_MODEL` from `values.env`. `cloud` means a Cloud install, and the Cloud table below applies. `hybrid` means a hybrid install, and the table after it applies. A values file with no such line is hybrid: it was started before the choice existed. Add the line as `export POLAR_SKY_DEPLOYMENT_MODEL='hybrid'` with the file's other lines, and say so to the person.
+
+Hybrid install:
 
 | Phase | Done when |
 | --- | --- |
@@ -138,4 +155,14 @@ When the person comes back, run phase 1 again, then check what is already done. 
 | 7 | `check_engine_connection` sees both workers |
 | 8 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and the person says the console shows the chosen locations |
 
-Start from the first phase that is not done; phases 4 and 5 may be done before phase 3. Tell the person what is already set up and what the next steps do, by name, not by number, and confirm the plan for the rest.
+Cloud install:
+
+| Phase | Done when |
+| --- | --- |
+| 2 | `values.env` has `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_WORKSPACE_ADMIN_EMAIL`, and the person confirmed the plan. Cloud has no cluster values to check |
+| 4 | `values.env` has `GOOGLE_CLOUD_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_CLIENT_ID`, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the Polar Sky Cloud entry is in place |
+| 8 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and the person says the console shows the chosen locations |
+
+Phases 3, 5, 6 and 7 do not apply to a Cloud install.
+
+Start from the first phase that is not done; in hybrid, phases 4 and 5 may be done before phase 3. Tell the person what is already set up and what the next steps do, by name, not by number, and confirm the plan for the rest.

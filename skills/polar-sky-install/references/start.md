@@ -2,28 +2,7 @@
 
 ## Open the install
 
-Before your first command, tell the person in two or three sentences what Polar Sky is and what this install sets up. For example:
-
-> Polar Sky is a data protection agent. AI assistants can read everything a person can reach, and most people can reach far more than they need. Polar Sky works out who needs to see what, finds overexposed files, and proposes controls your team approves.
-
-Then give a short picture of the setup, in a few lines:
-
-- **The engine runs in your own cloud,** in a Kubernetes cluster with GPU nodes. It reads your files there, with AI models that run in the cluster.
-- **Polar Sky Cloud gets the results,** and reads users, groups and sharing. It never sees the raw content of your files.
-- **Google Workspace connects through two service accounts** in your Google Cloud project, one for the engine and one for Polar Sky Cloud. A Workspace super admin approves their access. No one's password is used.
-- **Who else you may need:** a Workspace super admin, for a few minutes.
-
-Then show the steps and how long each usually takes, so the person can plan:
-
-| Step | Usually takes |
-| --- | --- |
-| Sign in to Polar Sky, look at this machine and your cloud, and agree the plan | 5 to 10 minutes |
-| Create the Google service accounts, and a super admin approves their access | 10 minutes, plus the super admin's time |
-| Set up the Kubernetes cluster the engine runs on | 15 to 30 minutes for a new cluster |
-| Get the engine's certificate and install the engine | 20 to 30 minutes, mostly loading AI models |
-| Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
-
-Say that the service accounts and the cluster can be set up at the same time, so the super admin's approval does not hold up the rest. Say you will show every command, and ask once for the whole plan and once for each step. Then start.
+Before your first command, tell the person one line: "I'll take a quick look at this machine first; it only reads." Then do the look around below, and give the preview. The install has three steps: the preview, the questions, and the final plan for one approval.
 
 ## Check the MCP server
 
@@ -71,6 +50,64 @@ If you are another agent and the network is blocked, tell the person what failed
 
 Later in the install, if a command fails the same way, or cannot write to `~/polar-sky-install`, `~/.kube` or the gcloud settings, stop and do the same. Never move the install folder somewhere else to get around it.
 
+## Look around
+
+**Tell the person:** Polar Sky first checks what is already here, so the preview fits this organization. Nothing is changed.
+
+Call `get_install_values` with no `deployment_model`. It only reads. It answers for hybrid, the default, and tells you whether the organization already has an engine, in `has_engine`. Write no value from this answer yet.
+
+Run the detection script with no argument. It only reads, and prints the tools and sign-ins on this machine:
+
+```bash
+<skill folder>/scripts/detect.sh
+```
+
+Also use what you already know about the company from this conversation, such as its name or the Google domain the person mentions. Do not ask about it yet.
+
+Do not explain or act on the cluster lines yet: the person may choose Cloud, which has no cluster. If a sign-in shows as expired, only note it. Do not ask for a fix yet: the questions step asks for it once the model is known, as in [Look up what the model needs](discover.md).
+
+## Preview the install
+
+Write one message, in this order. Ask nothing in it except the model question at the end.
+
+1. **What Polar Sky is,** in two or three sentences, for example:
+
+   > Polar Sky is a data protection agent. AI assistants can read everything a person can reach, and most people can reach far more than they need. Polar Sky works out who needs to see what, finds overexposed files, and proposes controls your team approves.
+
+2. **The deployment models,** in plain words:
+   - **If `has_engine` is true,** the organization already runs Polar Sky's hybrid deployment, with an engine in its own cluster. Say so, and do not offer Cloud.
+   - **If `has_engine` is false,** give both, one plain line each, and do not recommend either one:
+     - **Cloud:** Polar Sky Cloud reads file content, and nothing runs in your cloud.
+     - **hybrid:** an engine in your own Kubernetes cluster reads file content, so Polar Sky Cloud never sees it. It needs a Kubernetes cluster with GPUs.
+
+3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes.
+
+   Cloud:
+
+   | Step | Usually takes |
+   | --- | --- |
+   | Sign in to Polar Sky, look at this machine and your Google Cloud project, and agree the plan | 5 to 10 minutes |
+   | Create the Google service account, and a super admin approves its access | 10 minutes, plus the super admin's time |
+   | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
+
+   Hybrid:
+
+   | Step | Usually takes |
+   | --- | --- |
+   | Sign in to Polar Sky, look at this machine and your cloud, and agree the plan | 5 to 10 minutes |
+   | Create the Google service accounts, and a super admin approves their access | 10 minutes, plus the super admin's time |
+   | Set up the Kubernetes cluster the engine runs on | 15 to 30 minutes for a new cluster |
+   | Get the engine's certificate and install the engine | 20 to 30 minutes, mostly loading AI models |
+   | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
+
+   In Cloud, the super admin's approval is the longest wait. In hybrid, the service accounts and the cluster can be set up at the same time, so the approval does not hold up the rest.
+
+4. **The model question, as the last line.** If `has_engine` is false, end with: "Which deployment does your organization want?" If it is true, end with: "Shall I go ahead with the hybrid install?"
+
+The preview sets expectations only. It is not the plan and needs no approval.
+
+When the answer comes: if `has_engine` is true and the person wants Cloud, tell them: "Moving an organization that has an engine to Cloud is not part of this install, so I cannot do it here. I will tell Polar Sky, so they can help." Then call `report_issue`, as in [Report issues](../SKILL.md#report-issues), and stop. Otherwise record the model the person names, `cloud` or `hybrid`. Then make the install folder and get the install values for that model, as below. These steps only create files and read values, so they run without a yes. After them, go on to the questions in [Look up what the model needs](discover.md).
+
 ## Make the install folder
 
 Show and run (it only creates an empty folder):
@@ -83,24 +120,29 @@ If the last line names a Git repository, stop: ask the person for another folder
 
 ## Get the install values
 
-Call `get_install_values`. Write each value from the answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. The `scopes` list explains each delegation scope for the person; do not write it to the file. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Do not write the request ID or `refused`. Leave out every value that is empty or null.
+Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `hybrid`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
 
-| Name | Value from `get_install_values` |
-| --- | --- |
-| `POLAR_SKY_ORGANIZATION_ID` | The organization ID |
-| `POLAR_SKY_ORGANIZATION_NAME` | The organization name |
-| `POLAR_SKY_CHART_VERSION` | The Polar Sky chart version |
-| `POLAR_SKY_RELEASE_CHANNEL` | The release channel, `latest` |
-| `POLAR_SKY_HOST` | The Polar Sky Cloud endpoint the engine connects to |
-| `POLAR_SKY_CONSOLE_URL` | The Polar Sky console address |
-| `POLAR_SKY_CLOUD_SCOPES` | The delegation scopes for the cloud service account, as one comma-separated line |
-| `POLAR_SKY_ON_PREM_SCOPES` | The delegation scopes for the on-premises service account, as one comma-separated line |
+| Name | Value from `get_install_values` | Models |
+| --- | --- | --- |
+| `POLAR_SKY_DEPLOYMENT_MODEL` | The model the person chose, `cloud` or `hybrid` | Both |
+| `POLAR_SKY_ORGANIZATION_ID` | The organization ID | Both |
+| `POLAR_SKY_ORGANIZATION_NAME` | The organization name | Both |
+| `POLAR_SKY_CONSOLE_URL` | The Polar Sky console address | Both |
+| `POLAR_SKY_CLOUD_SCOPES` | The delegation scopes for the cloud service account, as one comma-separated line. In Cloud, this is the `cloud_scopes` answer | Both |
+| `POLAR_SKY_CHART_VERSION` | The Polar Sky chart version | Hybrid |
+| `POLAR_SKY_RELEASE_CHANNEL` | The release channel, `latest` | Hybrid |
+| `POLAR_SKY_HOST` | The Polar Sky Cloud endpoint the engine connects to | Hybrid |
+| `POLAR_SKY_ON_PREM_SCOPES` | The delegation scopes for the on-premises service account, as one comma-separated line | Hybrid |
 
-Also add this line, which is the same for every install:
+A Cloud answer has no chart, host or on-premises values, so write none of them.
+
+In hybrid, also add this line, which is the same for every hybrid install:
 
 ```bash
 export POLAR_SKY_NAMESPACE='polar-sky-on-prem'
 ```
+
+A Cloud install has no namespace, so do not add this line to it.
 
 A value with a single quote (`'`) in it cannot go in this file safely. If one has it, stop and tell the person to contact Polar Sky.
 
@@ -112,4 +154,4 @@ Write the file with your file tool, not with `echo`. Then check it. The script o
 
 `<skill folder>` is the folder this `SKILL.md` is in. When you show a command, put the real path in place of `<skill folder>`, so the person sees exactly what runs. If the script reports a problem, show it to the person and stop: a missing or wrong value comes from Polar Sky, so they contact their Polar Sky contact.
 
-Tell the person which organization they are signed in to, by name, for example "You are signed in to Polar Sky as **Acme Corp**." They confirm it with the install plan in phase 2. Do not mention the values file or the check. The deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.
+Tell the person which organization they are signed in to, by name, for example "You are signed in to Polar Sky as **Acme Corp**." They confirm it with the final plan in phase 2. Do not mention the values file or the check. In hybrid, the deployment platform (`POLAR_SKY_INFRA_PROFILE`) is not in these values: phase 2 finds it.
