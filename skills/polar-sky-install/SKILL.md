@@ -9,7 +9,7 @@ This skill installs Polar Sky for one customer organization. It works on the per
 
 The person chooses one of two deployment models when the install begins. In **Cloud**, Google Workspace connects to Polar Sky Cloud, and nothing runs in the customer's cloud. In **On-Prem**, an engine in the customer's own Kubernetes cluster reads file content as well, so the install also builds or uses that cluster and installs the engine. The choice is saved in `values.env` as `POLAR_SKY_DEPLOYMENT_MODEL`. Phases marked On-Prem only do not run in Cloud.
 
-The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly seven tools:
+The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. It has exactly eleven tools:
 
 | Tool | What it does |
 | --- | --- |
@@ -19,6 +19,10 @@ The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. 
 | `start_key_upload` | Takes the Workspace admin email and the deployment model, and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
 | `start_okta_connection` | Both models, only when groups live in Okta. Makes the key for the Okta app that lets Polar Sky manage groups, and returns only its public key. Polar Sky keeps the private key, for one hour. |
 | `finish_okta_connection` | Both models, only when groups live in Okta. Takes the Okta org URL, the app's client ID and the key ID. Polar Sky signs in to Okta as the app, reads its groups and, when that works, saves the Okta connection and the group settings. |
+| `get_drive_choice` | Says whether Polar Sky has found the organization's shared drives, shows the saved choice, a page of drives and folders to add, and whether monitoring started. `wait_seconds` (0 to 20) waits while the search runs. Read only. |
+| `start_drive_search` | Starts a new search for shared drives, while nothing is chosen. |
+| `check_drive_choice` | Previews a proposed choice without saving: what it adds, what it stops monitoring, controls that block it, and a `fingerprint`. Read only. |
+| `submit_drive_choice` | Saves a checked choice with its `fingerprint`, only after the person said yes to exactly that change. |
 | `report_issue` | Sends Polar Sky a short note about a problem in this install, so they can fix it. See [Report issues](#report-issues). |
 
 Polar Sky keeps no install state. To know where an install stands, look at the files in the install folder and, for On-Prem, at the cluster (see [Continue an install](#continue-an-install)).
@@ -127,7 +131,7 @@ If an answer raises a new question, ask it before the final plan, never inside i
 | 6 | Engine install (On-Prem only) | No | [references/engine.md](references/engine.md) |
 | 7 | Engine connected to Polar Sky Cloud (On-Prem only) | No | [references/connection.md](references/connection.md) |
 | 8 | Connect Okta, only when the organization manages its groups in Okta | Yes, the same stage | [references/okta.md](references/okta.md) |
-| 9 | Connect Google Workspace and choose locations | Yes | [references/workspace.md](references/workspace.md) |
+| 9 | Connect Google Workspace and choose what Polar Sky monitors | Yes | [references/workspace.md](references/workspace.md) |
 | 10 | Done: the summary for the chosen model | Yes (Cloud summary) | [references/done.md](references/done.md) |
 
 After the plan, do not wait idle. The slowest part is the super admin's approval, so start phase 4 early, and work on the next phase whose needs are met while something runs or waits.
@@ -163,7 +167,7 @@ On-Prem install:
 | 6 | `kubectl get helmrelease polar-sky -n "${POLAR_SKY_NAMESPACE}"` shows `Ready` `True`, and `kubectl get pods -n "${POLAR_SKY_NAMESPACE}"` shows the worker pods `Running`. Report the model pods on their own: `Running`, or `Pending` while they wait for GPU capacity, which does not block phase 7 |
 | 7 | `check_engine_connection` sees both workers |
 | 8 | Only when the plan has Okta: `get_install_values` answers `okta_connected` true, and `okta-admin-header` is deleted and the person says the token is revoked |
-| 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and the person says the console shows the chosen locations |
+| 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and a choice is saved: `get_drive_choice` answers `selected` and the person confirmed the choice (or the person says the console shows the chosen locations, when the tools are not listed) |
 
 Cloud install:
 
@@ -172,7 +176,7 @@ Cloud install:
 | 2 | `values.env` has `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_WORKSPACE_ADMIN_EMAIL`, and the person confirmed the plan. Cloud has no cluster values to check |
 | 4 | `values.env` has `GOOGLE_CLOUD_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_CLIENT_ID`, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the Polar Sky Cloud entry is in place |
 | 8 | Only when the plan has Okta: `get_install_values` answers `okta_connected` true, and `okta-admin-header` is deleted and the person says the token is revoked |
-| 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and the person says the console shows the chosen locations |
+| 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and a choice is saved: `get_drive_choice` answers `selected` and the person confirmed the choice (or the person says the console shows the chosen locations, when the tools are not listed) |
 
 Phases 3, 5, 6 and 7 do not apply to a Cloud install. Phase 8 applies to both models when the plan has Okta.
 

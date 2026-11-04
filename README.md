@@ -31,7 +31,7 @@ Polar Sky finds files that too many people can open, and proposes controls your 
 - **Cloud.** Polar Sky Cloud reads your files' content, and nothing runs in your cloud. This install sets up one Google service account in your Google Cloud project, its delegation entry, and the connection to Google Workspace. There is no cluster to build.
 - **On-Prem.** An engine in your own cloud reads your files' content, so Polar Sky Cloud never sees it. This install sets up a Kubernetes cluster with GPU nodes (on GKE, EKS or AKS), the engine certificate, the engine, two Google service accounts (one for the engine and one for Polar Sky Cloud), and the connection to Google Workspace. The agent can build a new cluster from Polar Sky's recipe, or use one you have.
 
-In both, a Google Workspace super admin approves what each service account may do, and no one's password is used. At the end, you choose in the Polar Sky console which drives Polar Sky monitors.
+In both, a Google Workspace super admin approves what each service account may do, and no one's password is used. At the end, you choose which drives Polar Sky monitors, in the conversation or in the Polar Sky console.
 
 If your organization already has an engine, its install is On-Prem, and the agent says so.
 

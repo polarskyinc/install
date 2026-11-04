@@ -16,19 +16,19 @@ Give the person a short summary, with real values:
 - **Google:** the service accounts `GOOGLE_ON_PREM_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and their two delegation entries. Polar Sky keeps the cloud account's key, encrypted.
 - **Certificate:** the subject and the end date from `scripts/check-certificate.sh`. It must be renewed before that date: run phase 5 again with a new key, and replace the `polar-sky-mtls` secret.
 - **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
-- **Monitoring:** the locations the person chose in the console.
+- **Monitoring:** what the person chose in the conversation, in their own drive names. They can change it again here or in the console. When the tools were not listed, the locations they chose in the console.
 - **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
 ## Cloud
 
-There is no cluster, no engine and no AI model to check, so skip the pod checks. Say the install is done once the person has chosen the locations in the console.
+There is no cluster, no engine and no AI model to check, so skip the pod checks. Say the install is done once the person has chosen what Polar Sky monitors, in the conversation or in the console.
 
 Give the person a short summary, with real values:
 
 - **Runs in Polar Sky Cloud:** the reading of Google Workspace, with the content scopes on the Polar Sky Cloud entry. Nothing runs in your cloud.
 - **Google:** the service account `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and its delegation entry with the scopes in `POLAR_SKY_CLOUD_SCOPES`. Polar Sky keeps the account's key, encrypted.
 - **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
-- **Monitoring:** the locations the person chose in the console.
+- **Monitoring:** what the person chose in the conversation, in their own drive names. They can change it again here or in the console. When the tools were not listed, the locations they chose in the console.
 
 ## What Polar Sky checks afterwards
 
