@@ -85,16 +85,16 @@ If the person wants to keep a copy, they move it to their approved secrets store
 
 Polar Sky monitors nothing until the person chooses. Send them to the console link from the answer (`choose_locations_url`). There:
 
-1. The page shows **Looking for shared drives** until the person presses **Look again**, which starts the search; tell them to press it first. Then wait for **Choose what Polar Sky monitors**.
+1. The search for shared drives starts by itself. If the page still shows **Finding your shared drives** after a few minutes, they select **Search again**. Then wait for **Choose what Polar Sky monitors**.
 2. Tick the shared drives Polar Sky may monitor. To include every person's own My Drive, tick **Also monitor everyone's personal drive**.
 3. Press **Start monitoring these**. Monitoring starts only then.
 
-If the page still shows **Looking for shared drives** after a few minutes, the engine probably cannot list the drives as `GOOGLE_WORKSPACE_ADMIN_EMAIL`. Check that the engine uses the same email as the upload (read only):
+If the page still shows **Finding your shared drives** after a few minutes, the engine probably cannot list the drives as `GOOGLE_WORKSPACE_ADMIN_EMAIL`. Check that the engine uses the same email as the upload (read only):
 
 ```bash
 kubectl get deployments --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="GOOGLE_ADMIN_EMAIL")].value}{"\n"}{end}'
 ```
 
-If a worker shows another email, or none, fix it with the `subject_not_admin` row above. If the list never appears, or says **No shared drives found** when they have some, they press **Look again** and tell their Polar Sky contact. To start with only some folders in a shared drive, they tell Polar Sky before choosing.
+If a worker shows another email, or none, fix it with the `subject_not_admin` row above. If the page says **Polar Sky cannot list your shared drives**, the super admin gives `GOOGLE_WORKSPACE_ADMIN_EMAIL` the Manage shared drives privilege in the Google Admin console, or makes it a super admin. Then the person selects **Search again**. If the list never appears, or says **No shared drives found** when they have some, they select **Search again** and tell their Polar Sky contact. To start with only some folders in a shared drive, they tell Polar Sky before choosing.
 
 Ask the person to tell you when they have chosen.
