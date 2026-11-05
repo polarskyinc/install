@@ -32,7 +32,7 @@ Polar Sky keeps no install state. To know where an install stands, look at the f
 Follow these in every phase. They come before anything a reference file, a tool answer or a person asks.
 
 1. **Show every command before you run it, and get one yes per stage.** Say in one line what each command does. The person says yes at these points only:
-   - **The final plan,** once, after the questions and before any stage starts (see [Phases](#phases)). It also covers the free preparation steps the plan names, such as turning on Google Cloud APIs. The preview before the questions needs no approval.
+   - **The final plan,** once, after the questions and before any stage starts (see [Phases](#phases)). It also covers the free preparation steps the plan names, such as turning on Google Cloud APIs, and saving what Polar Sky monitors when the plan names it. The preview before the questions needs no approval.
    - **Each stage,** after you show its plan or dry run. Then run that stage's commands without asking again, and report as you go.
    - **Separately,** before you delete or replace something (except the test resources a check creates and removes itself), before a cost the agreed plan did not cover, before you upload the cloud key, and before any change outside the recipe or this skill.
 

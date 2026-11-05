@@ -81,7 +81,7 @@ Google can take up to 24 hours to apply a new or changed delegation entry. If sc
 
 After the key upload, you must show the per-scope lines first (see "Read the answer" above), one line for each scope with its result. Do not move on to this section or to choosing what Polar Sky monitors until you have shown them.
 
-Ask about deleting the key file in a message of its own, with its own yes, and never in the same message as the question about what to cover. Wait for that answer before you ask what Polar Sky should cover.
+Ask about deleting the key file in a message of its own, with its own yes, and never in the same message as anything about what Polar Sky monitors. Wait for that answer before you go on to what Polar Sky monitors.
 
 Polar Sky now keeps the key, encrypted. The copy on this machine is no longer needed. If `cloud-key.json` is still in the install folder, show the command, say it deletes the cloud key file, and run it after a yes:
 
@@ -93,7 +93,7 @@ If the person wants to keep a copy, they move it to their approved secrets store
 
 ## Choose what Polar Sky monitors
 
-Polar Sky monitors nothing until the person chooses. Pick the path from the tools you have:
+Polar Sky monitors nothing until the choice is saved. The final plan already says what the person chose: everything, the recommended choice, or less in their own words. Pick the path from the tools you have:
 
 - If `get_drive_choice` is among the Install tools, choose in the conversation, as below.
 - If it is not, send the person to the console link from the earlier answer (`choose_locations_url`) and follow [Choose in the console](#choose-in-the-console).
@@ -119,22 +119,30 @@ Then read `data_selection_state`:
 | `engine_unreachable` | Polar Sky cannot reach the Document Processing Engine | On-Prem: check the engine's pods and connection as in the earlier steps, then call `start_drive_search` after a yes. Cloud has no engine: report it with `report_issue` |
 | `unknown` | The search stopped and Polar Sky does not know why | Call `start_drive_search` once after a yes. If it stops again, report it with `report_issue` and tell the person Polar Sky will follow up |
 
-**2. Ask, then propose.** Ask first what the person wants Polar Sky to cover, in one message that also says why you ask: Polar Sky starts with what they pick and nothing else. Give no examples of drives, names or topics before they answer. Do not page the list to find matches. Use `get_drive_choice` without `cursor` to read `drives.total` first, then follow the size rules below. If `total_is_exact` is false, say the count is approximate.
+**2. Build the choice.** Start from what the final plan said Polar Sky will monitor:
 
-- Up to about 20 shared drives in total: you may show them all, with the question.
-- More than about 20: never page the list to show it or to find matches, and never show it. Ask what to cover, then search with `query`, one word at a time, and for each word follow `next_cursor` until it is empty so no match is missed (this paging collects ids; it is not for showing the list). The search is one case-insensitive substring of the whole drive name, so "emea finance" and "finance, legal" match nothing: search "emea", then "finance". Merge the results, remove duplicates, and keep only the results whose `kind` is `shared_drive`: a search also returns folders, which are not drives. Count the kept drives yourself; the `total` of a search mixes in folders. Show a count and at most 5 example names, for example "62 shared drives have 'finance' in their name, for example A, B, C, D, E, and 57 more". Never show more than about 10 names in one message. Use `shared_drive_id` to look at folders inside one drive.
-- Their words match no drive: say so and ask again with other words. Never propose an empty choice.
-- Size check: ask roughly how many files the chosen drives hold only after they have picked drives, never before. Polar Sky needs roughly 2,000 documents across what they pick before it can find anything. Say the real count is not known until Polar Sky scans them, and offer to add more drives if it sounds small.
+- **Everything** (the recommended choice): build `mode` `all_locations` with nothing else. Do not ask what to cover, and do not show or page the drive list. It covers every shared drive, the ones found later, and everyone's personal drive when `personal_drives_supported` is true. Go to step 3.
+- **Less, in the person's words:** find the matching drives as below, and propose a rule.
+- **A continued install where you did not see the final plan:** propose everything, marked "(recommended)", with what it covers, including every person's own files, and ask once: "Any changes, or shall I go ahead?" If they want less, ask what to cover, then find the matching drives as below.
+
+To find the drives for less, use `get_drive_choice` without `cursor` to read `drives.total` first, then follow the size rules below. Give no examples of drives, names or topics before the person has said what to cover, and do not page the list to find matches. If `total_is_exact` is false, say the count is approximate.
+
+- Up to about 20 shared drives in total: you may show them all.
+- More than about 20: never page the list to show it or to find matches, and never show it. Search with `query` for the person's words, one word at a time, and for each word follow `next_cursor` until it is empty so no match is missed (this paging collects ids; it is not for showing the list). The search is one case-insensitive substring of the whole drive name, so "emea finance" and "finance, legal" match nothing: search "emea", then "finance". Merge the results, remove duplicates, and keep only the results whose `kind` is `shared_drive`: a search also returns folders, which are not drives. Count the kept drives yourself; the `total` of a search mixes in folders. Show a count and at most 5 example names, for example "62 shared drives have 'finance' in their name, for example A, B, C, D, E, and 57 more". Never show more than about 10 names in one message. Use `shared_drive_id` to look at folders inside one drive.
+- Their words match no drive: say so, and ask again with other words or offer everything. Never propose an empty choice.
 - The person approves the rule, not a list of names: "the 62 finance drives and the 18 legal drives, 80 in total, personal drives off". Recommend it, marked "(recommended)". Build the `locations` from the kept drives' ids.
-- No preference and 500 or fewer shared drives: propose every shared drive as a rule with a count ("all 312 shared drives, personal drives off"), not a list. To build `locations` for it, you may page with `cursor` (50 per page) to collect the ids of every `shared_drive` result without showing them; stop once you have all of them.
-- Hand-picking, or no preference with more than 500 shared drives (a save takes at most 500 locations): offer the console link (`choose_locations_url`), which has search and checkboxes. After they say they chose, read back what they saved with `get_drive_choice`. Also offer "monitor everything" (`all_locations`) and say, from the preview (`check_drive_choice`), that it includes everyone's personal drive when `personal_drives_supported` is true, and the shared drives found later.
-- No shared drives at all: say none were found and offer a new search after a yes. Offer personal drives only when `personal_drives_supported` is true, as an explicit opt-in that covers every person in the domain, including anyone who joins later.
-- Offer `all_locations` only to a person who asks for everything or as above. It covers every shared drive, ones found later, and (when supported) everyone's personal drive.
+- Every shared drive but no personal drives, with 500 or fewer shared drives: propose it as a rule with a count ("all 312 shared drives, personal drives off"), not a list, and say that shared drives added later are not included. To build `locations` for it, you may page with `cursor` (50 per page) to collect the ids of every `shared_drive` result without showing them; stop once you have all of them.
+- Hand-picking, or every shared drive with more than 500 shared drives (a save takes at most 500 locations): offer the console link (`choose_locations_url`), which has search and checkboxes. After they say they chose, read back what they saved with `get_drive_choice`. Also offer everything (`all_locations`).
+- No shared drives at all: say none were found, and offer a new search after a yes, or everything, which also covers shared drives added later. Personal drives on their own are possible only when `personal_drives_supported` is true; they cover every person in the domain, including anyone who joins later.
 - A drive or folder not in the list can be named by its id or by a Drive link in `locations`; Polar Sky checks it.
 
 Build the choice as `mode` `selected_locations`, `locations` (ids or links) and `personal_drives`, or `mode` `all_locations` with nothing else.
 
-**3. Check before any save.** Call `check_drive_choice` with the choice. Never skip this: it also gives the `fingerprint` the save needs. Show the person, in plain words:
+**3. Check before any save.** Call `check_drive_choice` with the choice. Never skip this: it gives the `fingerprint` the save needs, and it shows what the plan could not know.
+
+When a yes already covers the choice (everything, as the final plan said, or as the person approved in step 2 of a continued install), go straight to step 4. When `personal_drives_supported` is false, say in the same message as the save that everything covers the shared drives only: that is less than the plan said, never more. Ask first only when the check shows something the plan did not cover: a drop (`drops`), `stops_monitoring_something`, `discards_selection`, `blocked_by_controls` or an `unresolved` entry. Then show it as below and ask for a yes.
+
+For any other choice, show the person, in plain words:
 
 - what is added (`adds`), as a count with a few examples when there are many, never the whole list;
 - each drop (`drops`), always in full because drops are what stops being monitored, with its files read and the approved controls that stop being checked there;
@@ -143,9 +151,9 @@ Build the choice as `mode` `selected_locations`, `locations` (ids or links) and 
 - `blocked_by_controls` with its `message`: the save would be refused. The person dismisses those controls in the Polar Sky console or the Polar Sky Controls connector, then you check again;
 - each `unresolved` entry, with its `reason`, and ask for a corrected one.
 
-The `fingerprint` ties the yes to the exact list, so a yes covers the rule you showed. When `after.includes_future_shared_drives` is true, say the choice also covers shared drives found later, and when `after.personal_drives` is true, everyone's personal drive. Ask for a yes to that exact change, for example: "Any changes, or shall I save this?"
+The `fingerprint` ties the yes to the exact list, so a yes covers the rule you showed. When `after.includes_future_shared_drives` is true, say the choice also covers shared drives found later, and when `after.personal_drives` is true, everyone's personal drive. Ask for a yes to that exact change, the same way as everywhere else in the install: "Any changes, or shall I go ahead?"
 
-**4. Save.** After the yes, call `submit_drive_choice` with the same choice and the `fingerprint` from the check. If it is refused with `choice_changed`, the saved choice changed since the check: check again and show the new difference, and ask again.
+**4. Save.** After the yes, or straight after the check when a yes already covers the choice, call `submit_drive_choice` with the same choice and the `fingerprint` from the check. If it is refused with `choice_changed`, the saved choice changed since the check: check again and show the new difference, and ask again.
 
 | Refusal | What to tell the person |
 | --- | --- |
@@ -156,7 +164,7 @@ The `fingerprint` ties the yes to the exact list, so a yes covers the rule you s
 | `personal_drives_unsupported` | This connection cannot monitor personal drives. Leave them off |
 | `nothing_chosen` | Nothing was chosen. Name at least one location, or personal drives, or choose everything |
 | `folder_resolution_unavailable` | Polar Sky could not reach Google Drive to check the locations. Try again in a minute |
-| `several_connections` | The organization has more than one Google Workspace connection, which the conversation does not support. Use [Choose in the console](#choose-in-the-console) |
+| `several_connections` | The organization has more than one Google Workspace connection, which the conversation does not support. Use [Choose in the console](#choose-in-the-console). If the plan said everything, tell the person the console saves only what they tick, so shared drives added later are not included until they change it there |
 | `not_connected` | Google Workspace is not connected yet. Go back to the upload |
 | `already_chosen` (from `start_drive_search`) | A choice is saved, so there is nothing to search for. Change it with a check and a save |
 
@@ -175,7 +183,7 @@ Tell the person what each `monitoring` value means:
 | `unknown` | Polar Sky could not tell. Call `get_drive_choice` again a little later |
 | `unchanged` | A change to an already saved choice. It is done when `get_drive_choice` shows the choice the person approved. New locations are read at the next sync, usually within minutes |
 
-Say what Polar Sky now monitors, in the person's own drive names.
+Say what Polar Sky now monitors, in the person's own drive names. For everything, say it covers every shared drive (with the number found so far), the shared drives added later, and everyone's personal drive when it is included, and that they can narrow it here or in the console.
 
 ### Choose in the console
 
