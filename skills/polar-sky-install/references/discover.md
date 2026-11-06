@@ -73,7 +73,7 @@ The answers the plan needs:
 9. **Only with Okta: the Okta org URL, and who is an Okta Super Administrator** (both)? Why: creating Polar Sky's app in Okta and giving it an admin role needs a super admin, for a few minutes. If it is not the person, they do the Okta part from a message you prepare. Say in the same item that Polar Sky names its groups starting with `ps-`, and that the person can tell you if they want their own naming convention instead. Do not ask how groups reach Google Workspace: phase 8 finds out.
 10. **What Polar Sky monitors** (both), only when `get_drive_choice` is among the Install tools; without it, the person chooses in the console after the connection, and the plan says so. Why: Polar Sky reads only what the organization chooses. Recommend everything, marked "(recommended)": every shared drive, including ones added later, and everyone's personal drive (My Drive), including people who join later. Say plainly that this includes every person's own files. If the person wants less, take their words (for example "only the finance drives") and say you will find the matching drives once Google Workspace is connected. Do not list drives or ask about sizes here.
 
-Record only answers the person has confirmed.
+Record only answers the person has confirmed. Write each one into `values.env` as soon as the person confirms it, before you show the plan. This needs no yes, even when the person wants nothing changed today, because it only records their answers on this machine. Never put writing `values.env` into the plan as a stage that needs a yes.
 
 ## Show the final plan
 
