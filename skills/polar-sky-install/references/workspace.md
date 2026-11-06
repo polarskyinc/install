@@ -117,7 +117,7 @@ Then read `data_selection_state`:
 
 | `search_failure.reason` | What it means | More to do beyond the `fix` |
 | --- | --- | --- |
-| `admin_cannot_list_shared_drives` | Google did not allow the admin account Polar Sky uses to list shared drives | The super admin gives `GOOGLE_WORKSPACE_ADMIN_EMAIL` the Manage shared drives privilege in the Google Admin console, or makes it a super admin. After a yes, call `start_drive_search`. On-Prem: also check the engine's admin email as in [Choose in the console](#choose-in-the-console) |
+| `admin_cannot_list_shared_drives` | Google did not allow the admin account Polar Sky uses to list shared drives | The super admin gives `GOOGLE_WORKSPACE_ADMIN_EMAIL` the Manage shared drives privilege in the Google Admin console, or makes it a super admin. On-Prem: also check that the engine uses the same email (read only): `kubectl get deployments --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="GOOGLE_ADMIN_EMAIL")].value}{"\n"}{end}'`. If a worker shows another email, or none, fix it with the `subject_not_admin` row. Then, after a yes, call `start_drive_search` |
 | `engine_unreachable` | Polar Sky cannot reach the Document Processing Engine | On-Prem: check the engine's pods and connection as in the earlier steps, then call `start_drive_search` after a yes. Cloud has no engine: report it with `report_issue` |
 | `unknown` | The search stopped and Polar Sky does not know why | Call `start_drive_search` once after a yes. If it stops again, report it with `report_issue` and tell the person Polar Sky will follow up |
 

@@ -4,7 +4,7 @@
 
 Run this stage only when the install plan has it: the organization manages its groups in Okta. It is the same in Cloud and On-Prem, and needs only the install values, so it can run early: in Cloud while the super admin approves the Polar Sky Cloud entry, in On-Prem while the cluster builds. It must be done before connecting Google Workspace (phase 9): the key upload there tests the group scope with the organization's final group settings.
 
-If the super admin's request from phase 4 went out before this stage, call `get_install_values` again, with the same `deployment_model`, when this stage is done. If `needed_now` of `admin.directory.group` changed, tell the person in one line what its `needed_now_reason` now says. The scope is already on Polar Sky Cloud's line, so the super admin changes nothing.
+When this stage is done, call `get_install_values` again, with the same `deployment_model` (it only reads). If `needed_now` of `admin.directory.group` changed, tell the person in one line what its `needed_now_reason` now says. The scope is already on Polar Sky Cloud's line, so the super admin changes nothing.
 
 ## When Okta is already connected
 
@@ -18,7 +18,7 @@ If `get_install_values` answers `okta_connected` true, Okta is already connected
 
 ## The stage plan
 
-Show the plan in one message and ask "Does this look right?" One yes covers every command below, except where it says otherwise:
+Show the plan in one message and ask "Does this look right?" One yes covers every command below, except where it says otherwise. On a continued install where this stage is the next step, this plan may be the same message as the plan for the rest, as in the skill's [Continue an install](../SKILL.md#continue-an-install), with one yes for both:
 
 1. The person makes a short-lived Okta API token and saves it to a file on this machine.
 2. You look, read only, at how their Okta sends groups to Google Workspace, and say what you chose and why.
