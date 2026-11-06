@@ -4,7 +4,7 @@ set -u
 
 namespace="${POLAR_SKY_NAMESPACE:-}"
 profile="${POLAR_SKY_INFRA_PROFILE:-}"
-polar_sky_host="${POLAR_SKY_HOST:-connect.polarsky.ai:443}"
+polar_sky_host="${POLAR_SKY_HOST:-}"
 test_namespace="polar-sky-preflight-$(date +%s)"
 test_namespace_created=0
 busybox_image="busybox:1.36.1"
@@ -38,6 +38,15 @@ finish() {
 if [ -z "${namespace}" ] || [ -z "${profile}" ]; then
   printf 'Load values.env first: POLAR_SKY_NAMESPACE and POLAR_SKY_INFRA_PROFILE (the platform setting value gke, eks or aks) must be set.\n'
   exit 2
+fi
+
+if [ -z "${polar_sky_host}" ]; then
+  if [ "${POLAR_SKY_DEPLOYMENT_MODEL:-on_prem}" = cloud ]; then
+    polar_sky_host="connect.polarsky.ai:443"
+  else
+    printf 'POLAR_SKY_HOST is missing from values.env; get the install values again.\n'
+    exit 2
+  fi
 fi
 
 case "${profile}" in
@@ -326,7 +335,7 @@ check_egress() {
       6) fail "DNS cannot resolve ${host} from ${namespace}" "allow DNS from the namespace and check the resolver" ;;
       7 | 28) fail "no HTTPS connection to ${host}:443 from ${namespace}" "the network team allows outbound TCP 443 from the namespace and from the CPU and GPU nodes to ${host}, including its redirect and download hosts" ;;
       60) fail "a proxy changes TLS to ${host}" "let ${host} pass without TLS inspection; the engine's client certificate does not survive it" ;;
-      35 | 56)
+      35 | 55 | 56)
         if [ "${host}" = "${connect_host}" ]; then
           pass "TLS to ${host} (it asks for the engine's certificate, as expected)"
         else

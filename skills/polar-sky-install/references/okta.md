@@ -45,7 +45,7 @@ Check that the file is there (read only; it does not open the file):
 test -s ~/polar-sky-install/okta-admin-header && echo found
 ```
 
-Every Okta call below reads the token from this file with `-H @...`. Never add `-v`, `--trace` or `--trace-ascii`, because they print the token. Each command starts with `set -o pipefail`, so a call Okta refuses fails the whole command. A command that fails, or prints `null` where an ID should be, is a failure: stop, and follow hard rule 8. The one exception is an answer that a grant or the role is already there (see [Create the app in Okta](#create-the-app-in-okta)). Never go on with an ID you did not get.
+Every Okta call below reads the token from this file with `-H @...`. Never add `-v`, `--trace` or `--trace-ascii`, because they print the token. Each command starts with `set -o pipefail`, so a call Okta refuses fails the whole command. A command that fails, or prints `null` where an ID should be, is a failure: stop, and follow hard rule 8. The one exception is an answer that a grant or the role is already there (see [Create the app in Okta](#create-the-app-in-okta)). Never go on with an ID you did not get. The grant and role commands print Okta's `errorCode`, `errorSummary` and the summaries of its `errorCauses` when Okta refuses, so read that line before you decide.
 
 Check that the token works and belongs to a super admin (read only; it prints only the role names):
 
@@ -121,7 +121,7 @@ If it lists an app with that exact name, do not create a second one. Write its I
 set -o pipefail && . ~/polar-sky-install/values.env && okta() { curl -sS --fail-with-body -H @"$HOME/polar-sky-install/okta-admin-header" -H 'Accept: application/json' "$@"; } && okta -X POST -H 'Content-Type: application/json' --data @"$HOME/polar-sky-install/okta-public-key.json" "${OKTA_ORG_URL}/api/v1/apps/${OKTA_APP_ID}/credentials/jwks" | jq -r '[.kid, .status] | @tsv'
 ```
 
-Otherwise create the app. It is an API Services app that signs in with the public key, without DPoP, and only for itself (no person signs in through it). The first command writes the request to a file; the second sends it and prints the app's ID, client ID and state:
+Otherwise create the app. It is an API Services app that signs in with the public key, without DPoP, and only for itself (no person signs in through it). The first command writes the request to a file (the app from an earlier install has no request file); the second sends it and prints the app's ID, client ID and state:
 
 ```bash
 jq -n --slurpfile key ~/polar-sky-install/okta-public-key.json '{name: "oidc_client", label: "Polar Sky Group Provisioning", signOnMode: "OPENID_CONNECT", credentials: {oauthClient: {token_endpoint_auth_method: "private_key_jwt"}}, settings: {oauthClient: {application_type: "service", grant_types: ["client_credentials"], response_types: ["token"], dpop_bound_access_tokens: false, jwks: {keys: $key}}}}' > ~/polar-sky-install/okta-app-request.json
@@ -136,16 +136,21 @@ Write `export OKTA_APP_ID='<id>'` and `export OKTA_CLIENT_ID='<client id>'` into
 Let the app manage groups and read users (`okta.groups.manage`, `okta.users.read`). Polar Sky asks for both on every sign-in:
 
 ```bash
-set -o pipefail && . ~/polar-sky-install/values.env && okta() { curl -sS --fail-with-body -H @"$HOME/polar-sky-install/okta-admin-header" -H 'Accept: application/json' "$@"; } && grant() { okta -X POST -H 'Content-Type: application/json' --data "{\"scopeId\":\"$1\",\"issuer\":\"${OKTA_ORG_URL}\"}" "${OKTA_ORG_URL}/api/v1/apps/${OKTA_APP_ID}/grants" | jq -r '[.scopeId, .status] | @tsv'; } && grant okta.groups.manage && grant okta.users.read
+set -o pipefail && . ~/polar-sky-install/values.env && okta() { curl -sS --fail-with-body -H @"$HOME/polar-sky-install/okta-admin-header" -H 'Accept: application/json' "$@"; } && grant() { okta -X POST -H 'Content-Type: application/json' --data "{\"scopeId\":\"$1\",\"issuer\":\"${OKTA_ORG_URL}\"}" "${OKTA_ORG_URL}/api/v1/apps/${OKTA_APP_ID}/grants" | jq -r 'if .errorCode then "\(.errorCode) \(.errorSummary) \([.errorCauses[]?.errorSummary] | join("; "))" else [.scopeId, .status] | @tsv end'; } && { grant okta.groups.manage; grant okta.users.read; }
 ```
 
 Give the app the Organization Administrator role (`ORG_ADMIN`):
 
 ```bash
-set -o pipefail && . ~/polar-sky-install/values.env && okta() { curl -sS --fail-with-body -H @"$HOME/polar-sky-install/okta-admin-header" -H 'Accept: application/json' "$@"; } && okta -X POST -H 'Content-Type: application/json' --data '{"type":"ORG_ADMIN"}' "${OKTA_ORG_URL}/oauth2/v1/clients/${OKTA_CLIENT_ID}/roles" | jq -r '[.type, .status] | @tsv'
+set -o pipefail && . ~/polar-sky-install/values.env && okta() { curl -sS --fail-with-body -H @"$HOME/polar-sky-install/okta-admin-header" -H 'Accept: application/json' "$@"; } && okta -X POST -H 'Content-Type: application/json' --data '{"type":"ORG_ADMIN"}' "${OKTA_ORG_URL}/oauth2/v1/clients/${OKTA_CLIENT_ID}/roles" | jq -r 'if .errorCode then "\(.errorCode) \(.errorSummary) \([.errorCauses[]?.errorSummary] | join("; "))" else [.type, .status] | @tsv end'
 ```
 
-An answer that the grant or the role is already there (for an app from an earlier install) is fine: go on. Any other error: stop, and follow hard rule 8.
+Each grant prints `<scope> <status>`, and the role prints `<role> <status>`. An answer that the grant or the role is already there (for an app from an earlier install) is fine: go on. Only these two answers count:
+
+- a grant that prints `E0000001` with the cause "The scope has already been granted to the app." (Okta answers 400);
+- a role that prints `E0000090` with "The role specified is already assigned to the user." (Okta answers 409).
+
+The two grants run one after the other, so read the line of each. Any other error: stop, and follow hard rule 8.
 
 Why Organization Administrator, if the person asks: Okta checks an admin role as well as the granted access for an app. The Group Administrator role cannot work for an app, because Okta lets an app have it only for groups that already exist, so the app could not create new groups. The granted access still limits the app to groups and reading users.
 
@@ -166,6 +171,8 @@ Polar Sky signs in to Okta as the app with the key it kept, reads the org's grou
 | `connected` is true | Okta is connected | Go to [Tell the person what the app can do](#tell-the-person-what-the-app-can-do) |
 | `admin_role_missing` | The app has no admin role, so it cannot read or create groups | Give it the role as above, then call again |
 | `credentials_rejected` | Okta refused the app's sign-in. `detail` has Okta's reason | Check the client ID, that the app has the key `OKTA_KEY_ID`, that DPoP is off, and that both grants are there. Then call again |
+| `scopes_not_granted` | Okta has not granted the app every scope; `missing_scopes` names the ones missing | Grant them as above, then call again |
+| `dpop_enabled` | The app requires DPoP, which Polar Sky does not use | Ask the person to clear "Require Demonstrating Proof of Possession (DPoP)" on the app's **General** tab, then call again |
 | `okta_unreachable` | Polar Sky could not reach the Okta org | Check `OKTA_ORG_URL`, then call again |
 | `pending_key_expired` or `pending_key_not_found` | The key's hour passed, or another key replaced it | Call `start_okta_connection` again, write the new key to `okta-public-key.json`, add it to the app as in [Create the app in Okta](#create-the-app-in-okta), and call again |
 | `invalid_arguments` | A value does not fit | Fix the value it names, then call again |
@@ -194,7 +201,7 @@ Okta removes a key in two calls: `POST .../credentials/jwks/<id>/lifecycle/deact
 The token is no longer needed, and it can do anything the super admin can. Ask the person to revoke it now: **Security** > **API** > **Tokens**, then **Revoke** on `Polar Sky install`. Then delete its file and the stage's request files, after a yes:
 
 ```bash
-rm ~/polar-sky-install/okta-admin-header ~/polar-sky-install/okta-app-request.json ~/polar-sky-install/okta-public-key.json
+rm -f ~/polar-sky-install/okta-admin-header ~/polar-sky-install/okta-app-request.json ~/polar-sky-install/okta-public-key.json
 ```
 
 ## When the person is not an Okta super admin

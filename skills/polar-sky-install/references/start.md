@@ -133,10 +133,11 @@ Call `get_install_values` with `deployment_model` set to the model the person ch
 | `POLAR_SKY_CLOUD_SCOPES` | The delegation scopes for the cloud service account, as one comma-separated line. In Cloud, this is the `cloud_scopes` answer | Both |
 | `POLAR_SKY_CHART_VERSION` | The Polar Sky chart version | On-Prem |
 | `POLAR_SKY_RELEASE_CHANNEL` | The release channel, `latest` | On-Prem |
+| `POLAR_SKY_CHART_REFERENCE` | The Polar Sky chart address | On-Prem |
 | `POLAR_SKY_HOST` | The Polar Sky Cloud endpoint the engine connects to | On-Prem |
 | `POLAR_SKY_ON_PREM_SCOPES` | The delegation scopes for the on-premises service account, as one comma-separated line | On-Prem |
 
-A Cloud answer has no chart, host or on-premises values, so write none of them.
+A Cloud answer has no chart, chart address, host or on-premises values, so write none of them.
 
 In On-Prem, also add this line, which is the same for every On-Prem install:
 

@@ -86,10 +86,23 @@ if [ "${deployment_model}" != cloud ]; then
     [ "${POLAR_SKY_RELEASE_CHANNEL}" = "latest" ] || problem "POLAR_SKY_RELEASE_CHANNEL must be latest"
   fi
 
+  if require POLAR_SKY_CHART_REFERENCE; then
+    printf '%s' "${POLAR_SKY_CHART_REFERENCE}" | grep -Eq '^oci://[a-z0-9.:/_-]+$' ||
+      problem "POLAR_SKY_CHART_REFERENCE must look like oci://registry.example.com/charts/polar-sky-onprem"
+  fi
+
   if require POLAR_SKY_HOST; then
     printf '%s' "${POLAR_SKY_HOST}" | grep -Eq '^[a-z0-9.-]+:[0-9]+$' ||
       problem "POLAR_SKY_HOST must look like connect.polarsky.ai:443"
   fi
+fi
+
+if [ -n "${POLAR_SKY_OKTA_PLANNED:-}" ]; then
+  show POLAR_SKY_OKTA_PLANNED "${POLAR_SKY_OKTA_PLANNED}"
+  case "${POLAR_SKY_OKTA_PLANNED}" in
+    yes | no) ;;
+    *) problem "POLAR_SKY_OKTA_PLANNED must be yes or no" ;;
+  esac
 fi
 
 require POLAR_SKY_CONSOLE_URL || true

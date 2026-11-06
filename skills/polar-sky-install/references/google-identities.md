@@ -11,7 +11,7 @@ Polar Sky reads Google Workspace through Google service accounts in the customer
 
 Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
 
-This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in On-Prem. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
+Even right after the final plan's yes, show this stage's commands and ask again. This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in On-Prem. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
 
 ## Enable the APIs
 
