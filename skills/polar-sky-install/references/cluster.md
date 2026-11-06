@@ -20,7 +20,7 @@ Use the region, and for GKE the zone, from the install plan; if the plan did not
 
 For GKE, use the cluster's Google Cloud project from the install plan. It may be the service-account project or another one. Write it into `values.env` as `CLUSTER_PROJECT_ID`.
 
-For GKE, before the plan, check that the project has billing. The first command turns on the Cloud Billing API, which costs nothing; name it in the install plan, so the plan's yes covers it. If phase 2 found the API already on, leave that part out. It must print `True`:
+If the install plan has a new project for the cluster, create it first, as [Google identities](google-identities.md#create-a-new-project) says. For GKE, before the plan, check that the project has billing. The first command turns on the Cloud Billing API, which costs nothing; name it in the install plan, so the plan's yes covers it. If phase 2 found the API already on, leave that part out. It must print `True`:
 
 ```bash
 gcloud services enable cloudbilling.googleapis.com --project="${CLUSTER_PROJECT_ID}" && gcloud billing projects describe "${CLUSTER_PROJECT_ID}" --format='value(billingEnabled)'

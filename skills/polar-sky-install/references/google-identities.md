@@ -9,9 +9,29 @@ Polar Sky reads Google Workspace through Google service accounts in the customer
 | `polar-sky-cloud-integration` | Polar Sky Cloud | A JSON key, uploaded once to Polar Sky in phase 9, then deleted | Both |
 | `polar-sky-on-prem-dpe` | The engine in the cluster | A JSON key, which goes only into the cluster | On-Prem only |
 
-Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. Turn on only the APIs that phase 2 found off.
+Use the gcloud account and project the person confirmed in the final plan. The account needs to create service accounts, keys and service-account IAM bindings in the project, and to enable APIs. When `GOOGLE_CLOUD_ACCOUNT` is in `values.env`, a second Google account creates the service accounts: add `--account="${GOOGLE_CLOUD_ACCOUNT}"` at the end of every gcloud command in this stage, so the active account, which the cluster uses, stays as it is. The one exception is a new project that holds both the cluster and the service accounts, as [Create a new project](#create-a-new-project) says. Turn on only the APIs that phase 2 found off.
 
 Even right after the final plan's yes, show this stage's commands and ask again. This stage needs only the project, not the cluster, so start it as soon as the plan is approved, before or during the cluster build in On-Prem. Its plan: turn on two APIs, create the service accounts and their key files, then prepare the super admin's request. In Cloud that is one service account and one key. Show it in one message and ask "Does this look right?" That one yes covers every command below except where it says otherwise.
+
+## Create a new project
+
+Only when the final plan has a new project. Creating it is a stage of its own, with its own yes, before anything else in this file: show the commands and ask. Do this for each new project in the plan: `GOOGLE_CLOUD_PROJECT_ID`, `CLUSTER_PROJECT_ID`, or both when the plan has two new projects; the commands below show the first. First check whether the project is already there, from an earlier, stopped install. If this prints `ACTIVE` with the folder or organization from the plan, and the person confirms it is the project from that earlier install, skip the create. If it sits elsewhere, or the person does not know it, it is someone else's project: ask for another ID. An error that the project is not found, or that you may not see it, is the normal answer for a new project, not a failure: go on and create it. The `--account` rule above is for a project that holds only the service accounts. Create and link any project that holds the cluster with the active account, which the cluster uses, even when it also holds the service accounts. When one new project holds both, the active account creates it and becomes its owner: leave out `--account` in every command of this file, including the service account commands below.
+
+```bash
+gcloud projects describe "${GOOGLE_CLOUD_PROJECT_ID}" --format='value(lifecycleState,parent.type,parent.id)'
+```
+
+```bash
+gcloud projects create "${GOOGLE_CLOUD_PROJECT_ID}" --folder="<folder id>"
+```
+
+For a project directly under the organization, use `--organization="<organization id>"` in place of `--folder`. A project ID has 6 to 30 characters: lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen, and no other project in Google Cloud may use it. If Google answers that the ID is in use, ask the person for another, and write it into `values.env`. When the new project holds the cluster, link the billing account the person chose in the same stage:
+
+```bash
+gcloud billing projects link "${CLUSTER_PROJECT_ID}" --billing-account="<billing account id>"
+```
+
+If Google refuses to create the project or link billing for lack of permission, stop and call `report_issue`, outcome `blocked`. Tell the person the two ways out from the plan: use an existing project, or ask their Google Cloud administrator for the Project Creator role (or Billing Account User for billing) or to do this step for them.
 
 ## Enable the APIs
 
