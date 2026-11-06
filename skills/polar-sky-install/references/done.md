@@ -17,6 +17,7 @@ Give the person a short summary, with real values:
 - **Certificate:** the subject and the end date from `scripts/check-certificate.sh`. It must be renewed before that date: run phase 5 again with a new key, and replace the `polar-sky-mtls` secret.
 - **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
 - **Monitoring:** what the person chose in the conversation, in their own drive names. They can change it again here or in the console. When the tools were not listed, the locations they chose in the console.
+- **Slack:** when the plan had Slack and `get_install_values` answers `slack_connected` true, the workspace in `slack_workspace_name`, where Polar Sky can now send direct messages from the Polar Sky app. Requests Polar Sky raises on its own stay email-only until an administrator turns Slack on in the console under **Controls** > **Settings**. Otherwise: "Slack: not connected; you can connect it later from the Platform page in the Polar Sky console." Leave this line out when the company does not use Slack.
 - **Checks skipped:** any preflight failure the person chose to accept, with their reason, if there was one.
 
 ## Cloud
@@ -29,6 +30,7 @@ Give the person a short summary, with real values:
 - **Google:** the service account `GOOGLE_CLOUD_SERVICE_ACCOUNT` in `GOOGLE_CLOUD_PROJECT_ID`, and its delegation entry with the scopes in `POLAR_SKY_CLOUD_SCOPES`. Polar Sky keeps the account's key, encrypted.
 - **Okta** (only with Okta): the Okta org `OKTA_ORG_URL`, the app `Polar Sky Group Provisioning` with the Organization Administrator role, the start of Polar Sky's group names `OKTA_GROUP_PREFIX`, and how groups reach Google Workspace, in the words of phase 8. Polar Sky keeps the app's private key, encrypted; it never was on this machine.
 - **Monitoring:** what the person chose in the conversation, in their own drive names. They can change it again here or in the console. When the tools were not listed, the locations they chose in the console.
+- **Slack:** when the plan had Slack and `get_install_values` answers `slack_connected` true, the workspace in `slack_workspace_name`, where Polar Sky can now send direct messages from the Polar Sky app. Requests Polar Sky raises on its own stay email-only until an administrator turns Slack on in the console under **Controls** > **Settings**. Otherwise: "Slack: not connected; you can connect it later from the Platform page in the Polar Sky console." Leave this line out when the company does not use Slack.
 
 ## What Polar Sky checks afterwards
 

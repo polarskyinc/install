@@ -80,7 +80,7 @@ Write one message, in this order. Ask nothing in it except the model question at
      - **Cloud:** Polar Sky Cloud reads file content, and nothing runs in your cloud.
      - **On-Prem:** an engine in your own Kubernetes cluster reads file content, so Polar Sky Cloud never sees it. It needs a Kubernetes cluster with GPUs.
 
-3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes, and an Okta super admin if the company manages its groups in Okta. In both models, Okta adds one step, before connecting Google Workspace: Polar Sky connects to Okta through an Okta app whose key only Polar Sky holds, so it can create the groups for approved controls there.
+3. **The steps and how long each usually takes,** for the model or models you offered. Say which people they need: a Google Workspace super admin, for a few minutes, an Okta super admin if the company manages its groups in Okta, and, only for the optional Slack step, someone who may add apps to the company's Slack, or a Slack admin to approve the Polar Sky app. In both models, Okta adds one step, before connecting Google Workspace: Polar Sky connects to Okta through an Okta app whose key only Polar Sky holds, so it can create the groups for approved controls there.
 
    Cloud:
 
@@ -90,6 +90,7 @@ Write one message, in this order. Ask nothing in it except the model question at
    | Create the Google service account, and a super admin approves its access | 10 minutes, plus the super admin's time |
    | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
+   | Optional, only when your company uses Slack: connect Slack, so Polar Sky's messages arrive there | 5 minutes, plus a Slack admin's approval if your Slack needs one |
 
    On-Prem:
 
@@ -101,6 +102,7 @@ Write one message, in this order. Ask nothing in it except the model question at
    | Get the engine's certificate and install the engine | 20 to 30 minutes, mostly loading AI models |
    | Only when your groups live in Okta: connect Okta | 10 to 15 minutes, with an Okta super admin |
    | Connect Google Workspace and choose what Polar Sky monitors | 10 minutes |
+   | Optional, only when your company uses Slack: connect Slack, so Polar Sky's messages arrive there | 5 minutes, plus a Slack admin's approval if your Slack needs one |
 
    In Cloud, the super admin's approval is the longest wait. In On-Prem, the service accounts and the cluster can be set up at the same time, so the approval does not hold up the rest.
 
@@ -122,7 +124,7 @@ If the last line names a Git repository, stop: ask the person for another folder
 
 ## Get the install values
 
-Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `on_prem`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. Do not write `okta_connected`, `okta_org_url`, `provisioning_mode`, `managed_group_materialization` or `managed_group_prefix` either: they tell you whether Okta is connected and how groups are set up, for the questions and phase 8. If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
+Call `get_install_values` with `deployment_model` set to the model the person chose: `cloud` or `on_prem`. Write each value from that answer into `~/polar-sky-install/values.env`, one `export NAME='value'` line each, with the names below. Copy every value exactly as the tool gave it. Do not write `has_engine`, `scopes` or the request ID, and do not write `refused`. The `scopes` list explains each delegation scope for the person; do not write it to the file. Do not write `okta_connected`, `okta_org_url`, `provisioning_mode`, `managed_group_materialization` or `managed_group_prefix` either: they tell you whether Okta is connected and how groups are set up, for the questions and phase 8. Do not write `slack_connected` or `slack_workspace_name`: they tell you whether Slack is connected, for the questions and the [Slack step](slack.md). If the answer has any other value not in this table, add it as `POLAR_SKY_` plus its field name in capitals with `_` between words. Leave out every value that is empty or null.
 
 | Name | Value from `get_install_values` | Models |
 | --- | --- | --- |

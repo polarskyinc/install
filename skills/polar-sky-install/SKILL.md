@@ -1,6 +1,6 @@
 ---
 name: polar-sky-install
-description: Install Polar Sky for a customer, as a Cloud deployment (Google Workspace connected to Polar Sky Cloud) or an On-Prem deployment (adds a Kubernetes cluster, the engine certificate and the Polar Sky Document Processing Engine in the customer's own cloud), and in either one the Okta connection when groups live in Okta, using the Polar Sky Install MCP server and the person's own tools (gcloud, and for On-Prem kubectl, Helm, Terraform or OpenTofu, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
+description: Install Polar Sky for a customer, as a Cloud deployment (Google Workspace connected to Polar Sky Cloud) or an On-Prem deployment (adds a Kubernetes cluster, the engine certificate and the Polar Sky Document Processing Engine in the customer's own cloud), and in either one the Okta connection when groups live in Okta and, as an optional last step, the Slack connection for Polar Sky's messages, using the Polar Sky Install MCP server and the person's own tools (gcloud, and for On-Prem kubectl, Helm, Terraform or OpenTofu, aws or az, openssl). Use when the person asks to install, set up, onboard, continue or check a Polar Sky install.
 ---
 
 # Polar Sky install
@@ -13,7 +13,7 @@ The **Polar Sky Install** MCP server gives only what needs Polar Sky's servers. 
 
 | Tool | What it does |
 | --- | --- |
-| `get_install_values` | Returns this organization's install values for the chosen deployment model (`deployment_model`, which defaults to `on_prem`), and whether the organization already has an engine (`has_engine`). Read only. |
+| `get_install_values` | Returns this organization's install values for the chosen deployment model (`deployment_model`, which defaults to `on_prem`), whether the organization already has an engine (`has_engine`), and whether Okta and Slack are connected. Read only. |
 | `request_certificate` | On-Prem only. Takes a certificate signing request (CSR) and returns the signed engine certificate, or says Polar Sky staff will sign it. |
 | `check_engine_connection` | On-Prem only. Says whether Polar Sky Cloud sees the engine's two workers, and when it last saw each. Read only. |
 | `start_key_upload` | Takes the Workspace admin email and the deployment model, and returns a one-time `curl` command, valid for 10 minutes, that uploads the cloud service account key. Polar Sky tests each scope and, when no scope has a failure, saves the Google Workspace connection. |
@@ -134,6 +134,8 @@ If an answer raises a new question, ask it before the final plan, never inside i
 | 9 | Connect Google Workspace and choose what Polar Sky monitors | Yes | [references/workspace.md](references/workspace.md) |
 | 10 | Done: the summary for the chosen model | Yes (Cloud summary) | [references/done.md](references/done.md) |
 
+**Optional last step: connect Slack** ([references/slack.md](references/slack.md)), in both models, only when the plan has it: the company uses Slack and wants Polar Sky's messages there. It is not a phase of its own. Run it after phase 9 and before the summary in phase 10. The install is done without it.
+
 After the plan, do not wait idle. The slowest part is the super admin's approval, so start phase 4 early, and work on the next phase whose needs are met while something runs or waits.
 
 In On-Prem:
@@ -152,7 +154,7 @@ Recommend this order to the person with its reason. In On-Prem, for example: "Th
 
 ## Continue an install
 
-When the person comes back, run the server and network checks of phase 1 again, with `scripts/check-values.sh` (read only, after loading `values.env`). When it reports missing lines, call `get_install_values` with the model in `values.env` and copy them as [Start](references/start.md#get-the-install-values) says, with no yes needed. Then check what is already done. Skip the preview and the model question: the person already chose the model. If the install folder or its `values.env` does not exist, nothing was started. Tell the person exactly this one line, in place of the opening line in [Start](references/start.md#open-the-install), not added to it: "There's no Polar Sky install on this machine yet, so I'll start one. First, I'll look around without changing anything." Then go straight to the [look around](references/start.md#look-around) and the preview. The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done, and only after the person's yes for the cluster checks, as in rule 1. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access. For Okta, `get_install_values` answers whether it is connected; do not call `start_okta_connection` only to check.
+When the person comes back, run the server and network checks of phase 1 again, with `scripts/check-values.sh` (read only, after loading `values.env`). When it reports missing lines, call `get_install_values` with the model in `values.env` and copy them as [Start](references/start.md#get-the-install-values) says, with no yes needed. Then check what is already done. Skip the preview and the model question: the person already chose the model. If the install folder or its `values.env` does not exist, nothing was started. Tell the person exactly this one line, in place of the opening line in [Start](references/start.md#open-the-install), not added to it: "There's no Polar Sky install on this machine yet, so I'll start one. First, I'll look around without changing anything." Then go straight to the [look around](references/start.md#look-around) and the preview. The checks only read, with two exceptions. The preflight checks create a temporary namespace with short-lived test pods and delete it; run them only when phase 6 is not done, and only after the person's yes for the cluster checks, as in rule 1. `start_key_upload` writes nothing when Google Workspace is connected; otherwise it gives a one-time upload command that expires unused, and its first call may ask the person to approve write access. For Okta and Slack, `get_install_values` answers whether each is connected; do not call `start_okta_connection` only to check.
 
 First read `POLAR_SKY_DEPLOYMENT_MODEL` from `values.env`. `cloud` means a Cloud install, and the Cloud table below applies. `on_prem` means an On-Prem install, and the table after it applies. An older install may have written `'hybrid'` in that line, or no such line at all: both mean an On-Prem install. Rewrite the line as `export POLAR_SKY_DEPLOYMENT_MODEL='on_prem'`, keeping the file's other lines, and go on with the On-Prem table. Call it an On-Prem install when you talk to the person, and never say "hybrid".
 
@@ -168,6 +170,7 @@ On-Prem install:
 | 7 | `check_engine_connection` sees both workers |
 | 8 | Only when `values.env` has `POLAR_SKY_OKTA_PLANNED='yes'`: `get_install_values` answers `okta_connected` true, and `okta-admin-header` is deleted and the person says the token is revoked |
 | 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and a choice is saved: `get_drive_choice` answers `selected` and the person confirmed the choice (or the person says the console shows the chosen locations, when the tools are not listed) |
+| Slack | Only when the plan has Slack: `get_install_values` answers `slack_connected` true |
 
 Cloud install:
 
@@ -177,7 +180,8 @@ Cloud install:
 | 4 | `values.env` has `GOOGLE_CLOUD_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_CLIENT_ID`, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the Polar Sky Cloud entry is in place |
 | 8 | Only when `values.env` has `POLAR_SKY_OKTA_PLANNED='yes'`: `get_install_values` answers `okta_connected` true, and `okta-admin-header` is deleted and the person says the token is revoked |
 | 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and a choice is saved: `get_drive_choice` answers `selected` and the person confirmed the choice (or the person says the console shows the chosen locations, when the tools are not listed) |
+| Slack | Only when the plan has Slack: `get_install_values` answers `slack_connected` true |
 
-Phases 3, 5, 6 and 7 do not apply to a Cloud install. Phase 8 applies to both models when `POLAR_SKY_OKTA_PLANNED` is `'yes'`. When that line is missing, ask the person whether groups live in Okta, then record the answer.
+Phases 3, 5, 6 and 7 do not apply to a Cloud install. Phase 8 applies to both models when `POLAR_SKY_OKTA_PLANNED` is `'yes'`, and the Slack step when the plan has Slack. When that line is missing, ask the person whether groups live in Okta, then record the answer.
 
 Start from the first phase that is not done; in On-Prem, phases 4, 5 and 8 may be done before phase 3. Tell the person what is already set up and what the next steps do, by name, not by number, and confirm the plan for the rest.
