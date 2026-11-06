@@ -164,7 +164,7 @@ On-Prem install:
 | --- | --- |
 | 2 | `values.env` has `POLAR_SKY_INFRA_PROFILE` and the answers the person confirmed, including `POLAR_SKY_OKTA_PLANNED` |
 | 3 | `kubectl config current-context` names the install's cluster, and `scripts/preflight.sh` passes, or fails only on checks the person chose to skip |
-| 4 | `values.env` has `GOOGLE_ON_PREM_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_SERVICE_ACCOUNT`, `on-prem-key.json` exists or `kubectl get secret gws-creds -n "${POLAR_SKY_NAMESPACE}"` finds it, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the delegation entries are in place |
+| 4 | `values.env` has `GOOGLE_ON_PREM_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_SERVICE_ACCOUNT`, `on-prem-key.json` exists or `kubectl get secret gws-creds -n "${POLAR_SKY_NAMESPACE}"` finds it, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the delegation entries are in place with every scope in this model's scope lines and no `drive.readonly` or `drive` on Polar Sky Cloud's entry ([google-identities](references/google-identities.md#when-the-service-accounts-already-exist)) |
 | 5 | `scripts/check-certificate.sh` passes in the install folder, or `kubectl get secret polar-sky-mtls -n "${POLAR_SKY_NAMESPACE}"` finds it |
 | 6 | `kubectl get helmrelease polar-sky -n "${POLAR_SKY_NAMESPACE}"` shows `Ready` `True`, and `kubectl get pods -n "${POLAR_SKY_NAMESPACE}"` shows the worker pods `Running`. Report the model pods on their own: `Running`, or `Pending` while they wait for GPU capacity, which does not block phase 7 |
 | 7 | `check_engine_connection` sees both workers |
@@ -177,7 +177,7 @@ Cloud install:
 | Phase | Done when |
 | --- | --- |
 | 2 | `values.env` has `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_WORKSPACE_ADMIN_EMAIL`, and the person confirmed the plan, including `POLAR_SKY_OKTA_PLANNED`. Cloud has no cluster values to check |
-| 4 | `values.env` has `GOOGLE_CLOUD_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_CLIENT_ID`, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the Polar Sky Cloud entry is in place |
+| 4 | `values.env` has `GOOGLE_CLOUD_SERVICE_ACCOUNT` and `GOOGLE_CLOUD_CLIENT_ID`, `cloud-key.json` exists or `start_key_upload` answers `already_connected`, and the person says the Polar Sky Cloud entry is in place with every scope in the Cloud scope line ([google-identities](references/google-identities.md#when-the-service-accounts-already-exist)) |
 | 8 | Only when `values.env` has `POLAR_SKY_OKTA_PLANNED='yes'`: `get_install_values` answers `okta_connected` true, and `okta-admin-header` is deleted and the person says the token is revoked |
 | 9 | `start_key_upload` answers `already_connected`, `cloud-key.json` is deleted, and a choice is saved: `get_drive_choice` answers `selected` and the person confirmed the choice (or the person says the console shows the chosen locations, when the tools are not listed) |
 | Slack | Only when the plan has Slack: `get_install_values` answers `slack_connected` true |

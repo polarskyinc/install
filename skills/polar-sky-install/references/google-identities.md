@@ -23,7 +23,7 @@ This turns on the Admin SDK and Google Drive APIs in the project.
 
 ## When the service accounts already exist
 
-If `service-accounts create` answers that the account already exists (an earlier, stopped install), keep it: save its email and client ID as below, and do not create a second one. For its key:
+If `service-accounts create` answers that the account already exists (an earlier, stopped install), or the person tells you it exists, keep it: save its email and client ID as below, and do not create a second one. When the person told you first, do not run `create`: write the account's email into `values.env` as below (`<account name>@<project>.iam.gserviceaccount.com`), then read its client ID with the read-only `describe` command in [Delegation entries](#delegation-entries), which also shows the account exists. For its key:
 
 - If the person still has the key file from that install, they move it into the install folder under the name below. Check it belongs to the account without showing the private key: this prints only two public fields of the file, and Google's list of the account's keys, which must include that key ID and show it not disabled.
 
@@ -34,6 +34,8 @@ If `service-accounts create` answers that the account already exists (an earlier
 - If they don't have it, create a new key as below, and tell them the old key stays active until their administrator deletes it.
 
 If a key file is already in the install folder, never create a key over it: check it as above, or ask the person.
+
+A kept account still needs its delegation entry checked, even when the person says the super admin already approved it. The entry may come from an earlier install of the other model, and the two models put different scopes on each entry: in Cloud, Polar Sky Cloud's entry also holds `drive.readonly` and `drive`; in On-Prem, it must not. So the super admin's request stays in this stage's plan. In that plan, show each entry's client ID and its full scope line for the chosen model (`POLAR_SKY_CLOUD_SCOPES`, and in On-Prem `POLAR_SKY_ON_PREM_SCOPES`), and say the entry must have every scope in this line. When only Polar Sky uses the account, which is the usual case, recommend that the super admin opens the link from [Delegation entries](#delegation-entries) and clicks **Authorize** again: it sets exactly this line, and doing it again does no harm. If they would rather check by hand, they compare the entry in the Admin console with the line, and in On-Prem they also make sure Polar Sky Cloud's entry has no `drive.readonly` or `drive`. If the person says something else also uses the account, do not recommend the link: the super admin adds the missing scopes by hand and keeps the ones the other use still needs. In On-Prem, if that other use needs `drive.readonly` or `drive` on Polar Sky Cloud's account, use a new account instead, as below. This is part of the stage's one "Does this look right?", not a new yes.
 
 If the person does not trust an existing account, or cannot use it, they may choose a new account with another name instead; never delete the old one without its own yes, since something may still use it. Google needs 6 to 30 characters: lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. Check the name before you run anything. Then use it in place of `polar-sky-on-prem-dpe` or `polar-sky-cloud-integration` in every command and `values.env` line below, so the account email becomes `<new name>@<project>.iam.gserviceaccount.com`. Later steps read the emails from `values.env`, so nothing after this stage changes. Report it with `report_issue`, outcome `worked_around`.
 
@@ -148,7 +150,7 @@ Show the real values, not the names. There are no optional scopes: every scope t
 
 Always add this warning:
 
-> **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. If a client ID already has an entry with other scopes it still needs, add them by hand instead.
+> **Important:** Each link replaces any existing entry for that client ID with exactly these scopes, and editing an entry by hand also replaces its entire scope list. These client IDs belong to Polar Sky's own service accounts, so their entries should hold exactly these lines, and the link is the safe way to set them. Only if a client ID is also used by something else, and its entry has other scopes that still need to stay, add them by hand instead.
 
 Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`) needs the **Reports** privilege.
 
