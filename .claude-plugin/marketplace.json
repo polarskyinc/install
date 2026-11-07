@@ -1,0 +1,14 @@
+{
+  "name": "polar-sky",
+  "owner": {
+    "name": "Polar Sky"
+  },
+  "description": "Polar Sky plugins for Claude Code",
+  "plugins": [
+    {
+      "name": "polar-sky-status",
+      "source": "./plugins/polar-sky-status",
+      "description": "Shows Polar Sky folder and control status above the prompt"
+    }
+  ]
+}

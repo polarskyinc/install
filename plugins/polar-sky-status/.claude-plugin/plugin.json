@@ -1,0 +1,1 @@
+{"name": "polar-sky-status", "version": "0.1.0", "description": "Shows Polar Sky folder and control status above the prompt while a Polar Sky tool runs", "types": "./types/index.d.ts", "author": {"name": "Polar Sky"}}

@@ -92,6 +92,16 @@ Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar
 
 The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
 
+## Polar Sky status in Claude Code
+
+Once Polar Sky is installed, you can add a band above the Claude Code prompt that shows your folder and control status whenever Claude uses a Polar Sky connector. In Claude Code, run:
+
+```
+/plugin install polar-sky-status --marketplace polarskyinc/install
+```
+
+See [`plugins/polar-sky-status/README.md`](plugins/polar-sky-status/README.md) for what it shows and the permission it needs in auto mode.
+
 ## What is in this repository
 
 | Path | What it is |
@@ -99,6 +109,7 @@ The skill never prints your private keys, service account keys or Kubernetes sec
 | `skills/polar-sky-install/SKILL.md` | The skill: rules and the order of the phases |
 | `skills/polar-sky-install/references/` | One file for each phase |
 | `skills/polar-sky-install/scripts/` | Helper scripts: detection, value check, preflight checks, certificate check |
+| `plugins/polar-sky-status/` | The Polar Sky status mod for Claude Code, listed in `.claude-plugin/marketplace.json` |
 | `recipes/` | Polar Sky's OpenTofu/Terraform recipes for a new GKE, EKS or AKS cluster; the skill downloads the one for your platform |
 
 ## Changes
