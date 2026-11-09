@@ -46,16 +46,32 @@ gcloud auth application-default print-access-token >/dev/null && echo ADC OK
 
 If it does not print `ADC OK`, tell the person to run `gcloud auth application-default login` in their own terminal, and to choose the Google account that may create the cluster in `CLUSTER_PROJECT_ID`. It opens a browser. Run the check again when they are done.
 
-For AKS, check three more things before you plan. Use the answers from the install plan, and ask only for what it did not settle:
+For AKS, check four more things before you plan. Use the subscription from the install plan, and ask only if the plan did not settle it:
 
 1. **Subscription.** Which Azure subscription the cluster goes in. Propose the subscription `az` is signed in to, saying where it came from. Write its ID into `values.env` as `CLUSTER_SUBSCRIPTION_ID`. The person needs Owner, or Contributor and User Access Administrator, on it: the recipe creates a resource group and assigns a role to the cluster. With Contributor alone, `apply` fails at that role assignment.
-2. **Kubernetes version.** The Kubernetes minor version Polar Sky approved for this install, such as `1.35`. Ask the person for it; do not pick one. Check that the region offers it (read only), then write it into `values.env` as `CLUSTER_KUBERNETES_VERSION`:
+2. **Resource providers.** A subscription must register an Azure service's resource provider before it can use that service, and a new subscription may have none of the four the cluster needs. Without them, the version list and the quota check below fail. Check them (read only):
 
    ```bash
-   az aks get-versions --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --output table
+   . ~/polar-sky-install/values.env && for namespace in Microsoft.ContainerService Microsoft.Compute Microsoft.Network Microsoft.Storage; do echo "${namespace} $(az provider show --namespace "${namespace}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --query registrationState --output tsv)"; done
    ```
 
-3. **GPU quota.** Check the region's quota (read only):
+   If all four say `Registered`, go on. Otherwise show the person the command below for each provider that says `NotRegistered` or `Unregistered`; one that says `Registering` needs none. Say that registering is free and changes only this subscription, and ask for a yes. In the same message, say that OpenTofu's or Terraform's Azure provider also registers Azure's standard set of resource providers by itself on its first plan, which is free too. After the yes, run them:
+
+   ```bash
+   . ~/polar-sky-install/values.env && az provider register --namespace <namespace> --subscription "${CLUSTER_SUBSCRIPTION_ID}"
+   ```
+
+   Registering usually takes a few minutes. Tell the person so in one line. Then run the check again every minute or so, and go on only when all four say `Registered`. Do not wait a set time and assume it worked.
+
+3. **Kubernetes version.** Do not ask the person for it: pick it yourself. List the minor versions AKS offers in the region, with their preview flag (read only):
+
+   ```bash
+   az aks get-versions --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --query 'values[].{minor:version,preview:isPreview || `false`}' --output table
+   ```
+
+   Pick the newest minor whose `Preview` is `False` and that is 1.33 or newer. Write it into `values.env` as `CLUSTER_KUBERNETES_VERSION`, the minor only, such as `1.37`, and show it in the plan. If the command fails or lists no such minor, show the person what it printed and do not guess a version: you pick it once the region's list can be read. If it fails because a resource provider is not registered, go back to step 2.
+
+4. **GPU quota.** Check the region's quota (read only):
 
    ```bash
    az vm list-usage --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --output table
@@ -155,7 +171,7 @@ AKS:
 cd <recipe folder> && $IAC init && $IAC plan -var="subscription_id=${CLUSTER_SUBSCRIPTION_ID}" -var="location=${CLUSTER_REGION}" -var="kubernetes_version=${CLUSTER_KUBERNETES_VERSION}" -out=polar-sky.plan
 ```
 
-`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer. The AKS recipe stays on the minor version you planned and takes only its patch releases while AKS supports that minor. Tell the person that when AKS retires the minor, AKS upgrades the cluster to the next minor by itself, so they agree a new minor with Polar Sky before that date.
+`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer. The AKS recipe uses the minor version you picked: show it. It stays on that minor and takes only its patch releases while AKS supports it. Tell the person that when AKS retires the minor, AKS moves the cluster to the next minor by itself.
 
 ### Apply
 

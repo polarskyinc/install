@@ -37,7 +37,13 @@ The `premium-azurefile-retain` StorageClass provisions Azure Files premium NFS s
 
 ### Kubernetes Version
 
-`kubernetes_version` is a required minor version, such as `1.35`, and comes from the onboarding approval. The cluster uses the `patch` upgrade channel, so AKS applies patch releases within that minor while AKS supports it. When AKS retires the minor, it upgrades the cluster to the next supported minor by itself, outside any maintenance window, so agree a new approved minor with Polar Sky and upgrade before that date. Check which versions a region offers with `az aks get-versions --location <location> --output table`, and when each minor retires in the AKS Kubernetes release calendar.
+`kubernetes_version` is the required Kubernetes minor version the cluster runs, such as `1.35`. Use the newest minor that AKS offers in the region and that is not a preview; Polar Sky needs 1.33 or newer. The cluster uses the `patch` upgrade channel, so AKS applies patch releases within that minor while AKS supports it. When AKS retires the minor, it upgrades the cluster to the next supported minor by itself, outside any maintenance window. The AKS Kubernetes release calendar shows when each minor retires.
+
+List the minors a region offers, with their preview flag:
+
+```bash
+az aks get-versions --location <location> --subscription <your-subscription> --query 'values[].{minor:version,preview:isPreview || `false`}' --output table
+```
 
 ## Prerequisites
 
@@ -51,10 +57,10 @@ The `premium-azurefile-retain` StorageClass provisions Azure Files premium NFS s
 tofu init
 
 # Plan
-tofu plan -var subscription_id=<your-subscription> -var kubernetes_version=<approved-minor>
+tofu plan -var subscription_id=<your-subscription> -var kubernetes_version=<kubernetes-minor>
 
 # Apply
-tofu apply -var subscription_id=<your-subscription> -var kubernetes_version=<approved-minor>
+tofu apply -var subscription_id=<your-subscription> -var kubernetes_version=<kubernetes-minor>
 
 # Configure kubectl
 $(tofu output -raw aks_get_credentials_command)
@@ -65,7 +71,7 @@ $(tofu output -raw aks_get_credentials_command)
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `subscription_id` | Azure subscription ID | (required) |
-| `kubernetes_version` | Approved Kubernetes minor version | (required) |
+| `kubernetes_version` | Kubernetes minor version the cluster runs | (required) |
 | `location` | Azure region (must offer NCasT4_v3) | `eastus` |
 | `resource_group_name` | Resource group the recipe creates | `rg-polar-sky` |
 | `cluster_name` | AKS cluster name and DNS prefix | `aks-polar-sky` |

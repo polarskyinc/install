@@ -33,7 +33,7 @@ variable "cluster_name" {
 }
 
 variable "kubernetes_version" {
-  description = "Kubernetes minor version approved for this install, such as 1.35; AKS applies patch releases within it"
+  description = "Kubernetes minor version the cluster runs, such as 1.35; AKS applies patch releases within it"
   type        = string
 
   validation {
