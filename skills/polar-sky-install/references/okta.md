@@ -198,7 +198,7 @@ Okta removes a key in two calls: `POST .../credentials/jwks/<id>/lifecycle/deact
 
 ## Revoke the Okta API token
 
-The token is no longer needed, and it can do anything the super admin can. Ask the person to revoke it now: **Security** > **API** > **Tokens**, then **Revoke** on `Polar Sky install`. Then delete its file and the stage's request files, after a yes:
+The token is no longer needed, and it can do anything the super admin can. The earlier keys above need the token, so settle them first: ask nothing about the token until the person has answered about every earlier key, or there are none. Then ask the person to revoke it now: **Security** > **API** > **Tokens**, then **Revoke** on `Polar Sky install`. Then delete its file and the stage's request files, after a yes:
 
 ```bash
 rm -f ~/polar-sky-install/okta-admin-header ~/polar-sky-install/okta-app-request.json ~/polar-sky-install/okta-public-key.json

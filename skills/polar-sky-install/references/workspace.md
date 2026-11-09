@@ -81,7 +81,7 @@ Google can take up to 24 hours to apply a new or changed delegation entry. If sc
 
 After the key upload, you must show the per-scope lines first (see "Read the answer" above), one line for each scope with its result. Do not move on to this section or to choosing what Polar Sky monitors until you have shown them.
 
-Ask about deleting the key file in a message of its own, with its own yes, and never in the same message as anything about what Polar Sky monitors. Wait for that answer before you go on to what Polar Sky monitors.
+Ask about deleting the key file in a message of its own, with its own yes. Your whole message is the deletion question: say nothing about what Polar Sky monitors or the drive choice in it, and ask nothing else. Wait for that answer before you go on to what Polar Sky monitors.
 
 Polar Sky now keeps the key, encrypted. The copy on this machine is no longer needed. If `cloud-key.json` is still in the install folder, show the command, say it deletes the cloud key file, and run it after a yes:
 
@@ -112,7 +112,7 @@ Then read `data_selection_state`:
 | --- | --- |
 | `awaiting_selection` | Go to step 2 |
 | `selected` | A choice is already saved. Show it (`mode`, `locations`, `personal_drives`) and ask whether they want to change it. If so, go to step 2 with the saved choice as the start. If not, go to [After the save](#after-the-save) |
-| `scan_failed` | Report it at once. `search_failure` is an object with `reason`, `message` and `fix`: show the `message` as written and follow the `fix`, after a yes for any call that starts a search. The table below says more for each `reason` |
+| `scan_failed` | Report it at once. `search_failure` is an object with `reason`, `message` and `fix`: say the `message` in these words, the whole sentence, without shortening or rephrasing it, and follow the `fix`, after a yes for any call that starts a search. The table below says more for each `reason` |
 | `connected` | The search has not started. Call `get_drive_choice` again once; if it is still `connected`, call `start_drive_search` after a yes, then wait as above |
 
 | `search_failure.reason` | What it means | More to do beyond the `fix` |
