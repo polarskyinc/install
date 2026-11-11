@@ -9,8 +9,8 @@ Read this page from [Webhook endpoints](webhook.md#when-it-does-not-work) when a
 | `reason` | What it means | What to do |
 | --- | --- | --- |
 | `upload_shape_invalid` | The file does not hold exactly two lines. | The person makes it the URL on line 1 and the secret on line 2, nothing else. Run the same command again. |
-| `url_invalid` | Line 1 is not a URL Polar Sky can send to: it must start with `https://` and name a host on the internet, not an IP address or a local name such as `localhost`, and be at most 2048 characters. | The person copies the receiver's URL again onto line 1. Run the same command again. |
-| `secret_invalid` | Line 2 is not a usable secret: 1 to 1024 characters, with no tabs or other control characters. | The person copies the secret again onto line 2. Run the same command again. |
+| `url_invalid` | Line 1 is not a URL Polar Sky can send to: it must start with `https://` and name a host on the internet, not an IP address or a local name such as `localhost`, and be at most 2048 characters. | The person copies the receiver's URL again: you paste it again, or they put it on line 1 of the file and save. Run the same command again. |
+| `secret_invalid` | Line 2 is not a usable secret: 1 to 1024 characters, with no tabs or other control characters. | The person copies the receiver's secret again: you paste it again, or they put it on line 2 of the file and save. Run the same command again. |
 | `wrong_content_type` | The command was changed. | Run the command exactly as `curl_command` gives it. |
 | `upload_too_large` | The file holds more than a URL and a secret. | The person makes it two lines. Run the same command again. |
 | `upload_token_expired`, `upload_too_many_attempts` or `upload_token_invalid` | The command expired, was tried too often, or was already used. | Call `start_webhook_connection` again with the same name for a new command. The file can stay as it is. |
@@ -40,7 +40,7 @@ Read this page from [Webhook endpoints](webhook.md#when-it-does-not-work) when a
 | `failure_reason` | Say | What to do |
 | --- | --- | --- |
 | `status`, with `last_status_code` 401 or 403 | The receiver answered that code: the signing secret does not match, or the header name or hash algorithm differ. | Check that the receiver uses the header `X-Polar-Sky-Signature` and SHA 256. If they match, the secrets differ: on the Platform page, **Edit** the endpoint and paste the receiver's secret, or put Polar Sky's secret into the receiver. Then test again. |
-| `status`, with `last_status_code` 404 | The receiver answered 404: it does not know this URL. | A new Panther source may still be starting: [Webhook endpoints](webhook.md#upload-save-and-test) allows one retry a few minutes later. If it still fails, check the URL and **Edit** it on the Platform page. |
+| `status`, with `last_status_code` 404 | The receiver answered 404: it does not know this URL. | A new Panther source can answer 404 for a few minutes: [Webhook endpoints](webhook.md#upload-save-and-test) retries about 2 and 5 minutes after the first 404. If it still fails, check the URL and **Edit** it on the Platform page, or test again later. |
 | `status`, another code | The receiver answered that code. | Check the receiver's settings against the ones it was given, then test again. |
 | `timeout` | The receiver did not answer within 15 seconds. | Check that the receiver is running, then test again. |
 | `dns` | The host name could not be found. | The URL is wrong. **Edit** it on the Platform page. |
