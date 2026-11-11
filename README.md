@@ -26,25 +26,36 @@ The skill's hard rules apply from the first command. Read them in the "Hard rule
 
 ## What Polar Sky installs
 
-Polar Sky finds files that too many people can open, and proposes controls your team approves. You choose one of two deployments when the install starts:
+Polar Sky finds files that too many people can open, and proposes controls your team approves. It works with Google Workspace or Microsoft 365. You choose one of two deployments when the install starts:
 
-- **Cloud.** Polar Sky Cloud reads your files' content, and nothing runs in your cloud. This install sets up one Google service account in your Google Cloud project, its delegation entry, and the connection to Google Workspace. There is no cluster to build.
-- **On-Prem.** An engine in your own cloud reads your files' content, so Polar Sky Cloud never sees it. This install sets up a Kubernetes cluster with GPU nodes (on GKE, EKS or AKS), the engine certificate, the engine, two Google service accounts (one for the engine and one for Polar Sky Cloud), and the connection to Google Workspace. The agent can build a new cluster from Polar Sky's recipe, or use one you have.
+- **Cloud.** Polar Sky Cloud reads your files' content, and nothing runs in your cloud. For Google Workspace, this install sets up one Google service account in your Google Cloud project, its delegation entry, and the connection to Google Workspace. For Microsoft 365, it sets up one app registration in your Microsoft Entra ID, with a certificate made on your machine, and the connection to Microsoft 365. There is no cluster to build.
+- **On-Prem.** An engine in your own cloud reads your files' content, so Polar Sky Cloud never sees it. This install sets up a Kubernetes cluster with GPU nodes (on GKE, EKS or AKS), the engine certificate and the engine. For Google Workspace, it also sets up two Google service accounts (one for the engine and one for Polar Sky Cloud) and the connection to Google Workspace. For Microsoft 365, it sets up two app registrations (`Polar Sky On-Premises` for the engine, whose key goes only into your cluster, and `Polar Sky Cloud`, which reads no file content) and the connection to Microsoft 365. The agent can build a new cluster from Polar Sky's recipe, or use one you have.
 
 In both, a Google Workspace super admin approves what each service account may do, and no one's password is used. At the end, you choose which drives Polar Sky monitors, in the conversation or in the Polar Sky console.
+
+With Microsoft 365, a Global Administrator or Privileged Role Administrator grants admin consent to the app registrations, and no one's password is used. Polar Sky monitors every SharePoint site and everyone's OneDrive.
 
 If your organization already has an engine, its install is On-Prem, and the agent says so.
 
 ## What you need
 
-For a Cloud install:
+For a Cloud install with Google Workspace:
 
 - macOS, Linux, or Windows with WSL
 - An administrator account in your Polar Sky organization
 - `gcloud`, signed in to a Google Cloud project you can use
 - A Google Workspace super admin, for a few minutes, to add the delegation entry
 
-For an On-Prem install, in addition to the above:
+For a Cloud install with Microsoft 365:
+
+- macOS, Linux, or Windows with WSL
+- An administrator account in your Polar Sky organization
+- `az` (the Azure CLI), `jq` and OpenSSL; `az` signs in to your Microsoft 365 tenant, with or without an Azure subscription
+- The right to register applications in Microsoft Entra ID, which every user has by default
+- A Global Administrator or Privileged Role Administrator, for a few minutes, to grant admin consent
+- Audit logging turned on in Microsoft Purview
+
+For an On-Prem install, in addition to the Cloud list above for your provider (and with Microsoft 365 on GKE, `gcloud` too):
 
 - `kubectl`, Helm 3 or 4, and OpenSSL
 - Terraform or OpenTofu 1.6 or later, for a new cluster
@@ -59,8 +70,8 @@ An On-Prem install usually takes one to two hours, most of it waiting for the cl
 1. The agent signs you in to Polar Sky and looks at your machine and your cloud. It only reads.
 2. It asks which deployment you want, then asks any open questions in one message.
 3. It shows you one final plan: what it found, what it will create, and how long each step takes. You check it and say yes, or change it.
-4. It works step by step. Before each step it shows you that step's plan, such as the cluster plan in an On-Prem install, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, and before it uploads the cloud service account key.
-5. In an On-Prem install, slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin.
+4. It works step by step. Before each step it shows you that step's plan, such as the cluster plan in an On-Prem install, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, before it grants admin consent, and before it uploads the cloud service account key or the Microsoft 365 certificate bundle.
+5. In an On-Prem install, slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin, or with Microsoft 365 creates the app registrations and the consent request for your administrator.
 
 ## Install
 
@@ -88,9 +99,9 @@ Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-instal
 
 ## Use
 
-Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar Sky, reading your organization's install values and looking at your machine. Then it asks whether you want a Cloud or an On-Prem deployment.
+Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar Sky, reading your organization's install values and looking at your machine. Then it asks whether you use Google Workspace or Microsoft 365, and whether you want a Cloud or an On-Prem deployment.
 
-The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
+The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs, the Microsoft 365 tenant ID and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key for Google Workspace, or the cloud app's certificate bundle for Microsoft 365, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
 
 ## Polar Sky status in Claude Code
 
@@ -108,7 +119,7 @@ See [`plugins/polar-sky-status/README.md`](plugins/polar-sky-status/README.md) f
 | --- | --- |
 | `skills/polar-sky-install/SKILL.md` | The skill: rules and the order of the phases |
 | `skills/polar-sky-install/references/` | One file for each phase |
-| `skills/polar-sky-install/scripts/` | Helper scripts: detection, value check, preflight checks, certificate check |
+| `skills/polar-sky-install/scripts/` | Helper scripts: detection, value check, preflight checks, certificate check, and the Microsoft app registration's permission list and check |
 | `plugins/polar-sky-status/` | The Polar Sky status mod for Claude Code, listed in `.claude-plugin/marketplace.json` |
 | `recipes/` | Polar Sky's OpenTofu/Terraform recipes for a new GKE, EKS or AKS cluster; the skill downloads the one for your platform |
 

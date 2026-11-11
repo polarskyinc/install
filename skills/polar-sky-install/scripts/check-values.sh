@@ -59,6 +59,21 @@ case "${deployment_model}" in
     ;;
 esac
 
+provider="${POLAR_SKY_PROVIDER:-}"
+case "${provider}" in
+  google_workspace | microsoft365)
+    show POLAR_SKY_PROVIDER "${provider}"
+    ;;
+  "")
+    show POLAR_SKY_PROVIDER "google_workspace (no line in values.env yet)"
+    provider=google_workspace
+    ;;
+  *)
+    show POLAR_SKY_PROVIDER "${provider}"
+    problem "POLAR_SKY_PROVIDER must be google_workspace or microsoft365"
+    ;;
+esac
+
 if require POLAR_SKY_ORGANIZATION_ID; then
   printf '%s' "${POLAR_SKY_ORGANIZATION_ID}" | grep -Eq '^[A-Za-z0-9-]+$' ||
     problem "POLAR_SKY_ORGANIZATION_ID may hold only letters, digits and hyphens"
@@ -107,7 +122,7 @@ fi
 
 require POLAR_SKY_CONSOLE_URL || true
 
-if require POLAR_SKY_CLOUD_SCOPES; then
+if [ "${provider}" != microsoft365 ] && require POLAR_SKY_CLOUD_SCOPES; then
   check_scopes POLAR_SKY_CLOUD_SCOPES
   if [ "${deployment_model}" = cloud ]; then
     for scope in drive drive.readonly; do
@@ -126,7 +141,9 @@ if require POLAR_SKY_CLOUD_SCOPES; then
 fi
 
 if [ "${deployment_model}" != cloud ]; then
-  if require POLAR_SKY_ON_PREM_SCOPES; then check_scopes POLAR_SKY_ON_PREM_SCOPES; fi
+  if [ "${provider}" != microsoft365 ] && require POLAR_SKY_ON_PREM_SCOPES; then
+    check_scopes POLAR_SKY_ON_PREM_SCOPES
+  fi
 
   if require POLAR_SKY_NAMESPACE; then
     [ "${POLAR_SKY_NAMESPACE}" = "polar-sky-on-prem" ] || problem "POLAR_SKY_NAMESPACE must be polar-sky-on-prem"
@@ -168,6 +185,54 @@ for name in GOOGLE_WORKSPACE_ADMIN_EMAIL GOOGLE_CLOUD_ACCOUNT; do
   printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' ||
     problem "${name} is not a plain email address"
 done
+
+for name in MICROSOFT_TENANT_ID MICROSOFT_CLOUD_APP_CLIENT_ID MICROSOFT_ON_PREM_APP_CLIENT_ID; do
+  value="${!name:-}"
+  [ -n "${value}" ] || continue
+  show "${name}" "${value}"
+  printf '%s' "${value}" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' ||
+    problem "${name} is not an ID such as 00000000-0000-0000-0000-000000000000"
+done
+
+if [ -n "${MICROSOFT_CLOUD_APP_CERTIFICATE:-}" ]; then
+  show MICROSOFT_CLOUD_APP_CERTIFICATE "${MICROSOFT_CLOUD_APP_CERTIFICATE}"
+  printf '%s' "${MICROSOFT_CLOUD_APP_CERTIFICATE##*/}" | grep -Eq '^microsoft-cloud-app(-[0-9]{8})?\.crt$' ||
+    problem "MICROSOFT_CLOUD_APP_CERTIFICATE must name microsoft-cloud-app.crt, or one with a date such as microsoft-cloud-app-20261109.crt"
+fi
+
+engine_certificate="${MICROSOFT_ON_PREM_APP_CERTIFICATE:-}"
+engine_key_file="${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE:-}"
+if [ -n "${engine_certificate}" ] || [ -n "${engine_key_file}" ]; then
+  show MICROSOFT_ON_PREM_APP_CERTIFICATE "${engine_certificate}"
+  show MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE "${engine_key_file}"
+  if [ -z "${engine_certificate}" ] || [ -z "${engine_key_file}" ]; then
+    problem "MICROSOFT_ON_PREM_APP_CERTIFICATE and MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE go into values.env together, and one of them is missing"
+  else
+    printf '%s' "${engine_certificate##*/}" | grep -Eq '^microsoft-on-prem-app(-[0-9]{8})?\.crt$' ||
+      problem "MICROSOFT_ON_PREM_APP_CERTIFICATE must name microsoft-on-prem-app.crt, or one with a date such as microsoft-on-prem-app-20261109.crt"
+    [ "${engine_key_file}" = "${engine_certificate%.crt}.pem" ] ||
+      problem "MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE must be the .pem with the same name and folder as MICROSOFT_ON_PREM_APP_CERTIFICATE, so the cluster gets the key of the certificate on the app"
+  fi
+fi
+
+if [ -n "${MICROSOFT_SHAREPOINT_HOST:-}" ]; then
+  show MICROSOFT_SHAREPOINT_HOST "${MICROSOFT_SHAREPOINT_HOST}"
+  case "${MICROSOFT_SHAREPOINT_HOST}" in
+    *-my.sharepoint.com)
+      problem "MICROSOFT_SHAREPOINT_HOST must be the SharePoint host, such as contoso.sharepoint.com, not the OneDrive host that ends in -my.sharepoint.com"
+      ;;
+    *)
+      printf '%s' "${MICROSOFT_SHAREPOINT_HOST}" | grep -Eq '^[a-z0-9][a-z0-9-]*\.sharepoint\.com$' ||
+        problem "MICROSOFT_SHAREPOINT_HOST must be a host in lowercase such as contoso.sharepoint.com, with no https:// and no path"
+      ;;
+  esac
+fi
+
+if [ -n "${POLAR_SKY_ENGINE_CONNECTED_AT:-}" ]; then
+  show POLAR_SKY_ENGINE_CONNECTED_AT "${POLAR_SKY_ENGINE_CONNECTED_AT}"
+  printf '%s' "${POLAR_SKY_ENGINE_CONNECTED_AT}" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' ||
+    problem "POLAR_SKY_ENGINE_CONNECTED_AT must be a UTC time such as 2026-11-09T14:05:00Z"
+fi
 
 if [ "${problems}" -eq 0 ]; then
   printf 'VALUES OK\n'

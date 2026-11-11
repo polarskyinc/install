@@ -49,6 +49,28 @@ if [ -z "${polar_sky_host}" ]; then
   fi
 fi
 
+case "${POLAR_SKY_PROVIDER:-google_workspace}" in
+  google_workspace)
+    provider_hosts="oauth2.googleapis.com admin.googleapis.com www.googleapis.com"
+    ;;
+  microsoft365)
+    sharepoint_host="${MICROSOFT_SHAREPOINT_HOST:-}"
+    if [ -z "${sharepoint_host}" ]; then
+      printf 'MICROSOFT_SHAREPOINT_HOST is missing from values.env: the egress test needs the SharePoint host, such as contoso.sharepoint.com.\n'
+      exit 2
+    fi
+    if ! printf '%s' "${sharepoint_host}" | grep -Eq '^[a-z0-9][a-z0-9-]*\.sharepoint\.com$' || [ "${sharepoint_host%-my.sharepoint.com}" != "${sharepoint_host}" ]; then
+      printf 'MICROSOFT_SHAREPOINT_HOST must be the SharePoint host in lowercase, such as contoso.sharepoint.com, not %s.\n' "${sharepoint_host}"
+      exit 2
+    fi
+    provider_hosts="login.microsoftonline.com graph.microsoft.com ${sharepoint_host} ${sharepoint_host%.sharepoint.com}-my.sharepoint.com"
+    ;;
+  *)
+    printf 'POLAR_SKY_PROVIDER must be google_workspace or microsoft365.\n'
+    exit 2
+    ;;
+esac
+
 case "${profile}" in
   gke)
     platform="GKE"
@@ -308,7 +330,7 @@ check_egress() {
   local hosts host code connect_host results ca_pem
   connect_host="${polar_sky_host%%:*}"
   ca_pem="$(awk '{printf "%s\\n", $0}' "$(dirname "$0")/polar-sky-ca.crt")"
-  hosts="${connect_host} us-docker.pkg.dev fluxcd-community.github.io ghcr.io registry-1.docker.io auth.docker.io oauth2.googleapis.com admin.googleapis.com www.googleapis.com ${model_host}"
+  hosts="${connect_host} us-docker.pkg.dev fluxcd-community.github.io ghcr.io registry-1.docker.io auth.docker.io ${provider_hosts} ${model_host}"
   if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
     fail "namespace ${namespace} does not exist, so egress is not tested" "create the namespace (kubectl create namespace ${namespace}), then run this again"
     return

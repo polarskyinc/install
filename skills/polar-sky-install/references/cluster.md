@@ -260,7 +260,7 @@ The script checks the cluster against guide section 2 and reports every problem 
 - that the person can install Flux (custom resource definitions, cluster roles and their bindings) and manage resources in the namespace, with `kubectl auth can-i`
 - whether another Flux, or Argo CD, already runs in the cluster (a warning, not a failure)
 - that the cluster enforces NetworkPolicy: two test pods in a new temporary namespace `polar-sky-preflight-<time>`, first allowed to talk, then blocked by a policy
-- outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host; for the Polar Sky host it trusts the Polar Sky CA in [scripts/polar-sky-ca.crt](../scripts/polar-sky-ca.crt), because that host's certificate is not from a public CA
+- outbound DNS and HTTPS from a short-lived pod in the Polar Sky namespace to each required host: for Google Workspace the Google sign-in and API hosts, and for Microsoft 365 `login.microsoftonline.com`, `graph.microsoft.com` and the tenant's SharePoint and OneDrive hosts from `MICROSOFT_SHAREPOINT_HOST`; for the Polar Sky host it trusts the Polar Sky CA in [scripts/polar-sky-ca.crt](../scripts/polar-sky-ca.crt), because that host's certificate is not from a public CA
 
 It changes the cluster in two ways. On a new cluster, the plan's yes covers them. On an existing cluster, this is the stage's yes: tell the person both, and ask "Any concerns, or shall I go ahead?"
 
@@ -299,7 +299,7 @@ Explain each failure: what it means and what can go wrong if the install goes on
 | No HTTPS to `huggingface.co` (EKS and AKS only) | Yes. Risk: the AI models cannot download, as above |
 | Kubernetes older than 1.33, a missing StorageClass, missing permissions | No: the install cannot work. The cluster must be fixed first |
 | A node that is not Linux `amd64` | No, unless Polar Sky agrees with the person how to keep Polar Sky pods off that node |
-| No DNS, no HTTPS or TLS inspection for any other host (on GKE including `storage.googleapis.com`, which image downloads may also use), or the egress test could not run or be read | No: the engine cannot pull its images, reach Google or reach Polar Sky Cloud. The network must be fixed first |
+| No DNS, no HTTPS or TLS inspection for any other host (on GKE including `storage.googleapis.com`, which image downloads may also use), or the egress test could not run or be read | No: the engine cannot pull its images, reach Google Workspace or Microsoft 365, or reach Polar Sky Cloud. The network must be fixed first |
 
 Warnings never block; explain them the same way.
 

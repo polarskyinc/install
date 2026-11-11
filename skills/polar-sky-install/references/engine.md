@@ -2,9 +2,11 @@
 
 **Tell the person:** This installs the engine: the workers that find and read files, and the AI models that judge how sensitive each file is. It takes 20 to 30 minutes, mostly loading the models.
 
-Installs the Kubernetes secrets, Flux, and the Polar Sky chart in the Polar Sky namespace. Before you start, phase 3 must have passed (or the person chose to skip the failures left), `client.crt` must have passed its check in phase 5, and `on-prem-key.json` must exist from phase 4. Run commands from the install folder.
+Installs the Kubernetes secrets, Flux, and the Polar Sky chart in the Polar Sky namespace. Before you start, phase 3 must have passed (or the person chose to skip the failures left), `client.crt` must have passed its check in phase 5, and `on-prem-key.json` must exist from phase 4. For Microsoft 365, in place of `on-prem-key.json`: the engine app's key file (`MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE`) must exist, and the engine app's check must have ended with `APP OK` ([Microsoft app registrations](microsoft-apps.md#check-the-app)), so a missing grant or a certificate that is not on the app is fixed before the key goes into the cluster. Run commands from the install folder.
 
-The Helm commands below pass values with `--set`, where a comma or `=` inside a value would add other chart values. Check the values again first (read only). It must end with `VALUES OK` and show a valid `GOOGLE_WORKSPACE_ADMIN_EMAIL`; if not, stop:
+Some commands below differ by provider: run the Google Workspace one or the Microsoft 365 one, never both. The engine reads one provider: for Microsoft 365, the chart gets no Google values, so Google Workspace stays off.
+
+The Helm commands below pass values with `--set`, where a comma or `=` inside a value would add other chart values. Check the values again first (read only). It must end with `VALUES OK` and show a valid `GOOGLE_WORKSPACE_ADMIN_EMAIL`, or for Microsoft 365 valid `MICROSOFT_TENANT_ID`, `MICROSOFT_ON_PREM_APP_CLIENT_ID` and `MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE`; if not, stop:
 
 ```bash
 . ~/polar-sky-install/values.env && <skill folder>/scripts/check-values.sh
@@ -30,8 +32,16 @@ helm repo add fluxcd-community https://fluxcd-community.github.io/helm-charts &&
 cd ~/polar-sky-install && umask 077 && helm template flux2 fluxcd-community/flux2 --version 2.17.2 --namespace="${POLAR_SKY_NAMESPACE}" --set installCRDs=true --set watchAllNamespaces=false --set helmController.create=true --set sourceController.create=true --set kustomizeController.create=false --set notificationController.create=false --set imageAutomationController.create=false --set imageReflectionController.create=false > flux-rendered.yaml && grep -E '^kind:' flux-rendered.yaml | sort | uniq -c
 ```
 
+Google Workspace:
+
 ```bash
 cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
+```
+
+Microsoft 365:
+
+```bash
+cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
 ```
 
 Tell the person, plainly:
@@ -56,13 +66,19 @@ kubectl create namespace "${POLAR_SKY_NAMESPACE}"
 
 ## Secrets
 
-Check which already exist (names only, read only):
+Check which already exist (names only, read only). Google Workspace:
 
 ```bash
 kubectl get secret polar-sky-mtls gws-creds --namespace="${POLAR_SKY_NAMESPACE}" --ignore-not-found
 ```
 
-If one exists, ask the person before replacing it: that is a separate yes. Never print its contents to compare.
+Microsoft 365:
+
+```bash
+kubectl get secret polar-sky-mtls microsoft365-credentials gws-creds --namespace="${POLAR_SKY_NAMESPACE}" --ignore-not-found
+```
+
+If one exists, ask the person before replacing it: that is a separate yes. Never print its contents to compare. For Microsoft 365, `gws-creds` means the engine in this cluster was set up for Google Workspace, and Polar Sky connects one provider per organization: do not install over it. Tell the person, call `report_issue`, and stop.
 
 The mTLS secret holds `client.crt` and `client.key`. Dry-run, then create:
 
@@ -84,6 +100,16 @@ base64 < "${GOOGLE_ONPREM_KEY_FILE}" | tr -d '\n' | kubectl create secret generi
 base64 < "${GOOGLE_ONPREM_KEY_FILE}" | tr -d '\n' | kubectl create secret generic gws-creds --from-file=service-account-key=/dev/stdin --namespace="${POLAR_SKY_NAMESPACE}"
 ```
 
+For Microsoft 365, the Microsoft 365 secret takes the place of the Google one. It holds the engine app's three values under the names the chart reads: `client-id`, `tenant-id` and `certificate-base64`. The engine needs all three: without one, it turns Microsoft 365 off without an error. The certificate bundle, the engine app's private key and certificate, passes through a pipe only, base64-encoded as the engine expects. The two IDs are public. Each command first checks that the key file is there and not empty, and that both IDs are set; if one is missing, it stops before anything reaches the cluster, with no output: run the values check above. When `microsoft365-credentials` already exists, the create commands below would fail: keep it, or replace it as [Replace the Microsoft 365 secret](#replace-the-microsoft-365-secret) says, after its own yes. Otherwise dry-run, then create:
+
+```bash
+test -s "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -r "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -n "${MICROSOFT_ON_PREM_APP_CLIENT_ID}" && test -n "${MICROSOFT_TENANT_ID}" && base64 < "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" | tr -d '\n' | kubectl create secret generic microsoft365-credentials --from-file=certificate-base64=/dev/stdin --from-literal=client-id="${MICROSOFT_ON_PREM_APP_CLIENT_ID}" --from-literal=tenant-id="${MICROSOFT_TENANT_ID}" --namespace="${POLAR_SKY_NAMESPACE}" --dry-run=server
+```
+
+```bash
+test -s "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -r "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -n "${MICROSOFT_ON_PREM_APP_CLIENT_ID}" && test -n "${MICROSOFT_TENANT_ID}" && base64 < "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" | tr -d '\n' | kubectl create secret generic microsoft365-credentials --from-file=certificate-base64=/dev/stdin --from-literal=client-id="${MICROSOFT_ON_PREM_APP_CLIENT_ID}" --from-literal=tenant-id="${MICROSOFT_TENANT_ID}" --namespace="${POLAR_SKY_NAMESPACE}"
+```
+
 Each command prints only `secret/<name> created`. Never print a secret to check it.
 
 ## Install Flux
@@ -94,19 +120,44 @@ helm upgrade --install flux2 fluxcd-community/flux2 --version 2.17.2 --namespace
 
 ## Install the Polar Sky chart
 
-Dry-run against the cluster first. The output goes to a file, because it can hold rendered secrets; only the result is shown:
+Dry-run against the cluster first. The output goes to a file, because it can hold rendered secrets; only the result is shown. Google Workspace:
 
 ```bash
 cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
 ```
 
-If it passes, install:
+Microsoft 365:
+
+```bash
+cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
+```
+
+If it passes, and for Microsoft 365 only, record the time from which Polar Sky counts this engine's reads, when `values.env` has no `POLAR_SKY_ENGINE_CONNECTED_AT` yet. The workers start reading as soon as they connect, so the time must come before the new workers' first read, and after the last read of any worker that ran before:
+
+- **No Polar Sky release yet** (the target check's `helm list` showed no `polar-sky`): get it right before the install.
+- **`polar-sky` already installed:** its workers are running and reading. Get it after the install instead, once both workers finished rolling out, with the wait command in [Replace the Microsoft 365 secret](#replace-the-microsoft-365-secret).
+
+Get it with (read only):
+
+```bash
+date -u +%Y-%m-%dT%H:%M:%SZ
+```
+
+Write it into `values.env` with your file tool, as `export POLAR_SKY_ENGINE_CONNECTED_AT='<the time>'`. From then on, every `get_install_values` call for Microsoft 365 passes it as `reading_since`, so only files this engine read count as read ([Connect Microsoft 365](microsoft365.md#confirm-polar-sky-started-reading)), and none that an earlier engine read.
+
+Then install. Google Workspace:
 
 ```bash
 helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
 ```
 
-Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. Run it in the background if your agent can, so you can check progress while it runs. If you cannot, ask the person to run it in their own terminal and tell you when it ends, and check progress meanwhile.
+Microsoft 365:
+
+```bash
+helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
+```
+
+Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. For Microsoft 365, the chart reads the three key names in `microsoft365-credentials` by default, so they need no value. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. Run it in the background if your agent can, so you can check progress while it runs. If you cannot, ask the person to run it in their own terminal and tell you when it ends, and check progress meanwhile.
 
 ## Wait for the release and the pods
 
@@ -148,7 +199,7 @@ Name the cause you see (for example, an image it cannot pull) and stop. Do not c
 
 ## Model pods waiting for GPU capacity
 
-Look at a `Pending` model pod's events with `kubectl describe pod` (above). When they say the pod needs a GPU node that is not there, for example `FailedScheduling` with `Insufficient nvidia.com/gpu`, or that the cluster could not add one (`FailedScaleUp`, "out of resources"), and the GPU pool can still grow (it autoscales and is below its maximum, as the pool check in phase 3 shows), no GPU node is free yet. If the pool cannot grow, for example an existing cluster without GPU autoscaling or a pool at its maximum, the models will not start on their own: that is a failure, so name it and stop. Any other reason, such as an unbound PersistentVolumeClaim or an image it cannot pull, is a failure: name it and stop, as above. A GPU shortage does not stop the install: go on with phases 7 to 9. While the models wait, the workers run and connect to Polar Sky Cloud, and Polar Sky finds the files and who can open them. Judging how sensitive each file is waits for the models. Tell the person this plainly: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot judge how sensitive files are until the AI models run. They start on their own when a GPU machine is free."
+Look at a `Pending` model pod's events with `kubectl describe pod` (above). When they say the pod needs a GPU node that is not there, for example `FailedScheduling` with `Insufficient nvidia.com/gpu`, or that the cluster could not add one (`FailedScaleUp`, "out of resources"), and the GPU pool can still grow (it autoscales and is below its maximum, as the pool check in phase 3 shows), no GPU node is free yet. If the pool cannot grow, for example an existing cluster without GPU autoscaling or a pool at its maximum, the models will not start on their own: that is a failure, so name it and stop. Any other reason, such as an unbound PersistentVolumeClaim or an image it cannot pull, is a failure: name it and stop, as above. A GPU shortage does not stop the install: go on with phases 7 to 9. While the models wait, the workers run and connect to Polar Sky Cloud, and Polar Sky finds the files and who can open them. Judging how sensitive each file is waits for the models. Tell the person this plainly, naming Microsoft 365 in place of Google Workspace in a Microsoft 365 install: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot judge how sensitive files are until the AI models run. They start on their own when a GPU machine is free."
 
 Report the shortage once with `report_issue`, outcome `worked_around`. On GKE, run the instance group check from phase 3 ([GPU pool at zero](cluster.md#gpu-pool-at-zero)), and see [When GPU nodes cannot start](cluster.md#when-gpu-nodes-cannot-start). Keep checking the model pods while you go on, and tell the person when they start. Never call the install done or working while a model pod is not ready (phase 10).
 
@@ -167,3 +218,34 @@ helm show readme "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VER
 ```
 
 It patches the HelmRelease so the release no longer waits for pods and retries on failure, without remediation, then asks Flux to reconcile and reset its failure count. Offer it to the person, and show its commands with `"${POLAR_SKY_NAMESPACE}"` as the namespace. It changes a Polar Sky resource, so it needs its own yes. Do not wait for auto-update instead: a new chart revision can clear a stall by itself, but its first upgrade still runs under the old settings and waits 20 minutes again while model pods are `Pending`.
+
+## Replace the Microsoft 365 secret
+
+Microsoft 365 only. Use it to renew the engine app's certificate, which lasts two years, to replace a secret that already exists, or when the first reads show the secret is wrong. The workers read the secret only when they start, so replacing it also needs a restart of both. Report the reason with `report_issue` when it is a fix.
+
+1. **For a renewal, a new certificate on the app first.** Make a new, dated certificate for the engine app and add it to the app, as [Microsoft app registrations](microsoft-apps.md#make-the-certificate) says, with that stage's yes, then run the engine app's check there with the new `MICROSOFT_ON_PREM_APP_CERTIFICATE`. It must end with `APP OK` before the new key goes into the cluster.
+2. **Replace the secret in place,** after its own yes, from the key file in `MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE`. The new secret is rendered and goes straight into `kubectl replace` through a pipe: it is never printed, and the old secret stays until the new one is accepted. Dry-run first, then replace. Each prints only that the secret was replaced:
+
+   ```bash
+   test -s "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -r "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -n "${MICROSOFT_ON_PREM_APP_CLIENT_ID}" && test -n "${MICROSOFT_TENANT_ID}" && base64 < "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" | tr -d '\n' | kubectl create secret generic microsoft365-credentials --from-file=certificate-base64=/dev/stdin --from-literal=client-id="${MICROSOFT_ON_PREM_APP_CLIENT_ID}" --from-literal=tenant-id="${MICROSOFT_TENANT_ID}" --namespace="${POLAR_SKY_NAMESPACE}" --dry-run=client -o yaml | kubectl replace --dry-run=server -f -
+   ```
+
+   ```bash
+   test -s "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -r "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" && test -n "${MICROSOFT_ON_PREM_APP_CLIENT_ID}" && test -n "${MICROSOFT_TENANT_ID}" && base64 < "${MICROSOFT_ON_PREM_APP_CERTIFICATE_FILE}" | tr -d '\n' | kubectl create secret generic microsoft365-credentials --from-file=certificate-base64=/dev/stdin --from-literal=client-id="${MICROSOFT_ON_PREM_APP_CLIENT_ID}" --from-literal=tenant-id="${MICROSOFT_TENANT_ID}" --namespace="${POLAR_SKY_NAMESPACE}" --dry-run=client -o yaml | kubectl replace -f -
+   ```
+
+   Never use `kubectl apply` for it: it would keep a copy of the secret's values in an annotation that `kubectl describe` shows.
+
+3. **Restart both workers,** after its own yes. It changes the Polar Sky deployments only by starting new pods with the same settings:
+
+   ```bash
+   kubectl rollout restart deployment/polar-sky-document-discovery deployment/polar-sky-envelope-creation --namespace="${POLAR_SKY_NAMESPACE}"
+   ```
+
+4. **Wait for both** (read only):
+
+   ```bash
+   kubectl rollout status deployment/polar-sky-document-discovery --namespace="${POLAR_SKY_NAMESPACE}" --timeout=10m && kubectl rollout status deployment/polar-sky-envelope-creation --namespace="${POLAR_SKY_NAMESPACE}" --timeout=10m
+   ```
+
+5. **Check the new secret works.** Only once both rollouts finished, so no worker with the old secret runs any more, get the time with the `date` command in [Install the Polar Sky chart](#install-the-polar-sky-chart); do not write it into `values.env`. Run the worker check in [Engine connected](connection.md#microsoft-365-the-engine-app-in-the-workers), then confirm reading as [Confirm Polar Sky started reading](microsoft365.md#confirm-polar-sky-started-reading) says, with `reading_since` set to that time. The replacement is done only when `files_read` is above zero. Polar Sky reads again only what changed, so in a quiet tenant this can take longer than 15 minutes: then say so, report it, and offer to check again later. Once it is done, offer to delete the new key file, as [Delete the engine app's key file](microsoft365.md#delete-the-engine-apps-key-file) says, and for a renewal offer to remove the old certificate from the app, as in [Old certificates on a kept app](microsoft-apps.md#old-certificates-on-a-kept-app).

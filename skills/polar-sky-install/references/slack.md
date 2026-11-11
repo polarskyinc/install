@@ -2,7 +2,7 @@
 
 **Tell the person:** Polar Sky sends some messages as Slack direct messages from the Polar Sky app, such as "controls are ready for review" and requests to file owners. Connecting Slack lets those messages reach people where they already work; without Slack, they get them by email.
 
-Run this step only when the install plan has it: the person said in the questions that the company uses Slack and wants Polar Sky messages there. It is the same in Cloud and On-Prem. Run it last, after Google Workspace is connected and what Polar Sky monitors is saved, and before the summary in [Done](done.md). It is not needed for the install to work: when it is skipped or cannot finish, the install is still done.
+Run this step only when the install plan has it: the person said in the questions that the company uses Slack and wants Polar Sky messages there. It is the same in Cloud and On-Prem, and for Google Workspace and Microsoft 365. Run it last, after Google Workspace is connected and what Polar Sky monitors is saved, or after Microsoft 365 is connected and the check that Polar Sky started reading is over, and before the summary in [Done](done.md). It is not needed for the install to work: when it is skipped or cannot finish, the install is still done.
 
 Only a Polar Sky administrator can connect Slack, on the Platform page of the Polar Sky console. You cannot click for them, and you never get the app's token. You only give the link, explain, and check the result once.
 
@@ -10,7 +10,7 @@ This step only connects Slack. It does not choose which messages go to Slack. Re
 
 ## When Slack is already connected
 
-Call `get_install_values` with the same `deployment_model`. If it answers `slack_connected` true, Slack is already connected to the workspace in `slack_workspace_name`. Tell the person its name, and ask whether to keep it. If they want another workspace, say that changing it is not part of this install and needs Polar Sky support, and call `report_issue` with step `other`. Then go on to [Done](done.md).
+Call `get_install_values` with the same `deployment_model` and, for Microsoft 365, `provider` `microsoft365`. If it answers `slack_connected` true, Slack is already connected to the workspace in `slack_workspace_name`. Tell the person its name, and ask whether to keep it. If they want another workspace, say that changing it is not part of this install and needs Polar Sky support, and call `report_issue` with step `other`. Then go on to [Done](done.md).
 
 If `slack_workspace_name` is null while `slack_connected` is true, say Slack is connected and ask the person which workspace they see on the Platform page.
 
@@ -40,7 +40,7 @@ Show the plan in one message and ask "Does this look right?" One yes covers it:
 
 ## Check the result
 
-When the person says it is done, call `get_install_values` once, with the same `deployment_model`. Do not call it in a loop or before they say it is done: the person clicks in their browser, and you cannot see it.
+When the person says it is done, call `get_install_values` once, with the same `deployment_model` and provider. Do not call it in a loop or before they say it is done: the person clicks in their browser, and you cannot see it.
 
 - `slack_connected` true: tell the person Slack is connected to the workspace in `slack_workspace_name`, and that they should see the direct message from the Polar Sky app. If no message came, they can still go on; Polar Sky reaches them there when it has something to say.
 - `slack_connected` false: ask what they saw in the browser, and match it to [When it does not work](#when-it-does-not-work). If they saw none of these, call `report_issue` with step `other` and outcome `blocked`, say that they can connect Slack later from the Platform page, and go on to [Done](done.md).
