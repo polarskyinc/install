@@ -87,7 +87,7 @@ For AKS, check five more things before you plan. Use the subscription from the i
    . ~/polar-sky-install/values.env && az vm list-usage --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --query "[?contains(['<system family>','<GPU family>','cores'], name.value)].{family:name.value,used:currentValue,limit:limit}" --output table
    ```
 
-   Each `family` from step 4 is the `name.value` of its quota line, and `cores` is the regional vCPU limit. AKS adds one extra node to each pool while it upgrades the pool, so the recipe needs 40 free vCPUs in the GPU family for four GPU nodes and that extra node (56 for the pool's maximum of six), 16 to 28 in the system size's family for the system pool, and the total in the regional vCPU limit. If one of these limits is too low, stop: the person requests more on the subscription's Usage + quotas page in the Azure portal, and you plan once it is granted.
+   Each `family` from step 4 is the `name.value` of its quota line, and `cores` is the regional vCPU limit. The engine needs one GPU node for each copy of the inference model and one for the embedding model, 8 vCPUs each, and AKS adds one extra node to each pool while it upgrades the pool. So with its 3 copies the recipe needs 40 free vCPUs in the GPU family for four GPU nodes and that extra node (56 for the pool's maximum of six). Only when `values.env` already has `POLAR_SKY_INFERENCE_MODEL_REPLICAS`, because the person asked for fewer copies ([Fewer copies of the inference model](#fewer-copies-of-the-inference-model)), it needs 32 with 2 copies and 24 with 1 copy. It also needs 16 to 28 in the system size's family for the system pool, and the total in the regional vCPU limit. If one of these limits is too low, stop: the person requests more on the subscription's Usage + quotas page in the Azure portal, and you plan once it is granted.
 
 Check that nothing the recipe creates already exists (read only). A plan on a new cluster cannot see a clash, so the apply would fail part way. On GKE the recipe creates the cluster `gke-polar-sky`, the network `vpc-gke-polar-sky` and the service account `gke-polar-sky-node`. Run the three lists one by one. If one fails because its API is not enabled, it cannot tell you what exists: turn that API on, then list again. It costs nothing, the recipe turns it on during the apply anyway, and the install plan names it with the other free APIs:
 
@@ -231,7 +231,7 @@ AKS:
 az aks nodepool show --subscription "${CLUSTER_SUBSCRIPTION_ID}" --resource-group rg-polar-sky --cluster-name aks-polar-sky --name gpu --query '{vmSize:vmSize,minCount:minCount,maxCount:maxCount,labels:nodeLabels,taints:nodeTaints}' --output yaml
 ```
 
-The pool must have the platform's GPU type and taint (table below), and a maximum of at least 4 nodes. On EKS it must also have the label. On AKS the pool's `labels` is empty by design: AKS puts `accelerator=nvidia` on the GPU nodes when they start. The AKS pool must still have the GPU size, the `sku=gpu` `NoSchedule` taint and a maximum of at least 4. On GKE the maximum is for the whole pool across its zones (`totalMaxNodeCount`), the pool takes whichever zone has capacity (`locationPolicy: ANY`), and `locations` lists the GPU zones.
+The pool must have the platform's GPU type and taint (table below), and a maximum of at least the GPU nodes the model fleet needs: the copies of the inference model plus one, so 4 by default and fewer when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is set. On EKS it must also have the label. On AKS the pool's `labels` is empty by design: AKS puts `accelerator=nvidia` on the GPU nodes when they start. The AKS pool must still have the GPU size, the `sku=gpu` `NoSchedule` taint and that maximum. On GKE the maximum is for the whole pool across its zones (`totalMaxNodeCount`), the pool takes whichever zone has capacity (`locationPolicy: ANY`), and `locations` lists the GPU zones.
 
 On GKE, also check that the GPU pool's instance groups exist (read only). When a zone has no L4 GPUs while the pool is created, GKE can still show the pool as running but leave it without instance groups, and then no GPU node ever starts:
 
@@ -246,6 +246,20 @@ It must print at least one line, and every line should say `found`. If a line sa
 A zone can run out of a GPU type even though it offers it. The recipes already spread the GPU pool over several zones: on GKE every zone in the region that offers L4. Phase 6 shows when none has capacity: model pods stay `Pending`, and their events say they need a GPU node that is not there, for example `FailedScheduling` with `Insufficient nvidia.com/gpu`, or that the cluster could not add one, for example `FailedScaleUp` with "out of resources" or `ZONE_RESOURCE_POOL_EXHAUSTED`. First rule out the cloud quota, then tell the person plainly that their cloud has no GPU machines free in the region right now, and that GPU machines that do not start cost nothing.
 
 The install goes on while the models wait (phase 6), and the models start on their own when a GPU node appears. A new cluster in another zone of the same region is not the fix, except with an older GKE recipe that keeps the GPU pool in one zone. Recommend waiting and checking again later. If capacity stays short for a long time, the person may choose a new cluster in another region: it deletes this cluster and everything in it, so it needs its own yes, and you report it with `report_issue`, outcome `worked_around`.
+
+### Fewer copies of the inference model
+
+The engine runs 3 copies of the inference model, each on its own GPU, and 1 copy of the embedding model, so it needs four GPU nodes. Always install it with 3 copies. Never ask the person how many copies they want, and never offer fewer: most people cannot judge this, and a GPU shortage has its own fixes, more quota or waiting for capacity. Fewer copies is an escape hatch for small clusters, used only when the person asks for it in their own words, for example because their GPU quota allows only 2 or 3 GPU machines, or because Polar Sky told them to.
+
+When they ask without naming a number, do not ask for one: use the most copies the cluster can run, which is the GPU nodes it can have minus one for the embedding model, and at most 3. On AKS, step 5 of the AKS checks in [Plan](#plan) gives the quota for each count. Before you change anything, tell them the count and what it costs:
+
+- 3 copies (the default) need 4 GPUs, 2 copies need 3, and 1 copy needs 2.
+- Each copy removed takes away about a third of the capacity for judging how sensitive files are.
+- With 1 copy there is no spare: if its pod or its node restarts, judging pauses for about 20 minutes while the model loads again.
+- An update of the models starts each new copy before it stops an old one, so it needs one free GPU while it runs, as it does with 3 copies. A GPU pool that can grow adds that node by itself. On a cluster whose GPU pool cannot grow, model updates wait until a GPU is free, so leave one GPU free if the cluster has one.
+- They can go back to 3 copies later, once the GPUs are there.
+
+With their yes, write `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<copies>'` into `values.env`. Before the engine is installed, phase 6 sets it up with the install ([Fewer inference model copies](engine.md#fewer-inference-model-copies)). On an engine that is already installed, change it as [Change the number of inference model copies](engine.md#change-the-number-of-inference-model-copies) says.
 
 ## Existing cluster (AKS, EKS or GKE)
 
@@ -265,7 +279,7 @@ Check that the context is the cluster the person named in the install plan; ask 
 | EKS (`eks`) | `workload-type=gpu` and `gpu-type=t4` | `nvidia.com/gpu`, `NoSchedule` | `efs-polarsky-retain` (ReadWriteMany) |
 | AKS (`aks`) | `accelerator=nvidia`, which AKS sets on NVIDIA GPU nodes | `sku=gpu`, `NoSchedule` | `premium-azurefile-retain` (ReadWriteMany) |
 
-The standard model fleet needs four schedulable NVIDIA GPUs. All Polar Sky nodes must be Linux `amd64`.
+The model fleet needs one schedulable NVIDIA GPU for each copy of the inference model and one for the embedding model: four with the default 3 copies, and fewer when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is set. All Polar Sky nodes must be Linux `amd64`.
 
 ## Preflight checks
 
@@ -294,6 +308,14 @@ kubectl create namespace "${POLAR_SKY_NAMESPACE}" --dry-run=server
 ```bash
 kubectl get namespace "${POLAR_SKY_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${POLAR_SKY_NAMESPACE}"
 ```
+
+Check whether an earlier install set a count of inference model copies on this cluster (read only). It prints only the count line, never the rest of the ConfigMap, which may hold the API key:
+
+```bash
+kubectl get configmap polar-sky-customer-config --namespace="${POLAR_SKY_NAMESPACE}" --ignore-not-found -o jsonpath='{.data.values\.yaml}' | grep -E '^[[:space:]]+inferenceModelReplicas:' || echo "no count set"
+```
+
+A count in the ConfigMap is the one the cluster runs. If it prints a count of 1, 2 or 3, and the person did not ask for another count in this conversation, keep it without asking, even when `values.env` holds another one: write it into `values.env` as `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<count>'`, and tell the person in one line how many copies of the inference model run and that their ConfigMap sets it. The GPU checks then expect that many GPUs plus one. If it prints another number, stop and report it with `report_issue`.
 
 Then run the checks:
 

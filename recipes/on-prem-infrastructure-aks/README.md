@@ -60,7 +60,7 @@ az aks get-versions --location <location> --subscription <your-subscription> --q
 ## Prerequisites
 
 - **Permissions**: the person applying the recipe needs Owner, or Contributor and User Access Administrator, on the subscription. The recipe creates the resource group and assigns Network Contributor to the cluster identity; Contributor alone fails at that role assignment.
-- **GPU quota**: AKS adds one extra node to each pool while it upgrades the pool, and that node needs quota too. Four GPU nodes plus that extra node need 40 vCPUs of the NCasT4_v3 family quota in the chosen region (56 at the six-node maximum), and the system pool needs 16 to 28 vCPUs of its size's family. New subscriptions often have no GPU quota. The `family` that `az vm list-skus` prints for a size (see [System Pool Size](#system-pool-size)) is the `name.value` of its quota line. Check with `az vm list-usage --location <location> --query "[].{family:name.value,used:currentValue,limit:limit}" --output table` and request more under the subscription's Usage + quotas page.
+- **GPU quota**: AKS adds one extra node to each pool while it upgrades the pool, and that node needs quota too. Four GPU nodes plus that extra node need 40 vCPUs of the NCasT4_v3 family quota in the chosen region (56 at the six-node maximum). An engine that runs fewer inference model copies needs one GPU node less per copy removed, 8 vCPUs each: 32 for two copies, 24 for one. The engine chart's README explains the trade-off in "Run fewer inference model copies". The system pool needs 16 to 28 vCPUs of its size's family. New subscriptions often have no GPU quota. The `family` that `az vm list-skus` prints for a size (see [System Pool Size](#system-pool-size)) is the `name.value` of its quota line. Check with `az vm list-usage --location <location> --query "[].{family:name.value,used:currentValue,limit:limit}" --output table` and request more under the subscription's Usage + quotas page.
 - **Machine sizes**: quota does not mean the subscription may use a size in the region. Check the sizes as [System Pool Size](#system-pool-size) shows before you plan.
 
 ## Usage
@@ -92,7 +92,7 @@ When the size check picks a system size other than `Standard_D4s_v5`, add `-var 
 | `cluster_name` | AKS cluster name and DNS prefix | `aks-polar-sky` |
 | `system_node_vm_size` | System pool size, one of the sizes in [System Pool Size](#system-pool-size) | `Standard_D4s_v5` |
 | `gpu_node_min_count` | Min GPU nodes | `0` |
-| `gpu_node_max_count` | Max GPU nodes (at least 4) | `6` |
+| `gpu_node_max_count` | Max GPU nodes (at least 3; the engine needs one per inference model copy plus one, 4 by default, and a model update needs one more while it runs) | `6` |
 | `vnet_cidr` | Virtual network address space | `10.0.0.0/16` |
 | `nodes_cidr` | Node subnet CIDR | `10.0.0.0/20` |
 | `pods_cidr` | Pod overlay CIDR | `10.244.0.0/16` |

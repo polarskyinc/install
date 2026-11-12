@@ -35,13 +35,13 @@ cd ~/polar-sky-install && umask 077 && helm template flux2 fluxcd-community/flux
 Google Workspace:
 
 ```bash
-cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
+cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
 ```
 
 Microsoft 365:
 
 ```bash
-cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
+cd ~/polar-sky-install && umask 077 && helm template polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" > polar-sky-rendered.yaml && grep -E '^kind:' polar-sky-rendered.yaml | sort | uniq -c
 ```
 
 Tell the person, plainly:
@@ -49,8 +49,9 @@ Tell the person, plainly:
 - Flux adds cluster-wide custom resource definitions, cluster roles and cluster role bindings. Its helm-controller is bound to `cluster-admin` to manage the Polar Sky release. `watchAllNamespaces=false` limits what it watches, not what it may do.
 - The `latest` channel installs new eligible Polar Sky releases by itself, and can move to a new minor version.
 - The rendered files are in the install folder if their security team wants to review them.
+- Only when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is set and not 3: the engine runs that many copies of the inference model, and the install first writes the count into the `polar-sky-customer-config` ConfigMap, so Flux keeps it.
 
-This is the stage's plan. Ask: "Does this look right? Any changes, or shall I go ahead?" That one yes covers the namespace, the secrets, Flux and the Polar Sky chart below. Then run them in order, showing each command, and report each result in one line.
+This is the stage's plan. Ask: "Does this look right? Any changes, or shall I go ahead?" That one yes covers the namespace, the secrets, Flux, the customer ConfigMap and the Polar Sky chart below. Then run them in order, showing each command, and report each result in one line.
 
 ## Namespace
 
@@ -118,18 +119,78 @@ Each command prints only `secret/<name> created`. Never print a secret to check 
 helm upgrade --install flux2 fluxcd-community/flux2 --version 2.17.2 --namespace="${POLAR_SKY_NAMESPACE}" --set installCRDs=true --set watchAllNamespaces=false --set helmController.create=true --set sourceController.create=true --set kustomizeController.create=false --set notificationController.create=false --set imageAutomationController.create=false --set imageReflectionController.create=false ${HELM_WAIT:---wait} --timeout 120s
 ```
 
+## Fewer inference model copies
+
+The engine runs 3 copies of the inference model. Only when the person asked for fewer ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model)), `values.env` has `POLAR_SKY_INFERENCE_MODEL_REPLICAS`. Never ask about the count here. Flux keeps the count only when it is in the ConfigMap `polar-sky-customer-config`, as `vllm.inferenceModelReplicas` in its `values.yaml`: a `--set` alone is undone by Flux's next update. So it goes there before the chart install. Run this section on every engine install, also with the default count: a ConfigMap from an earlier install may hold another count. The ConfigMap may already hold other settings of the person's, even the engine's API key (`vllm.apiKey`), so never print what it holds: show only the names of its top-level settings and the count line.
+
+Below, the count is `POLAR_SKY_INFERENCE_MODEL_REPLICAS`, or 3 when it is not set. Check whether the ConfigMap exists (read only):
+
+```bash
+kubectl get configmap polar-sky-customer-config --namespace="${POLAR_SKY_NAMESPACE}" --ignore-not-found -o name
+```
+
+**It does not exist.** With the count 3, there is nothing to do. Otherwise dry-run, then create it:
+
+```bash
+printf 'vllm:\n  inferenceModelReplicas: %s\n' "${POLAR_SKY_INFERENCE_MODEL_REPLICAS}" | kubectl create configmap polar-sky-customer-config --from-file=values.yaml=/dev/stdin --namespace="${POLAR_SKY_NAMESPACE}" --dry-run=server
+```
+
+```bash
+printf 'vllm:\n  inferenceModelReplicas: %s\n' "${POLAR_SKY_INFERENCE_MODEL_REPLICAS}" | kubectl create configmap polar-sky-customer-config --from-file=values.yaml=/dev/stdin --namespace="${POLAR_SKY_NAMESPACE}"
+```
+
+**It exists.** Save what it holds to a private file in the install folder, and show only the names of its top-level settings and its count line (read only):
+
+```bash
+cd ~/polar-sky-install && umask 077 && kubectl get configmap polar-sky-customer-config --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.data.values\.yaml}' > customer-config-values.yaml && grep -oE '^[A-Za-z0-9_.-]+:' customer-config-values.yaml; grep -E '^[[:space:]]+inferenceModelReplicas:' customer-config-values.yaml; grep -qE '^[[:space:]]*[{]' customer-config-values.yaml && echo "JSON values"
+```
+
+Then, by what it shows. When the ConfigMap has no count line, only the names are printed. A count already in the ConfigMap is the one the cluster runs, so it wins over `values.env`, unless the person asked for a new count in this conversation:
+
+- **A count line with the count:** nothing to change.
+- **A count line with another count, and the person did not ask for a new count in this conversation:** keep the ConfigMap's count, since someone set it on purpose, even when `values.env` holds another one from an earlier install. Do not ask. If it is 1, 2 or 3, write it into `values.env` as `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<count>'`, so the install passes the same count, and tell the person in one line how many copies run and that their ConfigMap sets it. Nothing to change. If it is another number, stop and report it with `report_issue`.
+- **A count line with another count, and the person asked for the count in `values.env` in this conversation:** change the count in that line and keep the rest of the file:
+
+  ```bash
+  cd ~/polar-sky-install && umask 077 && sed -E "s/^([[:space:]]+inferenceModelReplicas:).*/\1 ${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}/" customer-config-values.yaml > customer-config-values.new && mv customer-config-values.new customer-config-values.yaml && grep -E '^[[:space:]]+inferenceModelReplicas:' customer-config-values.yaml
+  ```
+
+- **No count line, no top-level `vllm`, and no `JSON values` line:** with the count 3, nothing to change. Otherwise add the setting at the end of the file:
+
+  ```bash
+  cd ~/polar-sky-install && printf '\nvllm:\n  inferenceModelReplicas: %s\n' "${POLAR_SKY_INFERENCE_MODEL_REPLICAS}" >> customer-config-values.yaml
+  ```
+
+- **No count line, but a top-level `vllm` or a `JSON values` line:** with the count 3, nothing to change. Otherwise do not edit the file: you cannot see that setting, it may hold the API key, and a YAML line added to JSON values is ignored. Ask the person to add the line `inferenceModelReplicas: <count>` under `vllm`, at the same indent as the lines already under it (in JSON values, `"inferenceModelReplicas": <count>` inside `"vllm"`, adding `"vllm"` if it is not there), in their own terminal with `kubectl edit configmap polar-sky-customer-config --namespace=<namespace>`. When they are done, save and show it again with the command above, and check the count line. Skip the patch below.
+
+When you changed the file, change only the ConfigMap's `values.yaml`, dry-run first. The change goes straight into `kubectl patch` through a pipe, so it is never printed, and the ConfigMap's other keys, labels and annotations stay as they are. Each prints only that the ConfigMap was patched:
+
+```bash
+cd ~/polar-sky-install && jq -n --rawfile values customer-config-values.yaml '{data: {"values.yaml": $values}}' | kubectl patch configmap polar-sky-customer-config --namespace="${POLAR_SKY_NAMESPACE}" --type merge --patch-file /dev/stdin --dry-run=server
+```
+
+```bash
+cd ~/polar-sky-install && jq -n --rawfile values customer-config-values.yaml '{data: {"values.yaml": $values}}' | kubectl patch configmap polar-sky-customer-config --namespace="${POLAR_SKY_NAMESPACE}" --type merge --patch-file /dev/stdin
+```
+
+Never use `kubectl apply` or `kubectl replace` for it: `apply` would keep a copy of everything in the ConfigMap in an annotation, and `replace` would drop the ConfigMap's other keys, labels and annotations. At the end, whether or not anything changed, delete the saved file, since it may hold the API key:
+
+```bash
+rm -f ~/polar-sky-install/customer-config-values.yaml
+```
+
 ## Install the Polar Sky chart
 
 Dry-run against the cluster first. The output goes to a file, because it can hold rendered secrets; only the result is shown. Google Workspace:
 
 ```bash
-cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
+cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
 ```
 
 Microsoft 365:
 
 ```bash
-cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
+cd ~/polar-sky-install && umask 077 && helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" --dry-run=server > polar-sky-dry-run.yaml && echo "dry run passed"
 ```
 
 If it passes, and for Microsoft 365 only, record the time from which Polar Sky counts this engine's reads, when `values.env` has no `POLAR_SKY_ENGINE_CONNECTED_AT` yet. The workers start reading as soon as they connect, so the time must come before the new workers' first read, and after the last read of any worker that ran before:
@@ -148,16 +209,16 @@ Write it into `values.env` with your file tool, as `export POLAR_SKY_ENGINE_CONN
 Then install. Google Workspace:
 
 ```bash
-helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
+helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set googleWorkspace.enabled=true --set googleWorkspace.secretName='gws-creds' --set googleWorkspace.adminEmail="${GOOGLE_WORKSPACE_ADMIN_EMAIL}" --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
 ```
 
 Microsoft 365:
 
 ```bash
-helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
+helm upgrade --install polar-sky "${POLAR_SKY_CHART_REFERENCE}" --version "${POLAR_SKY_CHART_VERSION}" --namespace "${POLAR_SKY_NAMESPACE}" --set organization.id="${POLAR_SKY_ORGANIZATION_ID}" --set certificate.secretName='polar-sky-mtls' --set vllm.enabled=true --set vllm.inferenceModelReplicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}" --set releaseChannel="${POLAR_SKY_RELEASE_CHANNEL}" --set infraProfile="${POLAR_SKY_INFRA_PROFILE}" --set microsoft365.enabled=true --set microsoft365.secretName='microsoft365-credentials' --set host="${POLAR_SKY_HOST}" ${HELM_WAIT:---wait} --timeout 20m
 ```
 
-Add no other `--set` values. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. For Microsoft 365, the chart reads the three key names in `microsoft365-credentials` by default, so they need no value. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. Run it in the background if your agent can, so you can check progress while it runs. If you cannot, ask the person to run it in their own terminal and tell you when it ends, and check progress meanwhile.
+Add no other `--set` values. `vllm.inferenceModelReplicas` is the count in `polar-sky-customer-config` ([Fewer inference model copies](#fewer-inference-model-copies)), 3 when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is not set: Flux keeps the ConfigMap's count, and the `--set` makes the first install ask for the same number of GPUs. `host` is the Polar Sky Cloud endpoint from `get_install_values`, and `infraProfile` is the platform the person confirmed in phase 2. For Microsoft 365, the chart reads the three key names in `microsoft365-credentials` by default, so they need no value. It can take 20 minutes. Before you start it, tell the person this and that most of the time goes to loading the AI models. Run it in the background if your agent can, so you can check progress while it runs. If you cannot, ask the person to run it in their own terminal and tell you when it ends, and check progress meanwhile.
 
 ## Wait for the release and the pods
 
@@ -202,6 +263,33 @@ Name the cause you see (for example, an image it cannot pull) and stop. Do not c
 Look at a `Pending` model pod's events with `kubectl describe pod` (above). When they say the pod needs a GPU node that is not there, for example `FailedScheduling` with `Insufficient nvidia.com/gpu`, or that the cluster could not add one (`FailedScaleUp`, "out of resources"), and the GPU pool can still grow (it autoscales and is below its maximum, as the pool check in phase 3 shows), no GPU node is free yet. If the pool cannot grow, for example an existing cluster without GPU autoscaling or a pool at its maximum, the models will not start on their own: that is a failure, so name it and stop. Any other reason, such as an unbound PersistentVolumeClaim or an image it cannot pull, is a failure: name it and stop, as above. A GPU shortage does not stop the install: go on with phases 7 to 9. While the models wait, the workers run and connect to Polar Sky Cloud, and Polar Sky finds the files and who can open them. Judging how sensitive each file is waits for the models. Tell the person this plainly, naming Microsoft 365 in place of Google Workspace in a Microsoft 365 install: "The engine can connect and Google Workspace can be set up, but Polar Sky cannot judge how sensitive files are until the AI models run. They start on their own when a GPU machine is free."
 
 Report the shortage once with `report_issue`, outcome `worked_around`. On GKE, run the instance group check from phase 3 ([GPU pool at zero](cluster.md#gpu-pool-at-zero)), and see [When GPU nodes cannot start](cluster.md#when-gpu-nodes-cannot-start). Keep checking the model pods while you go on, and tell the person when they start. Never call the install done or working while a model pod is not ready (phase 10).
+
+## Change the number of inference model copies
+
+Use it on an engine that is already installed, only when the person asks for fewer copies of the inference model ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model) says how to pick the count and what it costs), or to go back to the default 3 once the GPUs are there. The cluster must be able to run the copies plus one GPU nodes. Write the person's choice into `values.env` as `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<copies>'`, with `'3'` to go back. Changing the ConfigMap and asking Flux to apply it change Polar Sky's settings, so they need their own yes.
+
+1. **Write the count into the ConfigMap,** as [Fewer inference model copies](#fewer-inference-model-copies) says.
+2. **Ask Flux to apply it now.** This changes only an annotation on the HelmRelease:
+
+   ```bash
+   kubectl annotate helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" --overwrite reconcile.fluxcd.io/requestedAt="$(date +%s)"
+   ```
+
+3. **Wait for the first update** (read only). Flux applies the count in two updates: the first writes it into the HelmRelease, and the second changes the inference model to it. Check every minute or so until this prints the new count:
+
+   ```bash
+   kubectl get helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.values.vllm.servingEngineSpec.modelSpec[?(@.name=="phi-4-mini")].replicaCount}'
+   ```
+
+   Then ask Flux again with the command in step 2, so the second update starts now.
+
+4. **Confirm the inference model runs the new count** (read only). It must print the count:
+
+   ```bash
+   kubectl get deployment polar-sky-phi-4-mini-deployment-vllm --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.replicas}'
+   ```
+
+   Then check the model pods as in [Wait for the release and the pods](#wait-for-the-release-and-the-pods). New copies may wait for GPU nodes, as in [Model pods waiting for GPU capacity](#model-pods-waiting-for-gpu-capacity). If either count has not changed after 20 minutes, show the HelmRelease's conditions with the check in [A stalled release](#a-stalled-release), name the cause, and stop.
 
 ## A stalled release
 

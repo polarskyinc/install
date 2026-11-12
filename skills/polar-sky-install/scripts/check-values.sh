@@ -179,6 +179,14 @@ if [ "${deployment_model}" != cloud ]; then
     esac
   fi
 
+  if [ -n "${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-}" ]; then
+    show POLAR_SKY_INFERENCE_MODEL_REPLICAS "${POLAR_SKY_INFERENCE_MODEL_REPLICAS}"
+    case "${POLAR_SKY_INFERENCE_MODEL_REPLICAS}" in
+      1 | 2 | 3) ;;
+      *) problem "POLAR_SKY_INFERENCE_MODEL_REPLICAS must be 1, 2 or 3, the copies of the inference model the engine runs" ;;
+    esac
+  fi
+
   if [ -n "${CLUSTER_GPU_ZONES:-}" ]; then
     show CLUSTER_GPU_ZONES "${CLUSTER_GPU_ZONES}"
     printf '%s' "${CLUSTER_GPU_ZONES}" | grep -Eq '^\["[a-z0-9-]+"(,"[a-z0-9-]+")*\]$' ||

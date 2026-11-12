@@ -81,8 +81,8 @@ variable "gpu_node_max_count" {
   default     = 6
 
   validation {
-    condition     = var.gpu_node_max_count >= 4 && var.gpu_node_max_count <= 10
-    error_message = "GPU node max count must be between 4 and 10; the model fleet needs four GPU nodes"
+    condition     = var.gpu_node_max_count >= 3 && var.gpu_node_max_count <= 10
+    error_message = "GPU node max count must be between 3 and 10; the smallest model fleet runs on two GPU nodes, one for each model, and a model update starts its new copy on one more"
   }
 }
 

@@ -40,6 +40,16 @@ if [ -z "${namespace}" ] || [ -z "${profile}" ]; then
   exit 2
 fi
 
+inference_model_replicas="${POLAR_SKY_INFERENCE_MODEL_REPLICAS:-3}"
+case "${inference_model_replicas}" in
+  1 | 2 | 3) ;;
+  *)
+    printf 'POLAR_SKY_INFERENCE_MODEL_REPLICAS must be 1, 2 or 3, the copies of the inference model the engine runs.\n'
+    exit 2
+    ;;
+esac
+gpus_needed=$((inference_model_replicas + 1))
+
 if [ -z "${polar_sky_host}" ]; then
   if [ "${POLAR_SKY_DEPLOYMENT_MODEL:-on_prem}" = cloud ]; then
     polar_sky_host="connect.polarsky.ai:443"
@@ -171,9 +181,9 @@ check_gpu_nodes() {
 ${gpu_nodes}
 EOF
   if [ "${count}" -eq 0 ]; then
-    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type and taint, and can grow to at least 4 nodes; ${gpu_label_origin}. If GPU nodes already run without this label, they do not match what Polar Sky needs on ${platform}"
-  elif [ "${total}" -lt 4 ]; then
-    warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs 4; fine if the pool can grow to 4"
+    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type and taint, and can grow to at least ${gpus_needed} nodes; ${gpu_label_origin}. If GPU nodes already run without this label, they do not match what Polar Sky needs on ${platform}"
+  elif [ "${total}" -lt "${gpus_needed}" ]; then
+    warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs ${gpus_needed} (${inference_model_replicas} for the inference model, 1 for the embedding model); fine if the pool can grow to ${gpus_needed}"
   else
     pass "${total} allocatable GPUs on ${count} GPU node(s)"
   fi
