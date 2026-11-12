@@ -28,7 +28,7 @@
   "groups": {
     "title": "Groups",
     "file": "groups.csv",
-    "description": "One row per group kept or dropped on each folder set.",
+    "description": "One row per group kept or dropped on each folder set, and per group the live read found granting access that was not decided in Polar Sky.",
     "columns": [
       {"id": "folder_set", "header": "Folder set", "default": true},
       {"id": "folders", "header": "Folders", "default": true},
@@ -60,7 +60,7 @@
   "removals": {
     "title": "Removals",
     "file": "removals.csv",
-    "description": "One row per change Polar Sky applied, or tried to apply, that took access away or lowered it in the period.",
+    "description": "One row per change Polar Sky applied, or tried to apply, that took access away or lowered it in the period. Removals Polar Sky recorded also have the decision date and the deadline check.",
     "columns": [
       {"id": "folder_set", "header": "Folder set", "default": true},
       {"id": "folders", "header": "Folders", "default": false},
@@ -74,7 +74,9 @@
       {"id": "state", "header": "Result", "default": true},
       {"id": "state_at", "header": "Date", "default": true},
       {"id": "state_reason", "header": "Result detail", "default": true},
-      {"id": "confirmed_on", "header": "Confirmed by re-scan", "default": true}
+      {"id": "confirmed_on", "header": "Confirmed by re-scan", "default": true},
+      {"id": "decided_on", "header": "Decided on", "default": true},
+      {"id": "within_deadline", "header": "Within the deadline", "default": true}
     ]
   },
   "approvals": {
@@ -85,6 +87,7 @@
       {"id": "folder_set", "header": "Folder set", "default": true},
       {"id": "folders", "header": "Folders", "default": true},
       {"id": "approved_by", "header": "Approved by", "default": true},
+      {"id": "approver_type", "header": "Approver type", "default": true},
       {"id": "approved_at", "header": "Approved at", "default": true},
       {"id": "carried_into_period", "header": "Approved before the period", "default": true},
       {"id": "ended", "header": "Approval ended", "default": true},

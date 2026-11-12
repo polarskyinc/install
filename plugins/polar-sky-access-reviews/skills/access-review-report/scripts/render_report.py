@@ -26,6 +26,7 @@ TABLE_ORDER = ("members", "groups", "shares", "removals", "approvals")
 EXTRACT_TABLE = "extract"
 PDF_FILE = "report.pdf"
 WIDE_TABLE_COLUMNS = 8
+WIDEST_TABLE_COLUMNS = 12
 BAR_COLORS = ("#380081", "#00B2E2", "#BEDEF0", "#4A4A4E")
 SECTIONS = (
     "Executive summary", "Scope and method", "Review population", "Why people have access", "Review results",
@@ -39,6 +40,8 @@ CHANGES_COUNTED = (
     "dropped, and approved changes carried out in full or in part. Polar Sky proposing access, or sending a proposal "
     "for review, is not counted. Removals have their own column."
 )
+
+OTHER_SYSTEMS = "Other systems in scope for the requirement are reviewed separately."
 
 SITES_INCOMPLETE = (
     "The list may be incomplete: Polar Sky lists the first 25 folders of a folder set, and a folder set has more."
@@ -92,6 +95,120 @@ def rescan_confirmation(totals):
         f"{number(totals['removals_confirmed'])} of {number(totals['removals_confirmable'])} applied removals "
         "confirmed by the read after the removal"
     )
+
+
+DEADLINE_NAMES_SHOWN = 5
+
+
+def _deadline_names(rows):
+    """Name removals with their days, the first few only, pointing to Attachment D for the rest."""
+    names = [
+        f"{row['principal'] or 'an unnamed grant'} on {row['target']}, {report_data.days_text(row['_days'])}"
+        if row["target"] else f"{row['principal'] or 'an unnamed grant'}, {report_data.days_text(row['_days'])}"
+        for row in sorted(rows, key=lambda row: (-row["_days"], row["_at"]))
+    ]
+    shown = names[:DEADLINE_NAMES_SHOWN]
+    if len(names) > DEADLINE_NAMES_SHOWN:
+        shown.append(f"and {number(len(names) - DEADLINE_NAMES_SHOWN)} more, listed in Attachment D")
+    return "; ".join(shown)
+
+
+def deadline_check(model, names=True):
+    """Say how many recorded removals were done within the removal deadline, or None when there is no deadline in days or no removal record."""
+    days = model["deadline_days"]
+    totals = model["totals"]
+    if days is None or not totals["removals_recorded"]:
+        return None
+    within = totals["removals_within"]
+    over = totals["removals_over"]
+    latest_attempts = {}
+    for row in sorted(totals["removals_open"], key=lambda row: row["_at"]):
+        latest_attempts[row["_same_access"]] = row
+    still_open = list(latest_attempts.values())
+    applied = len(within) + len(over)
+    deadline = counted(days, "day", "days")
+    if applied:
+        text = f"{number(len(within))} of {counted(applied, 'applied removal', 'applied removals')} within {deadline}"
+        if over:
+            text += f"; {number(len(over))} over" + (f" ({_deadline_names(over)})" if names else "")
+    else:
+        text = "No applied removals to check"
+    if still_open:
+        failed = sum(1 for row in still_open if row["_state"] == "failed")
+        pending = len(still_open) - failed
+        kinds = " and ".join(part for part in (
+            f"{number(failed)} failed" if failed else "", f"{number(pending)} pending" if pending else "",
+        ) if part)
+        low = min(row["_days"] for row in still_open)
+        high = max(row["_days"] for row in still_open)
+        since = report_data.days_text(low) if low == high else f"{number(low)} to {report_data.days_text(high)}"
+        text += f". {kinds} {'removal' if len(still_open) == 1 else 'removals'} not done by the period end, {since} since the decision"
+    if totals["removals_no_decision"]:
+        text += (
+            f". {counted(len(totals['removals_no_decision']), 'removal has', 'removals have')} no approval of its folder set "
+            "recorded before it, so it is not checked"
+        )
+    return text
+
+
+def approved_by_polar_sky_only(totals):
+    """Say which folder sets had no approval by a person in force at the period end, how that came about, and each one's data owner, or nothing."""
+    controls = totals["controls_without_person"]
+    if not controls:
+        return ""
+    names = "; ".join(
+        f"{control['name']} ("
+        + (f"approval {control['ended_how']} {control['ended_on']}" if control["ended_on"] else "approved by Polar Sky")
+        + (f"; data owner {control['owner']})" if control["owner"] else "; no data owner recorded)")
+        for control in controls
+    )
+    return (
+        f"{counted(len(controls), 'folder set had', 'folder sets had')} no approval by a person in force at the end of "
+        f"the period: {names}."
+    )
+
+
+def interval_findings(model):
+    """Say when the review period is longer than the review interval, and which folder sets a person last approved too long ago."""
+    check = model["interval"]
+    if check is None or no_folder_sets(model):
+        return []
+    found = []
+    if check["period_longer"]:
+        found.append(f"The review period is longer than the review interval of {check['text']}.")
+    if check["stale"]:
+        names = "; ".join(
+            f"{control['name']} (" + (
+                f"last approved by a person {control['last_person_approval'].strftime('%Y-%m-%d')})"
+                if control["last_person_approval"] else "no approval by a person in force at the period end)"
+            )
+            for control in check["stale"]
+        )
+        found.append(
+            f"{counted(len(check['stale']), 'folder set has', 'folder sets have')} no approval by a person from "
+            f"{check['cutoff']} on, within {check['text']} of the period end: {names}."
+        )
+    else:
+        found.append(f"Every folder set was approved by a person within {check['text']} of the period end.")
+    return found
+
+
+def checks_before_rendering(model):
+    """The points to raise with the person before the report is rendered: folder sets no person approved, the review interval, and a missing acknowledgment title or date."""
+    totals = model["totals"]
+    points = []
+    if totals["controls_without_person"]:
+        points.append(
+            f"{counted(len(totals['controls_without_person']), 'folder set has', 'folder sets have')} no approval by a "
+            "person in force at the end of the period: "
+            + "; ".join(control["name"] for control in totals["controls_without_person"]) + "."
+        )
+    points += [finding for finding in interval_findings(model) if not finding.startswith("Every folder set")]
+    acknowledgment = model["acknowledgment"]
+    missing = [label for key, label in (("name", "name"), ("title", "title"), ("date", "date")) if not acknowledgment.get(key)]
+    if missing:
+        points.append(f"The management acknowledgment has no {' and no '.join(missing)}; the report will show TBD.")
+    return points
 
 
 def ended_controls(totals):
@@ -194,6 +311,8 @@ def data_table(columns, rows, numeric=(), css_class=""):
             cells += f"<td{css}>{text}</td>"
         body += f'<tr{row.get("_row_attributes", "")}>{cells}</tr>'
     wide = "wide" if len(columns) > WIDE_TABLE_COLUMNS else ""
+    if len(columns) > WIDEST_TABLE_COLUMNS:
+        wide += " widest"
     classes = " ".join(part for part in ("ps-table", css_class, "num" if numeric else "", wide) if part)
     return f'<table class="{classes}"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
 
@@ -304,6 +423,9 @@ def checklist_evidence(model, key):
     if totals["first_approval"]:
         approved += f" {totals['first_approval']} to {totals['last_approval']}"
     approved += "."
+    by_polar_sky = sum(1 for control in model["controls"] if control["last_approval_by_polar_sky"])
+    if by_polar_sky:
+        approved += f" {number(by_polar_sky)} of them {'was' if by_polar_sky == 1 else 'were'} approved by Polar Sky itself, not by a person."
     if totals["controls_ended"]:
         approved += " " + ended_controls(totals)
     if totals["controls_carried"]:
@@ -313,7 +435,9 @@ def checklist_evidence(model, key):
         return (f"Previous review: {previous}. " if previous else "Previous review not recorded. ") + approved
     if key == "interval":
         interval = inputs.get("review_interval") or "TBD"
-        return f"Interval set by the company: {interval}. Review period {model['period']['from']} to {model['period']['to']}. " + approved
+        text = f"Interval set by the company: {interval}. Review period {model['period']['from']} to {model['period']['to']}. " + approved
+        checked = interval_findings(model)
+        return text + (" " + " ".join(checked) if checked else "")
     if key == "decisions":
         if not totals["members"] and not totals["shares"]:
             return "No members or kept direct shares."
@@ -335,20 +459,20 @@ def checklist_evidence(model, key):
             text += f" {kept_until_ended(totals)}."
         if totals["keeps_nothing"]:
             text += f" {number(totals['keeps_nothing'])} keep nothing."
+        if totals["controls_without_person"]:
+            text += " " + approved_by_polar_sky_only(totals)
         return text
     if key == "account_types":
-        if not totals["members"]:
-            return "No members."
-        if not totals["account_types_known"]:
-            return "Account type: " + NOT_AVAILABLE.lower() + "."
-        return "Account types: " + ", ".join(f"{name} {number(count)}" for name, count in totals["account_types"].items()) + "."
+        return account_types_evidence(model)
     if key == "removals":
         if not totals["removals"]:
             return "No removals."
-        return (
+        text = (
             f"{number(totals['removals_applied'])} applied, {number(totals['removals_failed'])} failed, "
             f"{number(totals['removals_pending'])} pending, {number(totals['removals_other'])} not applied. Re-scan confirmation: {rescan_confirmation(totals)}."
         )
+        within = deadline_check(model, names=False)
+        return text + (f" Within the deadline: {within}." if within else "")
     if key == "acknowledgment":
         if not acknowledgment.get("name"):
             return "TBD"
@@ -363,6 +487,72 @@ def checklist_evidence(model, key):
             return "No folders."
         return f"{number(totals['folders'])} folders, listed in Attachment A."
     raise report_data.ReportDataError(f"Unknown checklist evidence {key!r}.")
+
+
+def account_type_counts(totals):
+    """Count members by account type, with those whose type is not recorded last, such as "Full time 4, not recorded 4"."""
+    parts = [f"{name} {number(count)}" for name, count in totals["account_types"].items()]
+    unknown = totals["members"] - totals["account_types_known"]
+    if unknown:
+        parts.append(f"not recorded {number(unknown)}")
+    return ", ".join(parts)
+
+
+def account_types_evidence(model):
+    """Say which account types the provider gives for the members, and where the guest accounts are listed with who decided their access."""
+    totals = model["totals"]
+    if not totals["members"]:
+        return "No members."
+    if not totals["account_types_known"]:
+        return (
+            "No account types recorded, so this report does not show which members are guest or vendor accounts. "
+            f"Attachment A lists all {counted(totals['members'], 'member', 'members')}"
+            f"{attachment_a_details(model, account_type=False)}."
+        )
+    text = f"Account types: {account_type_counts(totals)}."
+    for provider in totals["account_type_providers"]:
+        text += " " + provider_account_types(model, provider)
+    for provider in totals["providers_without_account_types"]:
+        name = report_data.PROVIDER_LABELS.get(provider, ("the provider",))[0]
+        text += f" No account types recorded for the {name} members, so the report does not show which of them are guest or vendor accounts."
+    return text
+
+
+def attachment_a_details(model, account_type=True):
+    """The words naming what Attachment A shows of each member, by the member columns chosen, such as " with who decided their access and when"."""
+    chosen = {column["id"] for column in selected_columns(model, "members")}
+    details = []
+    if account_type and "account_type" in chosen:
+        details.append("their account type")
+    if {"decided_by", "decided_on"} <= chosen:
+        details.append("who decided their access and when")
+    elif "decided_by" in chosen:
+        details.append("who decided their access")
+    elif "decided_on" in chosen:
+        details.append("when their access was decided")
+    return " with " + " and ".join(details) if details else ""
+
+
+def provider_account_types(model, provider):
+    """The sentence on one provider's account types: Microsoft 365 guests, or the types another provider gives."""
+    totals = model["totals"]
+    if provider == report_data.MICROSOFT_365:
+        guests = totals["guest_members"]
+        if not guests:
+            return "Microsoft 365 lists no member as a Guest account."
+        accounts = totals["guest_accounts"]
+        who = counted(guests, "Guest member", "Guest members")
+        if accounts != guests:
+            who += f" ({counted(accounts, 'account', 'accounts')})"
+        verb = "is" if guests == 1 else "are each"
+        if "account_type" not in {column["id"] for column in selected_columns(model, "members")}:
+            return (
+                "Attachment A lists every member, but its chosen columns leave out the account type, so it does not "
+                "show which members are Guest accounts."
+            )
+        return f"The {who} {verb} listed in Attachment A{attachment_a_details(model, account_type=False)}."
+    name = report_data.PROVIDER_LABELS.get(provider, ("the provider",))[0]
+    return f"Account types are as {name} gives them; Attachment A lists each member{attachment_a_details(model)}."
 
 
 def outcome_bar(totals):
@@ -416,6 +606,8 @@ def summary_paragraph(model):
         "or another authorized approver reviewed and approved that access in Polar Sky. "
         f"{counted(totals['people_deciding'], 'person', 'people')} approved access or added or changed it."
     )
+    if totals["controls_without_person"]:
+        text += " " + approved_by_polar_sky_only(totals)
     if totals["controls_ended"]:
         text += " " + ended_controls(totals)
     return text
@@ -469,7 +661,7 @@ def render_scope(model):
         paragraphs = [
             f"This report documents what Polar Sky recorded about access to {framework['scope_noun']} in {provider} {period}. "
             f"{fill(framework['purpose'], values)}",
-            "<b>Scope.</b> No folder sets.",
+            f"<b>Scope.</b> No folder sets. {other_systems(model)}",
             f"<b>Requirement.</b> {framework['requirement']}",
         ]
     else:
@@ -478,7 +670,8 @@ def render_scope(model):
             f"{provider} {period}. {fill(framework['purpose'], values)}",
             f"<b>Scope.</b> The {counted(totals['controls'], 'folder set', 'folder sets')} whose access approval was in "
             "force during the period, and the access Polar Sky records for them: every member, every group kept or "
-            "dropped, and every direct share kept.",
+            f"dropped, and every direct share kept. This report covers only these folder sets in {provider}. "
+            f"{other_systems(model)}",
             "<b>How the review was done.</b> Access was reviewed as it changed during the period, not in a single campaign "
             "at the end. For each folder set, Polar Sky proposed who should keep access and why, and the data owner or "
             "another authorized approver reviewed and approved that access in Polar Sky. Polar Sky made the "
@@ -491,6 +684,11 @@ def render_scope(model):
         ]
     body = f"  <p>{escape(paragraphs[0])}</p>\n" + "".join(f"  <p>{_bold_lead(paragraph)}</p>\n" for paragraph in paragraphs[1:])
     return section_heading(2, SECTIONS[1]) + body + "</section>\n"
+
+
+def other_systems(model):
+    """Say that systems outside these folder sets are reviewed separately, in the framework's words or generic ones."""
+    return fill(model["framework"].get("other_systems") or OTHER_SYSTEMS, fill_values(model))
 
 
 def _bold_lead(paragraph):
@@ -524,12 +722,15 @@ def render_population(model):
         ("Access decisions", escape(decisions_text(totals))),
     ]
     rows += extract_rows(extract)
+    if model["unlisted"] is not None:
+        rows.append(("Not in the members list", escape(unlisted_text(model["unlisted"]))))
     rows += extract_method_rows(extract)
     rows += optional_row("Exclusions", inputs.get("exclusions"))
     return (
         section_heading(3, SECTIONS[2], first_on_page=False)
         + f"  <p>{escape(extract_intro(extract))}</p>\n  {key_values(rows)}\n"
         + extract_tables(extract)
+        + unlisted_table(model)
         + "</section>\n"
     )
 
@@ -539,7 +740,10 @@ def groups_text(model):
     totals = model["totals"]
     if no_folder_sets(model):
         return "No groups"
-    return f"{number(totals['groups_kept'])} kept, {number(totals['groups_dropped'])} dropped"
+    text = f"{number(totals['groups_kept'])} kept, {number(totals['groups_dropped'])} dropped"
+    if totals["groups_live"]:
+        text += f", {number(totals['groups_live'])} more found in the live read and not decided in Polar Sky, listed in Attachment B"
+    return text
 
 
 def members_text(model):
@@ -556,7 +760,7 @@ def members_text(model):
     if totals["kept_until_ended"]:
         text += f". {kept_until_ended(totals)}"
     if totals["account_types_known"]:
-        text += ". " + ", ".join(f"{name} {number(count)}" for name, count in totals["account_types"].items())
+        text += ". " + account_type_counts(totals)
     return text + (
         f". Read {report_data.format_time(model['members_as_of'])}, as they are at report time, "
         "not as at the end of the period"
@@ -783,6 +987,36 @@ def _group_difference(group):
     )
 
 
+UNLISTED_MEANING = (
+    "The live read found this access to the folders, but the members list in Attachment A does not show it: the person "
+    "is not a member of the folder set, or is a member with another permission, often a role on a shared drive or site "
+    "that every folder in it inherits. Polar Sky's review of the folder set did not cover this access."
+)
+
+
+def unlisted_text(unlisted):
+    """Say how many grants in the live read the members list does not show, and to how many people."""
+    if not unlisted:
+        return "Nothing: the members list shows every person's access the live read found"
+    people = len({row["email"].lower() or row["person_name"].lower() for row in unlisted})
+    return f"{counted(len(unlisted), 'grant', 'grants')} to {counted(people, 'person', 'people')}, listed in 3.3"
+
+
+def unlisted_table(model):
+    """Section 3.3: the person grants in the live read that the members list does not show."""
+    unlisted = model["unlisted"]
+    if unlisted is None:
+        return ""
+    columns = [
+        {"id": "folder_set", "header": "Folder set"}, {"id": "folder", "header": "Folder"},
+        {"id": "person_name", "header": "Person"}, {"id": "email", "header": "Email"},
+        {"id": "role", "header": "Permission"}, {"id": "inherited", "header": "Inherited"},
+        {"id": "why", "header": "Members list"},
+    ]
+    body = f"  {data_table(columns, unlisted)}\n" if unlisted else f"  <p>{escape(unlisted_text(unlisted))}.</p>\n"
+    return f"  <h3>3.3 Access not in the members list</h3>\n  <p>{escape(UNLISTED_MEANING)}</p>\n" + body
+
+
 def extract_tables(extract):
     """The group count and exclusion tables of a completed extract."""
     if not completed(extract):
@@ -894,18 +1128,25 @@ def render_results(model):
     for row in model["tables"]["approvals"]:
         if row["_carried"]:
             continue
-        entry = approvers.setdefault(row["approved_by"], {"controls": set(), "dates": []})
+        entry = approvers.setdefault(
+            (row["approved_by"], row["approver_type"]), {"controls": set(), "dates": [], "owners": set()}
+        )
         entry["controls"].add(row["folder_set"])
         entry["dates"].append(report_data.format_date(row["_at"]))
+        entry["owners"] |= {control["owner"] for control in model["controls"] if control["name"] == row["folder_set"] and control["owner"]}
     approver_columns = [
         {"id": "approved_by", "header": "Approved by"},
+        {"id": "approver_type", "header": "Approver type"},
         {"id": "controls", "header": "Folder sets"},
         {"id": "first", "header": "First approval"},
         {"id": "last", "header": "Last approval"},
     ]
     approver_rows = [
-        {"approved_by": name, "controls": number(len(entry["controls"])), "first": min(entry["dates"]), "last": max(entry["dates"])}
-        for name, entry in sorted(approvers.items(), key=lambda item: item[0].lower())
+        {
+            "approved_by": approver_label(name, kind, entry["owners"]), "approver_type": kind,
+            "controls": number(len(entry["controls"])), "first": min(entry["dates"]), "last": max(entry["dates"]),
+        }
+        for (name, kind), entry in sorted(approvers.items(), key=lambda item: (item[0][1] != report_data.APPROVER_PERSON, item[0][0].lower()))
     ]
     group_columns = selected_columns(model, "groups")
     share_columns = selected_columns(model, "shares")
@@ -929,10 +1170,11 @@ def render_results(model):
         f"  <p>{escape(CHANGES_COUNTED)}</p>\n",
         f"  {data_table(by_control_columns, rows, numeric=numeric)}\n",
         "  <h3>5.2 Access approvals</h3>\n",
-        "  <p>Each approval is a person's review and sign-off of the access to one folder set, recorded in Polar Sky "
-        "with the date and who approved it. Approvers do not sign again at period end. The table below shows how many "
-        "folder sets each person approved in the period, and when; Attachment E lists every approval, including any "
-        "from before the period that was still in force when it began.</p>\n",
+        "  <p>Each approval of the access to one folder set is recorded in Polar Sky with the date and who approved it. "
+        "An approval by a person is that person's review and sign-off; an approval whose approver type is Polar Sky was "
+        "made by Polar Sky itself, not by a person. Approvers do not sign again at period end. The table below shows how "
+        "many folder sets each approver approved in the period, and when; Attachment E lists every approval, including "
+        "any from before the period that was still in force when it began.</p>\n",
         f"  {data_table(approver_columns, approver_rows, numeric=('controls',), css_class='owners')}\n" if approver_rows
         else "  <p>No access was approved during the period.</p>\n",
         "  <h3>5.3 Groups</h3>\n",
@@ -950,11 +1192,21 @@ def render_results(model):
     return "".join(parts)
 
 
+def approver_label(name, kind, owners):
+    """Name an approver in the approvals table; Polar Sky's own approvals name the data owners of those folder sets."""
+    if kind != report_data.APPROVER_SYSTEM:
+        return name
+    if not owners:
+        return "Polar Sky; no data owner recorded"
+    return f"Polar Sky; data {'owner' if len(owners) == 1 else 'owners'} {', '.join(sorted(owners))}"
+
+
 def render_removals(model):
     totals = model["totals"]
     inputs = model["inputs"]
     columns = selected_columns(model, "removals")
     deadline = ("Removal deadline", value_or_tbd(inputs.get("removal_deadline")))
+    within = deadline_check(model)
     if not totals["removals"]:
         return (
             section_heading(6, SECTIONS[5])
@@ -969,12 +1221,21 @@ def render_removals(model):
         ("Not applied", escape(number(totals["removals_other"]))),
         ("Confirmed by re-scan", escape(rescan_confirmation(totals)) if totals["removals_recorded"] else not_available()),
         deadline,
-        ("Within the deadline", not_available()),
+        ("Within the deadline", escape(within) if within else not_available()),
     ]
     text = (
         f"Polar Sky made each removal in {model['provider_label']} after the access was approved, and recorded "
         "whether it was applied or failed. Attachment D lists every removal with its result and date."
     )
+    if totals["removals_recorded"]:
+        text += (
+            " For each removal Polar Sky recorded, the decision is the latest approval of its folder set at or before "
+            "the removal. The deadline check counts calendar days in UTC from the decision to the removal, or, for a "
+            "removal not done by the end of the review period, to that day. The evidence covers the review period only, so a "
+            "removal done after it is not shown here. A removal that failed or was pending, and "
+            "that a later removal of the same access on the same folder set completed, says when it was done later; "
+            "the deadline counts list that access once, by the later removal."
+        )
     return (
         section_heading(6, SECTIONS[5])
         + f"  <p>{escape(text)}</p>\n"
@@ -1140,7 +1401,7 @@ def not_available_parts(model):
     parts += ["Section 4 separate access rules", "Section 5.5 site owners and applications"]
     if totals["removals"] and not totals["removals_recorded"]:
         parts.append("Section 6.2 confirmed by re-scan")
-    if totals["removals"]:
+    if totals["removals"] and deadline_check(model) is None:
         parts.append("Section 6.2 within the deadline")
     parts.append("Section 7 exceptions")
     return parts
@@ -1193,7 +1454,9 @@ def summary_lines(model):
         f"Removals: {checklist_evidence(model, 'removals')}",
         f"Kept direct shares: {shares_text(model)}.",
         f"People who approved access or added or changed it: {people}.",
+        *([f"Approval by a person: {approved_by_polar_sky_only(totals)}"] if totals["controls_without_person"] else []),
         f"Extract: {extract_summary(model['extract'])}",
+        *([f"Access not in the members list: {unlisted_text(model['unlisted'])}."] if model["unlisted"] is not None else []),
         f"Generated: {report_data.format_time(model['inputs']['generated_at'])}.",
         f"Issued: {issued_text(model)}.",
         "Not available in this version: " + "; ".join(not_available_parts(model)) + ".",
@@ -1251,13 +1514,22 @@ def write_outputs(files, out_directory):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--data", required=True, help="report-data.json, or a folder with inputs.json and responses/")
-    parser.add_argument("--out", required=True, help="Output folder")
+    parser.add_argument("--out", help="Output folder")
+    parser.add_argument("--check", action="store_true", help="Only print what to check with the person before rendering")
     arguments = parser.parse_args(argv)
+    if not arguments.check and not arguments.out:
+        parser.error("--out is required unless --check is given")
     try:
         files, model = render_with_model(report_data.load_data(arguments.data), generated_at=clock_time())
     except report_data.ReportDataError as error:
         print(f"Cannot render the report: {error}", file=sys.stderr)
         return 2
+    if arguments.check:
+        points = checks_before_rendering(model)
+        print("Check before you render:" if points else "Nothing to check before you render.")
+        for point in points:
+            print(f"- {point}")
+        return 0
     write_outputs(files, arguments.out)
     for name in sorted(files):
         print(os.path.join(arguments.out, name))

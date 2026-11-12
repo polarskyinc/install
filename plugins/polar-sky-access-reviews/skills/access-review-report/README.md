@@ -7,12 +7,13 @@ Builds the Polar Sky access review report from the controls MCP. `SKILL.md` is w
 | Path | What it holds |
 |---|---|
 | `SKILL.md` | The steps Claude follows |
-| `references/frameworks.json` | Cover page, requirement and checklist text for each framework |
+| `references/frameworks.json` | Cover page, requirement, scope (`other_systems`) and checklist text for each framework |
 | `references/columns.json` | The columns of each table, with defaults |
 | `references/data-schema.md` | The data folder the renderer reads |
 | `scripts/report_data.py` | Reads the data and derives rows and counts |
 | `scripts/render_report.py` | Writes `report.html` and the CSV files (Python 3 standard library, no network; the command stamps `generated_at` from the clock) |
 | `scripts/make_pdf.py` | Prints the HTML to PDF with local headless Chrome or Chromium |
+| `scripts/previous_answers.py` | Finds the answers the skill wrote for earlier reports in the person's Claude Code sessions |
 | `assets/report.css`, `assets/wordmark.svg` | Taken from the sample report in PR #1947 |
 | `assets/fonts/` | Sora and JetBrains Mono, see below |
 | `tests/` | Fixture, golden files and tests |
@@ -48,6 +49,18 @@ After the file paths, `render_report.py` prints a block that starts with `Summar
 ## Extract
 
 The skill starts a live read of who has access (`start_access_review_extract`) right after it asks for the inputs, polls `get_access_review_extract` until it completes or fails, and then reads every page of groups, exclusions and rows. Section 3 shows the stored file's SHA-256, its size, the row counts by kind, each group's member count next to the provider's own count (for Google Workspace, the direct members of the group and of every group nested in it), what could not be read and whether the SHA-256 was checked. Attachment F lists the stored file and `extract.csv` with a SHA-256 each; they differ because the CSV is a rendering of the stored file. A failed extract is reported as failed and the rest of the report renders; with no extract tools on the server, the report marks the extract "Not available in this version".
+
+## Earlier answers
+
+Step 2 of the skill runs `scripts/previous_answers.py`, so a person who made a report before types only what changed. The script reads the Claude Code session files on this computer (`$CLAUDE_CONFIG_DIR/projects/*/*.jsonl`, default `~/.claude/projects/`; the files directly in each project folder, not `subagents/` or links, the newest 200, each up to 64 MB, 512 MB in all, skipping any line over 1 MB). In them it takes only this skill's own Write calls of an `access-review-<report id>/inputs.json` file, parses the written content as JSON, and keeps only the answers the renderer accepts, with the type it expects. It leaves out what is new for each report (period, report ID, acknowledgment date, session, issue time, previous review) and a logo whose file is gone. It prints one JSON object, `{"by_framework": {...}, "latest": {...}}`, each answer set with its `date` and `last_report` (report ID of letters, digits, `.`, `_` and `-`, and period dates as YYYY-MM-DD, each left out otherwise); with no sessions, or none it can read, it prints empty ones and exits 0. It never reads `inputs.json` files on disk and prints nothing else from the sessions.
+
+## Check before rendering
+
+`render_report.py --data <folder> --check` writes no file and prints what the skill must raise with the person before it renders: folder sets with no approval by a person in force for the period (only Polar Sky's own), a review period longer than the review interval, folder sets whose last approval by a person is older than the interval at the period end, and a missing acknowledgment name, title or date.
+
+## Removal deadline
+
+With `removal_deadline_days` in the inputs, each removal Polar Sky recorded gets the date of the decision behind it (the folder set's latest approval at or before the removal) and whether it was done within the deadline, and Section 6.2 counts them. `references/data-schema.md` has the rules.
 
 ## CSV escaping
 

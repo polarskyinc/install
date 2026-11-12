@@ -7,6 +7,7 @@ Set UPDATE_GOLDEN=1 to rewrite the golden files after an intended change.
 import base64
 import copy
 import csv
+import datetime
 import html
 import io
 import json
@@ -1058,6 +1059,354 @@ def removals_by_principal(data):
     return {row["principal"]: row for row in rows_of(render_report.render(data)["removals.csv"])}
 
 
+DEADLINE_COLUMNS = ["folder_set", "principal", "state", "state_at", "decided_on", "within_deadline"]
+
+
+def with_deadline_records(days=30):
+    """The fixture with removal records on its first folder set, approved 2026-06-01 and 2026-09-15, generated 2026-11-02."""
+    data = fixture()
+    control = data["responses"][0]["response"]["controls"][0]
+    control["approvals"].insert(0, {
+        "at": "2026-06-01T09:00:00Z", "carried_into_range": True,
+        "actor": {"type": "user", "surface": "console", "name": "Dana Whitfield"},
+    })
+    record = {"source": "removal_record", "action": "Remove a grant", "grantee_kind": "user", "target": "/Shared/Catalog"}
+    control["removals"] = [
+        dict(record, principal="Ana Same", result="removed", at="2026-09-15T16:30:00Z", confirmed_at="2026-09-15T16:31:00Z"),
+        dict(record, principal="Ben Within", result="removed", at="2026-10-15T23:59:00Z", confirmed_at="2026-10-16T00:00:00Z"),
+        dict(record, principal="Cy Over", result="removed", at="2026-09-10T08:00:00Z", confirmed_at="2026-09-10T08:01:00Z"),
+        dict(record, principal="Di Failed", result="failed", at="2026-09-15T16:40:00Z", reason="Retention hold"),
+        dict(record, principal="Ed Pending", result="pending", at="2026-10-30T10:00:00Z"),
+        {"action": "Remove a member from a group", "step": "Remove Jordan Lee.", "target": "Catalog-Client-Viewers",
+         "state": "applied", "at": "2026-10-20T08:00:00Z", "principal": "Jordan Lee"},
+    ]
+    data["inputs"]["columns"] = {"removals": DEADLINE_COLUMNS}
+    if days is not None:
+        data["inputs"]["removal_deadline_days"] = days
+    return data
+
+
+def section_six_two(page):
+    return page.split("<h3>6.2 Verification</h3>", 1)[1].split("</section>", 1)[0]
+
+
+class RemovalDeadlineTest(unittest.TestCase):
+    def test_each_removal_record_is_dated_by_the_latest_approval_at_or_before_it(self):
+        removals = {row["principal"]: row for row in rows_of(render_report.render(with_deadline_records())["removals.csv"])}
+        self.assertEqual(removals["Cy Over"]["decided_on"], "2026-06-01")
+        self.assertEqual(removals["Ana Same"]["decided_on"], "2026-09-15")
+        self.assertEqual(removals["Ben Within"]["decided_on"], "2026-09-15")
+        self.assertEqual(removals["Ed Pending"]["decided_on"], "2026-09-15")
+
+    def test_each_removal_record_says_whether_it_was_done_within_the_deadline(self):
+        removals = {row["principal"]: row for row in rows_of(render_report.render(with_deadline_records())["removals.csv"])}
+        self.assertEqual(removals["Ana Same"]["within_deadline"], "Within (same day)")
+        self.assertEqual(removals["Ben Within"]["within_deadline"], "Within (30 days)")
+        self.assertEqual(removals["Cy Over"]["within_deadline"], "Over (101 days)")
+        self.assertEqual(removals["Di Failed"]["within_deadline"], "Not done by the period end (46 days since the decision)")
+        self.assertEqual(removals["Ed Pending"]["within_deadline"], "Not done by the period end (46 days since the decision)")
+
+    def test_removals_without_a_record_get_no_decision_date_or_deadline_result(self):
+        removals = {row["principal"]: row for row in rows_of(render_report.render(with_deadline_records())["removals.csv"])}
+        self.assertEqual((removals["Jordan Lee"]["decided_on"], removals["Jordan Lee"]["within_deadline"]), ("", ""))
+
+    def test_section_six_two_counts_the_removals_within_the_deadline_and_names_those_over_it(self):
+        files, model = render_report.render_with_model(with_deadline_records())
+        within = (
+            "2 of 3 applied removals within 30 days; 1 over (Cy Over on /Shared/Catalog, 101 days). "
+            "1 failed and 1 pending removals not done by the period end, 46 days since the decision"
+        )
+        self.assertIn(f"<tr><td>Within the deadline</td><td>{within}</td></tr>", section_six_two(files["report.html"]))
+        self.assertIn("Within the deadline: 2 of 3 applied removals within 30 days; 1 over. 1 failed", files["report.html"])
+        summary = render_report.render_summary_text(model)
+        self.assertIn("Within the deadline: 2 of 3 applied removals within 30 days; 1 over.", summary)
+        self.assertNotIn("within the deadline", summary.split("Not available in this version:", 1)[1])
+
+    def test_the_section_says_how_the_decision_and_the_days_are_found(self):
+        page = render_report.render(with_deadline_records())["report.html"]
+        self.assertIn("the decision is the latest approval of its folder set at or before the removal", page)
+        self.assertIn("calendar days in UTC", page)
+
+    def test_without_a_number_of_days_the_check_is_not_available_and_never_tbd(self):
+        files, model = render_report.render_with_model(with_deadline_records(days=None))
+        self.assertIn('<td>Within the deadline</td><td><span class="na">Not available in this version</span>',
+                      section_six_two(files["report.html"]))
+        removals = {row["principal"]: row for row in rows_of(files["removals.csv"])}
+        self.assertEqual(removals["Cy Over"]["decided_on"], "2026-06-01")
+        self.assertEqual(removals["Cy Over"]["within_deadline"], "")
+        summary = render_report.render_summary_text(model)
+        self.assertIn("Section 6.2 within the deadline", summary)
+        self.assertIn("TBD: nothing.", summary)
+
+    def test_the_number_of_days_alone_gives_the_deadline_line(self):
+        data = with_deadline_records()
+        del data["inputs"]["removal_deadline"]
+        files, model = render_report.render_with_model(data)
+        self.assertIn("<tr><td>Removal deadline</td><td>30 days after the decision</td></tr>", files["report.html"])
+        self.assertIn("TBD: nothing.", render_report.render_summary_text(model))
+
+    def test_the_number_of_days_may_be_given_as_text(self):
+        page = render_report.render(with_deadline_records(days="30"))["report.html"]
+        self.assertIn("2 of 3 applied removals within 30 days", page)
+
+    def test_a_number_of_days_that_is_not_a_whole_positive_number_is_refused(self):
+        for days in (0, -3, 2.5, "thirty", True):
+            with self.subTest(days=days), self.assertRaisesRegex(report_data.ReportDataError, "removal_deadline_days"):
+                render_report.render(with_deadline_records(days=days))
+
+    def test_a_removal_with_no_approval_before_it_says_so_and_is_not_counted(self):
+        data = with_deadline_records()
+        data["responses"][0]["response"]["controls"][0]["removals"][2]["at"] = "2026-05-02T08:00:00Z"
+        files = render_report.render(data)
+        removals = {row["principal"]: row for row in rows_of(files["removals.csv"])}
+        self.assertEqual((removals["Cy Over"]["decided_on"], removals["Cy Over"]["within_deadline"]),
+                         ("", "No approval recorded before it"))
+        self.assertIn("2 of 2 applied removals within 30 days.", files["report.html"])
+        self.assertIn("1 removal has no approval of its folder set recorded before it, so it is not checked",
+                      files["report.html"])
+
+    def test_no_removal_records_leave_the_check_not_available(self):
+        page = render_report.render(dict(fixture(), inputs=dict(fixture()["inputs"], removal_deadline_days=30)))["report.html"]
+        self.assertIn('<td>Within the deadline</td><td><span class="na">Not available in this version</span>',
+                      section_six_two(page))
+
+    def test_only_the_first_five_removals_over_the_deadline_are_named(self):
+        data = with_deadline_records(days=1)
+        control = data["responses"][0]["response"]["controls"][0]
+        record = dict(control["removals"][0], at="2026-10-20T08:00:00Z")
+        control["removals"] = [dict(record, principal=f"Person {index}") for index in range(7)]
+        within = section_six_two(render_report.render(data)["report.html"])
+        self.assertIn("0 of 7 applied removals within 1 day; 7 over (Person 0 on /Shared/Catalog, 35 days;", within)
+        self.assertIn("Person 4 on /Shared/Catalog, 35 days; and 2 more, listed in Attachment D)", within)
+        self.assertNotIn("Person 5", within)
+
+
+def with_retries(*attempts):
+    """The fixture's first folder set, approved 2026-09-15, with removal records of one grant given as (result, at) pairs."""
+    data = with_deadline_records()
+    control = data["responses"][0]["response"]["controls"][0]
+    record = {
+        "source": "removal_record", "action": "Remove a grant", "grantee_kind": "user", "target": "/Shared/Catalog",
+        "principal": "Liam Carter", "email": "liam.carter@northwind-demo.com",
+    }
+    control["removals"] = [dict(record, result=result, at=at) for result, at in attempts]
+    return data
+
+
+class RemovalRetryTest(unittest.TestCase):
+    def render(self, *attempts):
+        files = render_report.render(with_retries(*attempts))
+        return [row["within_deadline"] for row in rows_of(files["removals.csv"])], section_six_two(files["report.html"])
+
+    def test_a_failed_removal_done_later_within_the_deadline_is_counted_once_as_within(self):
+        cells, within = self.render(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z"))
+        self.assertEqual(cells, ["Done later on 2026-10-05 (20 days after the decision)", "Within (20 days)"])
+        self.assertIn("<td>1 of 1 applied removal within 30 days</td>", within)
+        self.assertNotIn("not done by", within)
+
+    def test_a_failed_removal_done_later_over_the_deadline_is_counted_once_as_over(self):
+        cells, within = self.render(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-28T09:00:00Z"))
+        self.assertEqual(cells, ["Done later on 2026-10-28 (43 days after the decision)", "Over (43 days)"])
+        self.assertIn("<td>0 of 1 applied removal within 30 days; 1 over (Liam Carter on /Shared/Catalog, 43 days)</td>", within)
+        self.assertNotIn("not done by", within)
+
+    def test_a_pending_removal_done_later_is_not_counted_as_not_done(self):
+        cells, within = self.render(("pending", "2026-09-15T17:00:00Z"), ("removed", "2026-09-16T09:00:00Z"))
+        self.assertEqual(cells, ["Done later on 2026-09-16 (1 day after the decision)", "Within (1 day)"])
+        self.assertNotIn("not done by", within)
+
+    def test_a_failed_removal_with_no_later_success_is_not_done_yet(self):
+        cells, within = self.render(("failed", "2026-09-15T17:00:00Z"), ("failed", "2026-09-20T09:00:00Z"))
+        self.assertEqual(cells, ["Not done by the period end (46 days since the decision)"] * 2)
+        self.assertIn("No applied removals to check. 1 failed removal not done by the period end, 46 days since the decision", within)
+
+    def test_a_later_removal_of_other_access_does_not_complete_a_failed_one(self):
+        data = with_retries(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z"))
+        removals = data["responses"][0]["response"]["controls"][0]["removals"]
+        removals[1].update(principal="Kai Morgan", email="kai.morgan@northwind-demo.com")
+        cells = [row["within_deadline"] for row in rows_of(render_report.render(data)["removals.csv"])]
+        self.assertEqual(cells, ["Not done by the period end (46 days since the decision)", "Within (20 days)"])
+
+    def test_a_removal_before_the_failed_one_does_not_complete_it(self):
+        cells, _ = self.render(("removed", "2026-09-15T16:50:00Z"), ("failed", "2026-09-15T17:00:00Z"))
+        self.assertEqual(cells, ["Within (same day)", "Not done by the period end (46 days since the decision)"])
+
+    def test_a_later_removal_of_another_permission_does_not_complete_a_failed_one(self):
+        data = with_retries(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z"))
+        removals = data["responses"][0]["response"]["controls"][0]["removals"]
+        removals[0]["role"] = "write"
+        removals[1]["role"] = "read"
+        cells = [row["within_deadline"] for row in rows_of(render_report.render(data)["removals.csv"])]
+        self.assertEqual(cells, ["Not done by the period end (46 days since the decision)", "Within (20 days)"])
+
+    def test_open_removals_on_folder_sets_with_the_same_name_are_counted_apart(self):
+        data = with_retries(("failed", "2026-09-15T17:00:00Z"))
+        controls = data["responses"][0]["response"]["controls"]
+        controls[1]["name"] = controls[0]["name"]
+        controls[1]["removals"] = copy.deepcopy(controls[0]["removals"])
+        controls[1]["approvals"].append(copy.deepcopy(controls[0]["approvals"][-1]))
+        within = section_six_two(render_report.render(data)["report.html"])
+        self.assertIn("2 failed removals not done by the period end", within)
+
+    def test_a_person_the_records_do_not_identify_is_never_linked(self):
+        data = with_retries(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z"))
+        for removal in data["responses"][0]["response"]["controls"][0]["removals"]:
+            removal.pop("email")
+            removal["principal"] = "an unknown person"
+        files = render_report.render(data)
+        cells = [row["within_deadline"] for row in rows_of(files["removals.csv"])]
+        self.assertEqual(cells, ["Not done by the period end (46 days since the decision)", "Within (20 days)"])
+        self.assertIn("1 failed removal not done by the period end", section_six_two(files["report.html"]))
+
+    def test_a_sharing_link_is_linked_by_its_scope_without_an_email(self):
+        data = with_retries(("pending", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z"))
+        for removal in data["responses"][0]["response"]["controls"][0]["removals"]:
+            removal.pop("email")
+            removal.update(grantee_kind="link", link_scope="organization", principal="anyone in the organization with the link")
+        cells = [row["within_deadline"] for row in rows_of(render_report.render(data)["removals.csv"])]
+        self.assertEqual(cells, ["Done later on 2026-10-05 (20 days after the decision)", "Within (20 days)"])
+
+    def test_an_open_removal_is_counted_to_the_period_end_however_late_the_report_is(self):
+        data = with_retries(("failed", "2026-09-15T17:00:00Z"))
+        files = render_report.render(data, generated_at="2027-01-31T10:00:00Z")
+        cells = [row["within_deadline"] for row in rows_of(files["removals.csv"])]
+        self.assertEqual(cells, ["Not done by the period end (46 days since the decision)"])
+        self.assertIn("The evidence covers the review period only", files["report.html"])
+
+    def test_every_attempt_keeps_its_own_row(self):
+        files = render_report.render(with_retries(("failed", "2026-09-15T17:00:00Z"), ("removed", "2026-10-05T09:00:00Z")))
+        self.assertEqual([row["state"] for row in rows_of(files["removals.csv"])], ["Failed", "Removed"])
+
+
+def with_account_types(data, types):
+    """Give the fixture members the account types named by email; others get Member, or none when types maps None."""
+    for item in data["responses"]:
+        if item["tool"] == "list_control_members":
+            for member in item["response"]["members"]:
+                account_type = types.get(member["email"], types.get(None, "Member"))
+                if account_type:
+                    member["account_type"] = account_type
+    return data
+
+
+def vendor_evidence(data):
+    page = render_report.render(data)["report.html"]
+    return html.unescape(page.split("<td>Vendor accounts included</td><td>", 1)[1].split("</td>", 1)[0])
+
+
+class VendorAccountsTest(unittest.TestCase):
+    def test_guest_members_are_counted_and_pointed_to_in_attachment_a(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Guest", "tess.quinn@northwind-demo.com": "Guest"})
+        self.assertEqual(vendor_evidence(data), (
+            "Account types: Guest 2, Member 5. The 2 Guest members are each listed in Attachment A with who decided "
+            "their access and when."
+        ))
+
+    def test_a_guest_on_two_folder_sets_is_counted_once_as_an_account(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Guest", "tess.quinn@northwind-demo.com": "Guest"})
+        for item in data["responses"]:
+            if item["tool"] == "list_control_members":
+                for member in item["response"]["members"]:
+                    if member["email"] == "tess.quinn@northwind-demo.com":
+                        member["email"] = "MIA.NOVAK@northwind-demo.com"
+        self.assertIn("The 2 Guest members (1 account) are each listed in Attachment A", vendor_evidence(data))
+
+    def test_one_guest_member_reads_in_the_singular(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Guest"})
+        self.assertIn("The 1 Guest member is listed in Attachment A with who decided their access and when.",
+                      vendor_evidence(data))
+
+    def test_no_guest_members_is_said_plainly(self):
+        self.assertEqual(vendor_evidence(with_account_types(fixture(), {})), (
+            "Account types: Member 7. Microsoft 365 lists no member as a Guest account."
+        ))
+
+    def test_google_employee_types_are_shown_as_google_gives_them(self):
+        data = with_account_types(google_fixture(), {"mia.novak@northwind-demo.com": "Guest", None: "Contractor"})
+        self.assertEqual(vendor_evidence(data), (
+            "Account types: Contractor 6, Guest 1. Account types are as Google Workspace gives them; Attachment A lists "
+            "each member with their account type and who decided their access and when."
+        ))
+
+    def test_members_without_an_account_type_are_counted(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Guest", None: None})
+        self.assertEqual(vendor_evidence(data), (
+            "Account types: Guest 1, not recorded 6. The 1 Guest member is listed in "
+            "Attachment A with who decided their access and when."
+        ))
+
+    def test_without_account_types_the_row_says_vendors_cannot_be_told_apart(self):
+        self.assertEqual(vendor_evidence(fixture()), (
+            "No account types recorded, so this report does not show which members are guest or vendor accounts. "
+            "Attachment A lists all 7 members with who decided their access and when."
+        ))
+
+    def test_the_row_names_only_the_member_details_the_chosen_columns_show(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Guest"})
+        data["inputs"]["columns"]["members"] = ["folder_set", "person_name", "account_type", "decided_by"]
+        self.assertIn("The 1 Guest member is listed in Attachment A with who decided their access.", vendor_evidence(data))
+        data["inputs"]["columns"]["members"] = ["folder_set", "person_name", "decided_by", "decided_on"]
+        self.assertIn(
+            "Attachment A lists every member, but its chosen columns leave out the account type, so it does not show "
+            "which members are Guest accounts.", vendor_evidence(data),
+        )
+        self.assertNotIn("Guest member is listed", vendor_evidence(data))
+        google = with_account_types(google_fixture(), {None: "Contractor"})
+        google["inputs"]["columns"]["members"] = ["folder_set", "person_name", "decided_on"]
+        self.assertIn("Attachment A lists each member with when their access was decided.", vendor_evidence(google))
+
+    def test_a_vendor_is_never_guessed_from_an_email_domain(self):
+        data = with_account_types(fixture(), {})
+        for item in data["responses"]:
+            if item["tool"] == "list_control_members":
+                item["response"]["members"][0]["email"] = "vendor@partner.example"
+        self.assertNotIn("Guest member", vendor_evidence(data))
+
+
+def scope_paragraph(data):
+    page = render_report.render(data)["report.html"]
+    return html.unescape(page.split("<b>Scope.</b>", 1)[1].split("</p>", 1)[0])
+
+
+class ScopeTest(unittest.TestCase):
+    def test_the_scope_says_the_report_covers_only_these_folder_sets_and_names_the_other_systems_per_framework(self):
+        expected = {
+            "pci_dss": "Other systems in Northwind Traders's cardholder data environment are reviewed separately.",
+            "soc2": "Other systems in scope for Northwind Traders's SOC 2 examination are reviewed separately.",
+            "hipaa": "Other systems that hold Northwind Traders's electronic protected health information are reviewed separately.",
+            "sox": "Other systems that support Northwind Traders's financial reporting are reviewed separately.",
+        }
+        for framework, sentence in expected.items():
+            with self.subTest(framework=framework):
+                data = fixture()
+                data["inputs"]["framework"] = framework
+                data["inputs"]["review_interval"] = "Quarterly"
+                self.assertIn(f"This report covers only these folder sets in Microsoft 365. {sentence}", scope_paragraph(data))
+
+    def test_the_scope_names_the_provider_the_folder_sets_use(self):
+        self.assertIn("only these folder sets in Google Workspace.", scope_paragraph(google_fixture()))
+
+    def test_a_framework_without_its_own_words_gets_the_generic_sentence(self):
+        model = {"framework": {}, "inputs": {"organization": "Northwind Traders"}, "provider_label": "Microsoft 365",
+                 "provider_scope": "Microsoft 365 tenant", "period": {"to": "2026-10-31"}}
+        self.assertEqual(render_report.other_systems(model), "Other systems in scope for the requirement are reviewed separately.")
+
+    def test_with_no_folder_sets_the_scope_still_says_other_systems_are_reviewed_separately(self):
+        data = fixture()
+        data["responses"][0]["response"]["controls"] = []
+        self.assertEqual(scope_paragraph(data).strip(), (
+            "No folder sets. Other systems in Northwind Traders's cardholder data environment are reviewed separately."
+        ))
+
+    def test_exclusions_stay_in_section_three_as_extra_detail(self):
+        data = fixture()
+        data["inputs"]["exclusions"] = "Global administrators, reviewed in the privileged access review"
+        page = render_report.render(data)["report.html"]
+        self.assertIn("<tr><td>Exclusions</td><td>Global administrators, reviewed in the privileged access review</td></tr>",
+                      page.split('id="s3"', 1)[1].split("</section>", 1)[0])
+        self.assertIn("cardholder data environment are reviewed separately", scope_paragraph(data))
+
+
 class RemovalRoleTest(unittest.TestCase):
     def setUp(self):
         self.removals = removals_by_principal(with_role_records())
@@ -1207,9 +1556,15 @@ class TableWidthTest(unittest.TestCase):
     def test_a_table_with_more_than_eight_columns_is_marked_wide(self):
         page = render_report.render(all_columns(fixture()))["report.html"]
         removals = page.split("<h3>6.1 Removals</h3>", 1)[1]
-        self.assertTrue(removals.lstrip().startswith('<table class="ps-table wide">'))
+        self.assertTrue(removals.lstrip().startswith('<table class="ps-table wide widest">'))
         default_shares = render_report.render(fixture())["report.html"].split("<h3>5.4 Kept direct shares</h3>", 1)[1]
         self.assertNotIn("wide", default_shares.split("<thead>", 1)[0])
+
+    def test_the_default_removals_table_is_wide_but_keeps_the_wider_path_cells(self):
+        data = fixture()
+        del data["inputs"]["columns"]
+        removals = render_report.render(data)["report.html"].split("<h3>6.1 Removals</h3>", 1)[1]
+        self.assertTrue(removals.lstrip().startswith('<table class="ps-table wide">'))
 
     def test_every_table_fits_the_page_width_in_chrome(self):
         import make_pdf
@@ -1661,3 +2016,365 @@ class NoPolarSkyJargonTest(unittest.TestCase):
         self.assertIn("reviewed_by", ids)
         self.assertIn("reviewed_on", ids)
         self.assertIn("folder_set_id", ids)
+
+
+def in_force():
+    """The fixture with Model Eval Results' approval by a person still in force at the period end."""
+    return with_ending(fixture(), "member_added")
+
+
+def with_system_approval(data=None):
+    """The fixture with Catalog-Client-Viewers approved by Polar Sky itself, not by a person."""
+    data = data or fixture()
+    data["responses"][0]["response"]["controls"][0]["approvals"][0]["actor"] = {"type": "system", "surface": ""}
+    return data
+
+
+class ApproverTypeTest(unittest.TestCase):
+    def test_approvals_csv_says_whether_a_person_or_polar_sky_approved(self):
+        rows = rows_of(render_report.render(with_system_approval())["approvals.csv"])
+        self.assertEqual([(row["approved_by"], row["approver_type"]) for row in rows], [
+            ("Polar Sky", "Polar Sky"), ("Dana Whitfield", "Person"), ("Dana Whitfield", "Person"), ("Omar Haddad", "Person"),
+        ])
+
+    def test_only_people_are_counted_as_approvers(self):
+        files, model = render_report.render_with_model(with_system_approval())
+        self.assertIn("People who approved access or added or changed it: 1.", render_report.render_summary_text(model))
+        self.assertIn("1 person approved access or added or changed it.", files["report.html"])
+
+    def test_folder_sets_only_polar_sky_approved_are_named_with_their_data_owner(self):
+        files, model = render_report.render_with_model(with_system_approval())
+        sentence = (
+            "2 folder sets had no approval by a person in force at the end of the period: Catalog-Client-Viewers "
+            "(approved by Polar Sky; data owner Dana Whitfield); Model Eval Results (approval withdrawn 2026-10-19; data "
+            "owner Omar Haddad)."
+        )
+        page = html.unescape(files["report.html"])
+        self.assertIn(sentence, page.split('id="s2"', 1)[0].split('id="s1"', 1)[1])
+        who = page.split("<td>Access matches job function</td><td>", 1)[1].split("</td>", 1)[0]
+        self.assertIn(sentence, who)
+        self.assertIn(f"Approval by a person: {sentence}", render_report.render_summary_text(model))
+        self.assertIn("1 of them was approved by Polar Sky itself, not by a person.", page)
+
+    def test_the_approvals_table_shows_polar_sky_apart_with_the_data_owner(self):
+        page = render_report.render(with_system_approval())["report.html"]
+        table = page.split("<h3>5.2 Access approvals</h3>", 1)[1].split("</table>", 1)[0]
+        self.assertIn("<td>Dana Whitfield</td><td>Person</td>", table)
+        self.assertIn("<td>Polar Sky; data owner Dana Whitfield</td><td>Polar Sky</td>", table)
+
+    def test_with_every_approval_by_a_person_in_force_nothing_extra_is_said(self):
+        files, model = render_report.render_with_model(in_force())
+        self.assertNotIn("no approval by a person", files["report.html"])
+        self.assertNotIn("<td>Polar Sky</td>", files["report.html"])
+        self.assertNotIn("Approval by a person:", render_report.render_summary_text(model))
+
+    def test_a_person_approval_withdrawn_in_the_period_is_not_in_force(self):
+        model = render_report.render_with_model(fixture())[1]
+        self.assertEqual([control["name"] for control in model["totals"]["controls_without_person"]], ["Model Eval Results"])
+
+    def test_a_later_polar_sky_approval_replaces_an_approval_by_a_person(self):
+        data = in_force()
+        approvals = data["responses"][0]["response"]["controls"][1]["approvals"]
+        approvals.append({"at": "2026-09-01T10:00:00Z", "carried_into_range": False, "actor": {"type": "system", "surface": ""}})
+        model = render_report.render_with_model(data)[1]
+        self.assertEqual([control["name"] for control in model["totals"]["controls_without_person"]], ["Customer Records"])
+
+
+def interval_row(data):
+    page = html.unescape(render_report.render(data)["report.html"])
+    return page.split("<td>Reviewed at the interval the company set</td><td>", 1)[1].split("</td>", 1)[0]
+
+
+def soc2(data=None, **inputs):
+    data = data or fixture()
+    data["inputs"].update(framework="soc2", review_interval="Every 6 months, per the review procedure", **inputs)
+    return data
+
+
+def check_lines(data):
+    model = render_report.render_with_model(data)[1]
+    return render_report.checks_before_rendering(model)
+
+
+class ReviewIntervalTest(unittest.TestCase):
+    def test_a_folder_set_a_person_last_approved_before_the_interval_is_flagged(self):
+        self.assertIn(
+            "1 folder set has no approval by a person from 2026-04-30 on, within 6 months of the period end: "
+            "Model Eval Results (last approved by a person 2026-03-02).",
+            interval_row(soc2(in_force(), review_interval_months=6)),
+        )
+
+    def test_a_period_as_long_as_the_interval_is_not_flagged_as_longer(self):
+        self.assertNotIn("longer than the review interval", interval_row(soc2(review_interval_months=6)))
+
+    def test_a_period_longer_than_the_interval_is_said(self):
+        row = interval_row(soc2(review_interval_days=90))
+        self.assertIn("The review period is longer than the review interval of 90 days.", row)
+        self.assertIn("1 folder set has no approval by a person from 2026-08-02 on", row)
+
+    def test_a_folder_set_only_polar_sky_approved_is_never_approved_by_a_person(self):
+        row = interval_row(soc2(with_system_approval(), review_interval_months=6))
+        self.assertIn("Catalog-Client-Viewers (no approval by a person in force at the period end)", row)
+
+    def test_every_folder_set_within_the_interval_is_said(self):
+        self.assertIn("Every folder set was approved by a person within 12 months of the period end.",
+                      interval_row(soc2(in_force(), review_interval_months=12)))
+
+    def test_without_a_number_the_row_reads_as_before(self):
+        row = interval_row(soc2())
+        self.assertNotIn("longer than", row)
+        self.assertNotIn("approved by a person within", row)
+        self.assertNotIn("no approval by a person from", row)
+
+    def test_the_number_alone_gives_the_interval_wording(self):
+        data = soc2(review_interval_months=6)
+        del data["inputs"]["review_interval"]
+        self.assertTrue(interval_row(data).startswith("Interval set by the company: Every 6 months."))
+        self.assertNotIn("Review interval", render_report.tbd_fields(render_report.render_with_model(data)[1]))
+
+    def test_months_and_days_together_or_not_whole_numbers_are_refused(self):
+        for extra in ({"review_interval_months": 6, "review_interval_days": 90}, {"review_interval_months": 0},
+                      {"review_interval_days": "a quarter"}):
+            with self.subTest(extra=extra), self.assertRaises(report_data.ReportDataError):
+                render_report.render(soc2(**extra))
+
+    def test_months_count_back_to_the_last_day_of_a_shorter_month(self):
+        self.assertEqual(report_data.before(datetime.date(2026, 8, 31), ("months", 6)), datetime.date(2026, 2, 28))
+
+
+class CheckBeforeRenderingTest(unittest.TestCase):
+    def test_folder_sets_no_person_approved_are_listed(self):
+        self.assertIn(
+            "2 folder sets have no approval by a person in force at the end of the period: Catalog-Client-Viewers; "
+            "Model Eval Results.",
+            check_lines(with_system_approval()),
+        )
+
+    def test_the_interval_findings_are_listed(self):
+        lines = check_lines(soc2(review_interval_days=90))
+        self.assertIn("The review period is longer than the review interval of 90 days.", lines)
+        self.assertTrue(any(line.startswith("1 folder set has no approval by a person from 2026-08-02") for line in lines))
+
+    def test_a_missing_acknowledgment_title_or_date_is_listed(self):
+        data = in_force()
+        del data["inputs"]["acknowledgment"]["title"]
+        del data["inputs"]["acknowledgment"]["date"]
+        self.assertEqual(check_lines(data), ["The management acknowledgment has no title and no date; the report will show TBD."])
+
+    def test_the_check_command_writes_nothing_and_says_when_there_is_nothing_to_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "data.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(in_force(), handle)
+            output = io.StringIO()
+            with mock.patch("sys.stdout", output):
+                self.assertEqual(render_report.main(["--data", path, "--check"]), 0)
+            self.assertEqual(output.getvalue(), "Nothing to check before you render.\n")
+            self.assertEqual(os.listdir(directory), ["data.json"])
+
+    def test_the_check_command_lists_each_point(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "data.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(with_system_approval(), handle)
+            output = io.StringIO()
+            with mock.patch("sys.stdout", output):
+                render_report.main(["--data", path, "--check"])
+            self.assertTrue(output.getvalue().startswith("Check before you render:\n- 2 folder sets have no approval"))
+
+    def test_rendering_without_check_still_needs_an_output_folder(self):
+        with mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit):
+            render_report.main(["--data", FIXTURE])
+
+
+class AccountTypeNotRecordedTest(unittest.TestCase):
+    def test_a_blank_account_type_reads_not_recorded_and_is_counted(self):
+        data = with_account_types(fixture(), {"mia.novak@northwind-demo.com": "Full time", None: None})
+        files, model = render_report.render_with_model(data)
+        types = {row["person_name"]: row["account_type"] for row in rows_of(files["members.csv"])}
+        self.assertEqual(types["Mia Novak"], "Full time")
+        self.assertEqual(types["Leah Brooks"], "Not recorded")
+        self.assertIn("Full time 1, not recorded 6.", render_report.render_summary_text(model))
+
+
+class ExtractGroupMemberNameTest(unittest.TestCase):
+    def test_a_group_member_row_without_a_name_shows_its_email(self):
+        data = fixture()
+        for item in data["responses"]:
+            if item["tool"] == "read_access_review_extract_rows":
+                for row in item["response"]["rows"]:
+                    if row["row_kind"] == "group_member":
+                        row.pop("principal_name", None)
+        rows = [row for row in rows_of(render_report.render(data)["extract.csv"]) if row["row_kind"] == "group member"]
+        self.assertTrue(rows)
+        self.assertEqual([row["principal_name"] for row in rows], [row["principal_email"].lstrip("'") for row in rows])
+
+
+CATALOG_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def with_extract_rows(*rows):
+    """The fixture with extra extract rows on Catalog-Client-Viewers' APAC folder."""
+    data = fixture()
+    base = {"control_id": CATALOG_ID, "control_name": "Catalog-Client-Viewers", "folder": "Catalog / Product Adoption / APAC",
+            "inherited": False}
+    for item in data["responses"]:
+        if item["tool"] == "read_access_review_extract_rows" and not item["arguments"].get("cursor"):
+            item["response"]["rows"].extend(dict(base, **row) for row in rows)
+    return data
+
+
+OUTSIDER = {"row_kind": "grant", "grantee_type": "user", "principal_name": "Kai Outsider",
+            "principal_email": "kai.outsider@northwind-demo.com", "roles": ["reader"]}
+MANAGER = {"row_kind": "grant", "grantee_type": "user", "principal_name": "Dana Whitfield",
+           "principal_email": "dana.whitfield@northwind-demo.com", "roles": ["organizer"], "inherited": True}
+SAME_ROLE = {"row_kind": "grant", "grantee_type": "user", "principal_name": "Dana Whitfield",
+             "principal_email": "DANA.WHITFIELD@northwind-demo.com", "roles": ["writer"]}
+HIDDEN_GROUP = {"row_kind": "grant", "grantee_type": "group", "principal_name": "Hidden Readers",
+                "principal_email": "hidden-readers@northwind-demo.com", "roles": ["reader"]}
+HIDDEN_MEMBER = {"row_kind": "group_member", "grantee_type": "user", "principal_email": "leah.brooks@northwind-demo.com",
+                 "roles": ["reader"], "via_group_name": "Hidden Readers"}
+
+
+def unlisted_of(data):
+    return render_report.render_with_model(data)[1]["unlisted"]
+
+
+class AccessNotInTheMembersListTest(unittest.TestCase):
+    def test_a_person_who_is_not_a_member_is_listed(self):
+        rows = [row for row in unlisted_of(with_extract_rows(OUTSIDER)) if row["email"].startswith("kai")]
+        self.assertEqual([(row["folder_set"], row["person_name"], row["role"], row["inherited"], row["why"]) for row in rows],
+                         [("Catalog-Client-Viewers", "Kai Outsider", "Viewer", "No", "Not a member of this folder set")])
+
+    def test_a_member_with_another_inherited_permission_is_listed(self):
+        rows = [row for row in unlisted_of(with_extract_rows(MANAGER)) if row["email"].startswith("dana") and row["_control_id"] == CATALOG_ID]
+        self.assertEqual([(row["role"], row["inherited"], row["why"]) for row in rows],
+                         [("Manager", "Yes", "A member, with Editor permission in Attachment A")])
+
+    def test_a_member_with_the_same_permission_is_not_listed(self):
+        self.assertFalse([
+            row for row in unlisted_of(with_extract_rows(SAME_ROLE))
+            if row["email"].lower().startswith("dana") and row["_control_id"] == CATALOG_ID
+        ])
+
+    def test_section_three_counts_them_and_explains_them_in_one_sentence(self):
+        files, model = render_report.render_with_model(with_extract_rows(OUTSIDER, MANAGER))
+        page = html.unescape(files["report.html"])
+        count = render_report.unlisted_text(model["unlisted"])
+        self.assertIn(f"<tr><td>Not in the members list</td><td>{count}</td></tr>", page)
+        self.assertIn("<h3>3.3 Access not in the members list</h3>", page)
+        self.assertIn(render_report.UNLISTED_MEANING, page)
+        self.assertIn(f"Access not in the members list: {count}.", render_report.render_summary_text(model))
+
+    def test_without_a_completed_extract_there_is_no_such_section(self):
+        files, model = render_report.render_with_model(fail_extract(fixture()))
+        self.assertIsNone(model["unlisted"])
+        self.assertNotIn("3.3 Access not in the members list", files["report.html"])
+
+
+class LiveReadGroupsTest(unittest.TestCase):
+    def test_a_group_found_only_in_the_live_read_is_listed_in_attachment_b(self):
+        files, model = render_report.render_with_model(with_extract_rows(HIDDEN_GROUP))
+        rows = [row for row in rows_of(files["groups.csv"]) if row["group_name"] == "Hidden Readers"]
+        self.assertEqual([(row["folder_set"], row["outcome"], row["role"]) for row in rows],
+                         [("Catalog-Client-Viewers", "Found in the live read, not decided in Polar Sky", "Viewer")])
+        self.assertIn("1 more found in the live read and not decided in Polar Sky, listed in Attachment B",
+                      render_report.groups_text(model))
+
+    def test_a_group_the_folder_set_decided_on_is_not_listed_twice(self):
+        decided = dict(HIDDEN_GROUP, principal_name="Catalog-Client-Viewers",
+                       principal_email="catalog-client-viewers@northwind-demo.com")
+        rows = rows_of(render_report.render(with_extract_rows(decided))["groups.csv"])
+        self.assertEqual([row["group_name"] for row in rows].count("Catalog-Client-Viewers"), 1)
+
+    def test_a_member_reached_through_such_a_group_shows_it_in_attachment_a(self):
+        files = render_report.render(with_extract_rows(HIDDEN_GROUP, HIDDEN_MEMBER))
+        leah = [row for row in rows_of(files["members.csv"]) if row["person_name"] == "Leah Brooks"]
+        self.assertEqual([row["through_groups"] for row in leah], ["Catalog-Client-Viewers; Hidden Readers (live read)"])
+
+
+class LiveReadMatchingTest(unittest.TestCase):
+    def test_a_grant_with_several_roles_lists_the_roles_the_members_list_does_not_show(self):
+        both = dict(SAME_ROLE, roles=["writer", "organizer"])
+        rows = [row for row in unlisted_of(with_extract_rows(both)) if row["_control_id"] == CATALOG_ID and row["email"].lower().startswith("dana")]
+        self.assertEqual([row["role"] for row in rows], ["Manager"])
+
+    def test_a_live_group_with_a_decided_name_but_another_email_is_still_listed(self):
+        twin = dict(HIDDEN_GROUP, principal_name="Catalog-Client-Viewers", principal_email="other-viewers@northwind-demo.com")
+        rows = rows_of(render_report.render(with_extract_rows(twin))["groups.csv"])
+        self.assertEqual([row["outcome"] for row in rows if row["group_name"] == "Catalog-Client-Viewers"],
+                         ["Kept", "Found in the live read, not decided in Polar Sky"])
+
+    def test_a_decided_group_missing_from_through_groups_is_not_marked_live_read(self):
+        decided_member = dict(HIDDEN_MEMBER, principal_email="mia.novak@northwind-demo.com", via_group_name="Catalog-Client-Viewers")
+        rows = rows_of(render_report.render(with_extract_rows(decided_member))["members.csv"])
+        self.assertFalse([row for row in rows if "(live read)" in row["through_groups"]])
+
+    def test_an_extract_that_read_no_folder_gives_no_list(self):
+        data = fixture()
+        for item in data["responses"]:
+            if item["tool"] == "get_access_review_extract" and item["response"].get("status") == "completed":
+                item["response"]["folders_read"] = 0
+        files, model = render_report.render_with_model(data)
+        self.assertIsNone(model["unlisted"])
+        self.assertNotIn("Not in the members list", files["report.html"])
+
+
+class EndedPolarSkyApprovalTest(unittest.TestCase):
+    def test_a_polar_sky_approval_that_ended_says_how(self):
+        data = fixture()
+        model_eval = data["responses"][0]["response"]["controls"][2]
+        model_eval["approvals"][0]["actor"] = {"type": "system", "surface": ""}
+        sentence = render_report.approved_by_polar_sky_only(render_report.render_with_model(data)[1]["totals"])
+        self.assertIn("Model Eval Results (approval withdrawn 2026-10-19; data owner Omar Haddad)", sentence)
+
+
+class LiveGroupCountTest(unittest.TestCase):
+    def test_a_live_group_without_an_email_takes_no_count_from_a_same_named_group(self):
+        data = with_extract_rows(dict(HIDDEN_GROUP, principal_email="", principal_name="Twins"))
+        for item in data["responses"]:
+            if item["tool"] == "get_access_review_extract" and item["response"].get("status") == "completed":
+                item["response"]["groups"] += [
+                    {"group_id": "site-a", "name": "Twins", "kind": "sharepoint_group", "counted_members": 3, "provider_member_count": 3},
+                    {"group_id": "site-b", "name": "Twins", "kind": "sharepoint_group", "counted_members": 9, "provider_member_count": 9},
+                ]
+        rows = [row for row in rows_of(render_report.render(data)["groups.csv"]) if row["group_name"] == "Twins"]
+        self.assertEqual([row["people_count"] for row in rows], ["Not recorded"])
+
+
+class LiveSharePointGroupTest(unittest.TestCase):
+    def test_a_sharepoint_group_found_only_in_the_live_read_is_listed_with_its_members(self):
+        site_group = dict(HIDDEN_GROUP, grantee_type="site_group", principal_name="Site Visitors", principal_email="")
+        member = dict(HIDDEN_MEMBER, row_kind="sharepoint_group_member", via_group_name=None,
+                      via_sharepoint_group_name="Site Visitors")
+        files = render_report.render(with_extract_rows(site_group, member))
+        groups = [row["outcome"] for row in rows_of(files["groups.csv"]) if row["group_name"] == "Site Visitors"]
+        self.assertEqual(groups, ["Found in the live read, not decided in Polar Sky"])
+        leah = [row["through_groups"] for row in rows_of(files["members.csv"]) if row["person_name"] == "Leah Brooks"]
+        self.assertEqual(leah, ["Catalog-Client-Viewers; Site Visitors (live read)"])
+
+
+class UnmatchedLiveGrantTest(unittest.TestCase):
+    def test_a_person_grant_with_no_email_is_listed_as_not_matched(self):
+        nameless = dict(OUTSIDER, principal_email="", principal_name="Pat Unknown")
+        rows = [row for row in unlisted_of(with_extract_rows(nameless)) if row["person_name"] == "Pat Unknown"]
+        self.assertEqual([row["why"] for row in rows], ["Not matched: the live read gave no email for this person"])
+
+
+class MixedProviderAccountTypesTest(unittest.TestCase):
+    def test_a_provider_with_no_account_types_is_named(self):
+        data = with_account_types(mixed_fixture(), {None: None})
+        for item in data["responses"]:
+            if item["tool"] == "list_control_members" and item["response"].get("control_id", "").startswith("2222"):
+                for member in item["response"]["members"]:
+                    member["account_type"] = "Contractor"
+        evidence = vendor_evidence(data)
+        self.assertIn("No account types recorded for the Microsoft 365 members", evidence)
+
+
+class SameNamedLiveGroupTest(unittest.TestCase):
+    def test_a_member_of_a_group_named_like_a_decided_group_is_not_marked_live_read(self):
+        twin = dict(HIDDEN_GROUP, principal_name="Catalog-Client-Viewers", principal_email="other-viewers@northwind-demo.com")
+        member = dict(HIDDEN_MEMBER, principal_email="mia.novak@northwind-demo.com", via_group_name="Catalog-Client-Viewers")
+        rows = rows_of(render_report.render(with_extract_rows(twin, member))["members.csv"])
+        self.assertFalse([row for row in rows if "(live read)" in row["through_groups"]])

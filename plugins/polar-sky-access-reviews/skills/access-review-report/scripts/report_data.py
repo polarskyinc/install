@@ -1,6 +1,7 @@
 """Load the report data file and derive the rows and counts the report shows."""
 
 import base64
+import calendar
 import json
 import os
 import re
@@ -41,6 +42,9 @@ UNKNOWN_PROVIDER_LABEL = "the provider"
 
 NESTED_GROUP_DIFFERS = "Differs in a nested group"
 
+MICROSOFT_365 = "microsoft365"
+MICROSOFT_365_GUEST = "Guest"
+
 PROVIDER_LABELS = {
     "microsoft365": ("Microsoft 365", "Microsoft 365 tenant"),
     "google_workspace": ("Google Workspace", "Google Workspace domain"),
@@ -66,9 +70,31 @@ LOWER_ACCESS_ACTION = "Lower access"
 
 RESULT_LABELS = {"removed": "Removed", "failed": "Failed", "pending": "Pending"}
 
+REMOVAL_RECORD = "removal_record"
+
+DEADLINE_WITHIN = "within"
+DEADLINE_OVER = "over"
+DEADLINE_OPEN = "open"
+DEADLINE_NO_DECISION = "no_decision"
+DEADLINE_DONE_LATER = "done_later"
+UNIDENTIFIED_GRANTEE = "unidentified"
+NO_DECISION_RECORDED = "No approval recorded before it"
+
 ROLE_LABELS = {
     "reader": "Viewer", "writer": "Editor", "owner": "Owner", "commenter": "Commenter", "read": "Read", "write": "Edit",
+    "organizer": "Manager", "fileOrganizer": "Content manager",
 }
+
+SAME_PERMISSION = {
+    "reader": "read", "read": "read", "viewer": "read", "writer": "write", "write": "write", "editor": "write",
+    "edit": "write", "contributor": "write", "commenter": "comment", "owner": "owner", "full control": "owner",
+    "organizer": "manager", "manager": "manager", "fileorganizer": "content manager", "content manager": "content manager",
+}
+
+LIVE_READ_GROUP = "Found in the live read, not decided in Polar Sky"
+GROUP_GRANTEE_TYPES = frozenset({"group", "site_group", "sharepoint_group"})
+GROUP_MEMBER_KINDS = frozenset({"group_member", "sharepoint_group_member"})
+LIVE_READ_MARK = "(live read)"
 
 TARGET_KIND_LABELS = {
     "user": "Person", "group": "Group", "site_group": "SharePoint group", "application": "Application",
@@ -101,6 +127,9 @@ CONTROL_CARRIED = "carried"
 CONTROL_ENDED = "ended"
 
 POLICY_LABEL = "Polar Sky"
+NOT_RECORDED = "Not recorded"
+APPROVER_PERSON = "Person"
+APPROVER_SYSTEM = "Polar Sky"
 KEPT_BY_POLICY = "Proposed by Polar Sky"
 KEPT_BY_PERSON = "Added or changed by"
 
@@ -530,7 +559,7 @@ def _extract_row(row):
         "folder": row.get("folder") or "",
         "row_kind": ROW_KIND_LABELS.get(row.get("row_kind") or "", row.get("row_kind") or ""),
         "grantee_type": (row.get("grantee_type") or "").replace("_", " "),
-        "principal_name": row.get("principal_name") or "",
+        "principal_name": row.get("principal_name") or row.get("principal_email") or "",
         "principal_email": row.get("principal_email") or "",
         "login_name": row.get("login_name") or "",
         "roles": _join(row.get("roles") or []),
@@ -550,6 +579,11 @@ def _extract_row(row):
         "drive_id": row.get("drive_id") or "",
         "as_of": format_time(row.get("as_of")),
         "_kind": row.get("row_kind") or "",
+        "_grantee_type": row.get("grantee_type") or "",
+        "_roles": [role for role in row.get("roles") or [] if isinstance(role, str)],
+        "_inherited": bool(row.get("inherited")),
+        "_via_group": row.get("via_group_name") or row.get("via_sharepoint_group_name") or "",
+        "_name": row.get("principal_name") or "",
     }
 
 
@@ -574,6 +608,7 @@ def _group_count_row(group):
         "counted_members": counted,
         "provider_member_count": provider_count,
         "result": result,
+        "_group_id": (group.get("group_id") or "").lower(),
     }
 
 
@@ -677,7 +712,7 @@ def _member_row(control_entry, member, members_as_of):
         "email": member.get("email") or "",
         "title": member.get("title") or "",
         "department": member.get("department") or "",
-        "account_type": member.get("account_type") or "",
+        "account_type": member.get("account_type") or NOT_RECORDED,
         "role": member.get("role") or "",
         "through_groups": _join(member.get("through_groups") or []),
         "individual_access": _yes_no(member.get("individual_access")),
@@ -694,6 +729,8 @@ def _member_row(control_entry, member, members_as_of):
         "_keeps_access": bool(member.get("keeps_access")),
         "_kept_until_ended": kept_until_ended,
         "_has_account_type": bool(member.get("account_type")),
+        "_provider": control_entry["provider"],
+        "_control_id": control_entry["id"],
     }
 
 
@@ -740,14 +777,45 @@ def _removal_role(removal):
     return role_label(removal.get("role") or from_role)
 
 
-def _removal_rows(control_entry, evidence):
+def days_text(days):
+    """Say a number of days in words, such as "same day", "1 day" or "43 days"."""
+    return "same day" if days == 0 else f"{days} day" if days == 1 else f"{days} days"
+
+
+def _deadline_result(removal, state, approval_times, deadline_days, report_time):
+    """Return a removal record's decision date, its result against the deadline in words, its result key and its days."""
+    if removal.get("source") != REMOVAL_RECORD:
+        return "", "", None, None
+    at = parse_time(removal.get("at"))
+    decided_at = max((time for time in approval_times if at and time <= at), default=None)
+    if decided_at is None:
+        return "", NO_DECISION_RECORDED, DEADLINE_NO_DECISION, None
+    decided_on = decided_at.strftime("%Y-%m-%d")
+    if state == "applied":
+        days = (at.date() - decided_at.date()).days
+        if deadline_days is None:
+            return decided_on, "", None, days
+        if days <= deadline_days:
+            return decided_on, f"Within ({days_text(days)})", DEADLINE_WITHIN, days
+        return decided_on, f"Over ({days_text(days)})", DEADLINE_OVER, days
+    if state == "failed" or state in PENDING_STATES:
+        days = (report_time.date() - decided_at.date()).days
+        return decided_on, f"Not done by the period end ({days_text(days)} since the decision)", DEADLINE_OPEN, days
+    return decided_on, "", None, None
+
+
+def _removal_rows(control_entry, evidence, deadline_days, report_time):
     rows = []
+    approval_times = [parse_time(approval.get("at")) for approval in evidence.get("approvals") or [] if approval.get("at")]
     for removal in evidence.get("removals") or []:
         result = removal.get("result") or ""
         state = removal.get("state") or RESULT_STATES.get(result, result)
         label = RESULT_LABELS.get(result) or STATE_LABELS.get(state, state.replace("_", " ").capitalize())
         if result == "removed" and removal.get("action") == LOWER_ACCESS_ACTION:
             label = "Lowered"
+        decided_on, within_deadline, deadline, days = _deadline_result(
+            removal, state, approval_times, deadline_days, report_time
+        )
         rows.append({
             "folder_set": control_entry["name"],
             "folders": _join(control_entry["folders"]),
@@ -762,12 +830,55 @@ def _removal_rows(control_entry, evidence):
             "state_at": format_date(removal.get("at")),
             "state_reason": removal.get("reason") or "",
             "confirmed_on": format_date(removal.get("confirmed_at")),
+            "decided_on": decided_on,
+            "within_deadline": within_deadline,
             "_state": state,
-            "_confirmable": removal.get("source") == "removal_record",
+            "_confirmable": removal.get("source") == REMOVAL_RECORD,
             "_confirmed": bool(removal.get("confirmed_at")),
             "_at": removal.get("at") or "",
+            "_deadline": deadline,
+            "_days": days,
+            "_time": parse_time(removal.get("at")),
+            "_decided_on": decided_on,
+            "_same_access": (control_entry["id"],) + (_same_access(removal) or (UNIDENTIFIED_GRANTEE, len(rows))),
         })
+    _link_retries(rows)
     return sorted(rows, key=lambda row: (row["_at"], row["target"], row["step"]))
+
+
+def _same_access(removal):
+    """The removal kind, item, grantee and permission a removal acted on, so a later record of the same removal can be found; None when the record does not identify the person."""
+    grantee_kind = removal.get("grantee_kind") or removal.get("target_kind") or ""
+    principal = (removal.get("principal") or "").strip()
+    if not removal.get("email") and (grantee_kind == "user" or not principal or principal.lower().startswith("an unknown")):
+        return None
+    return (
+        removal.get("action") or "",
+        removal.get("role") or "",
+        removal.get("from_role") or "",
+        removal.get("to_role") or "",
+        removal.get("target") or "",
+        grantee_kind,
+        (removal.get("email") or removal.get("principal") or "").lower(),
+        removal.get("link_scope") or "",
+    )
+
+
+def _link_retries(rows):
+    """Mark a failed or pending record as done later when a later record on the same folder set removed the same access."""
+    applied = [row for row in rows if row["_confirmable"] and row["_state"] == "applied" and row["_time"]]
+    for row in rows:
+        if row["_deadline"] != DEADLINE_OPEN or not row["_time"]:
+            continue
+        later = [done for done in applied if done["_same_access"] == row["_same_access"] and done["_time"] > row["_time"]]
+        if not later:
+            continue
+        done = min(later, key=lambda item: item["_time"])
+        days = (done["_time"].date() - datetime.fromisoformat(row["_decided_on"]).date()).days
+        after = "the same day as the decision" if days == 0 else f"{days_text(days)} after the decision"
+        row["within_deadline"] = f"Done later on {done['_time'].strftime('%Y-%m-%d')} ({after})"
+        row["_deadline"] = DEADLINE_DONE_LATER
+        row["_days"] = days
 
 
 def _approval_endings(entries):
@@ -801,6 +912,7 @@ def _approval_rows(control_entry, evidence, endings, period_end):
             "folder_set": control_entry["name"],
             "folders": _join(control_entry["folders"]),
             "approved_by": _approval_actor_name(approval),
+            "approver_type": APPROVER_SYSTEM if actor.get("type") == "system" else APPROVER_PERSON,
             "approved_at": format_time(approval.get("at")),
             "carried_into_period": _yes_no(approval.get("carried_into_range")),
             "surface": SURFACE_LABELS.get(actor.get("surface") or "", actor.get("surface") or ""),
@@ -811,6 +923,7 @@ def _approval_rows(control_entry, evidence, endings, period_end):
             "_ended_on": ended[0].strftime("%Y-%m-%d") if ended else "",
             "_ended_how": ended[1] if ended else "",
             "_ended_at": ended[0] if ended else None,
+            "_by_person": actor.get("type") != "system",
         })
     return rows
 
@@ -875,6 +988,66 @@ def extract_providers(extract, controls, report_providers):
     return sorted(found)
 
 
+def whole_number(value, field, example):
+    """Read a positive whole number from the inputs, or None when it was not given."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value.strip())
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ReportDataError(f"inputs.{field} must be a whole number, such as {example}.")
+    return value
+
+
+def removal_deadline_days(value):
+    """Read the removal deadline in days from the inputs, or None when it was not given."""
+    return whole_number(value, "removal_deadline_days", 30)
+
+
+def review_interval_length(inputs):
+    """Read the review interval as ("months", n) or ("days", n) from the inputs, or None when no number was given."""
+    months = whole_number(inputs.get("review_interval_months"), "review_interval_months", 6)
+    days = whole_number(inputs.get("review_interval_days"), "review_interval_days", 90)
+    if months and days:
+        raise ReportDataError("Give inputs.review_interval_months or inputs.review_interval_days, not both.")
+    if months:
+        return "months", months
+    return ("days", days) if days else None
+
+
+def interval_text(length):
+    """Say a review interval in words, such as "6 months" or "90 days"."""
+    unit, count = length
+    return f"{count} {unit[:-1] if count == 1 else unit}"
+
+
+def before(day, length):
+    """The date one review interval before a date, keeping the day of the month where the month allows."""
+    unit, count = length
+    if unit == "days":
+        return day - timedelta(days=count)
+    year, month = divmod(day.year * 12 + day.month - 1 - count, 12)
+    return day.replace(year=year, month=month + 1, day=min(day.day, calendar.monthrange(year, month + 1)[1]))
+
+
+def interval_check(length, period, controls):
+    """Compare the review period and each folder set's last approval by a person with the review interval."""
+    if length is None:
+        return None
+    first_day = datetime.fromisoformat(period["from"]).date()
+    last_day = datetime.fromisoformat(period["to"]).date()
+    cutoff = before(last_day, length)
+    return {
+        "text": interval_text(length),
+        "cutoff": cutoff.isoformat(),
+        "period_longer": first_day < before(last_day + timedelta(days=1), length),
+        "stale": [
+            control for control in controls
+            if control["last_person_approval"] is None or control["last_person_approval"].date() < cutoff
+        ],
+    }
+
+
 def build_model(data):
     """Turn the data file into the rows, counts and texts the renderer lays out."""
     inputs = data.get("inputs") or {}
@@ -886,6 +1059,12 @@ def build_model(data):
         raise ReportDataError(
             f"inputs.framework must be one of {', '.join(sorted(frameworks))}, not {inputs['framework']!r}."
         )
+    deadline_days = removal_deadline_days(inputs.get("removal_deadline_days"))
+    interval_length = review_interval_length(inputs)
+    if interval_length is not None and not inputs.get("review_interval"):
+        inputs = {**inputs, "review_interval": f"Every {interval_text(interval_length)}"}
+    if deadline_days is not None and not inputs.get("removal_deadline"):
+        inputs = {**inputs, "removal_deadline": f"{deadline_days} days after the decision"}
     records = collect(data)
     period = inputs["period"]
     check_complete(records, period)
@@ -897,6 +1076,7 @@ def build_model(data):
     )
     members_as_of = members_read_at(inputs, extract, data.get("responses", []))
 
+    open_until = min(_period_bounds(period)[1] - timedelta(days=1), parse_time(inputs["generated_at"]))
     controls = []
     tables = {"members": [], "groups": [], "shares": [], "removals": [], "approvals": []}
     providers = set()
@@ -923,6 +1103,7 @@ def build_model(data):
             "id": control_id,
             "name": evidence.get("name") or detail.get("name") or "",
             "status": evidence.get("status") or "",
+            "provider": detail.get("provider") or "",
             "folders": evidence.get("folders") or [],
             "reason": (detail.get("reason") or "").strip(),
             "purpose": (detail.get("purpose") or "").strip(),
@@ -934,6 +1115,10 @@ def build_model(data):
             "ended_at": latest["_ended_at"] if latest else None,
             "has_detail": bool(detail),
             "has_members": control_id in records["members"],
+            "last_person_approval": (
+                parse_time(latest["_at"]) if latest and latest["_by_person"] and not latest["_ended_on"] else None
+            ),
+            "last_approval_by_polar_sky": bool(latest and not latest["_by_person"]),
         }
         members = sorted(
             (_member_row(entry, member, members_as_of) for member in records["members"].get(control_id, {}).values()),
@@ -943,7 +1128,7 @@ def build_model(data):
         entry["owner"] = owners[0] if owners else ""
         groups = _group_rows(entry, detail)
         shares = _share_rows(entry, evidence, evidence.get("shares_read_at") or records["shares_read_at"])
-        removals = _removal_rows(entry, evidence)
+        removals = _removal_rows(entry, evidence, deadline_days, open_until)
         entry["activity_in_period"] = len(_activity_in_period(records["activity"].get(control_id, []), period))
         entry["counts"] = {
             "members": len(members),
@@ -953,6 +1138,7 @@ def build_model(data):
             "kept_until_ended": sum(1 for row in members if row["_kept_until_ended"]),
             "groups_kept": sum(1 for row in groups if row["outcome"] == "Kept"),
             "groups_dropped": sum(1 for row in groups if row["outcome"] == "Dropped"),
+            "groups_live": 0,
             "shares": len(shares),
             "removals": len(removals),
             "removals_applied": sum(1 for row in removals if row["_state"] == "applied"),
@@ -964,6 +1150,7 @@ def build_model(data):
         tables["removals"].extend(removals)
         tables["approvals"].extend(approvals)
 
+    unlisted = reconcile_extract(extract, controls, tables, records["controls"])
     controls.sort(key=lambda control: (control["name"].lower(), control["id"]))
     order = {control["name"]: index for index, control in enumerate(controls)}
     for name in tables:
@@ -993,17 +1180,113 @@ def build_model(data):
         "issued_at": inputs.get("issued_at") or inputs["generated_at"],
         "extract": extract,
         "acknowledgment": inputs.get("acknowledgment") or {},
+        "deadline_days": deadline_days,
+        "interval": interval_check(interval_length, period, controls),
         "logo": load_logo(inputs.get("logo")),
         "totals": _totals(controls, tables),
+        "unlisted": unlisted,
     }
+
+
+def _permission(value):
+    text = (value or "").strip().lower()
+    return SAME_PERMISSION.get(text, text)
+
+
+def _is_decided_group(email, name, control):
+    """Say whether a group is one the folder set kept or dropped: by email when both have one, else by name."""
+    for group in (control.get("kept_groups") or []) + (control.get("dropped_groups") or []):
+        decided_email = (group.get("email") or "").lower()
+        if email and decided_email:
+            if email == decided_email:
+                return True
+        elif name and name == (group.get("name") or "").lower():
+            return True
+    return False
+
+
+def reconcile_extract(extract, controls, tables, details):
+    """Compare a completed extract with the members and groups Polar Sky records: return the person grants the members list does not show, and add the groups found only in the live read to the groups table and to members' groups."""
+    if not extract or extract["status"] != EXTRACT_COMPLETED or not extract["folders_read"]:
+        return None
+    by_id = {control["id"]: control for control in controls}
+    members = {}
+    for row in tables["members"]:
+        if row["email"]:
+            members.setdefault((row["_control_id"], row["email"].lower()), row)
+    counts = {group["_group_id"]: group["counted_members"] for group in extract["groups"] if group["_group_id"]}
+    names = [group["group_name"].lower() for group in extract["groups"]]
+    for group in extract["groups"]:
+        if names.count(group["group_name"].lower()) == 1:
+            counts.setdefault(group["group_name"].lower(), group["counted_members"])
+    unlisted = []
+    live_groups = {}
+    through = {}
+    for row in extract["table"]:
+        control = by_id.get(row["folder_set_id"])
+        if control is None:
+            continue
+        email = row["principal_email"].lower()
+        if row["_kind"] == "grant" and row["_grantee_type"] == "user":
+            member = members.get((control["id"], email)) if email else None
+            if not email:
+                why = "Not matched: the live read gave no email for this person"
+                extra = row["_roles"]
+            elif member is None:
+                why = "Not a member of this folder set"
+                extra = row["_roles"]
+            else:
+                why = f"A member, with {member['role'] or 'no recorded'} permission in Attachment A"
+                extra = [role for role in row["_roles"] if _permission(role) != _permission(member["role"])]
+                if not extra:
+                    continue
+            unlisted.append({
+                "folder_set": control["name"], "folder": row["folder"], "person_name": row["_name"] or row["principal_email"],
+                "email": row["principal_email"], "role": _join(role_label(role) for role in extra),
+                "inherited": _yes_no(row["_inherited"]), "why": why, "_control_id": control["id"],
+            })
+        elif row["_kind"] == "grant" and row["_grantee_type"] in GROUP_GRANTEE_TYPES:
+            name = row["_name"] or row["principal_email"]
+            if _is_decided_group(email, name.lower(), details.get(control["id"]) or {}):
+                continue
+            entry = live_groups.setdefault((control["id"], email or name.lower()), {
+                "control": control, "name": name, "email": row["principal_email"], "folders": [], "roles": [],
+            })
+            entry["folders"] += [row["folder"]] if row["folder"] not in entry["folders"] else []
+            entry["roles"] += [role_label(role) for role in row["_roles"] if role_label(role) not in entry["roles"]]
+        elif row["_kind"] in GROUP_MEMBER_KINDS and email and row["_via_group"]:
+            through.setdefault((control["id"], email), []).append(row["_via_group"])
+    live_names = {
+        (entry["control"]["id"], entry["name"].lower()) for entry in live_groups.values()
+        if not _is_decided_group("", entry["name"].lower(), details.get(entry["control"]["id"]) or {})
+    }
+    for entry in live_groups.values():
+        count = counts.get(entry["email"].lower(), counts.get(entry["name"].lower()))
+        entry["control"]["counts"]["groups_live"] += 1
+        tables["groups"].append({
+            "folder_set": entry["control"]["name"], "folders": _join(entry["folders"]), "group_name": entry["name"],
+            "group_email": entry["email"], "outcome": LIVE_READ_GROUP, "role": _join(entry["roles"]),
+            "people_count": "Not recorded" if count is None else str(count), "membership_complete": "",
+            "external_recipients": "", "reviewed_by": "", "reviewed_on": "",
+        })
+    for row in tables["members"]:
+        listed = [name for name in row["through_groups"].split("; ") if name]
+        for name in through.get((row["_control_id"], row["email"].lower()), []):
+            if (row["_control_id"], name.lower()) not in live_names:
+                continue
+            if name not in listed and f"{name} {LIVE_READ_MARK}" not in listed:
+                listed.append(f"{name} {LIVE_READ_MARK}")
+        row["through_groups"] = _join(listed)
+    return unlisted
 
 
 def _totals(controls, tables):
     totals = {key: sum(control["counts"][key] for control in controls) for key in controls[0]["counts"]} if controls else {
         key: 0 for key in ("members", "kept_by_policy", "kept_by_person", "keeps_nothing", "kept_until_ended", "groups_kept",
-                           "groups_dropped", "shares", "removals", "removals_applied")
+                           "groups_dropped", "groups_live", "shares", "removals", "removals_applied")
     }
     totals["controls"] = len(controls)
+    totals["controls_without_person"] = [control for control in controls if control["last_person_approval"] is None]
     totals["controls_approved_in_period"] = sum(1 for control in controls if control["state"] == CONTROL_APPROVED)
     totals["controls_carried"] = sum(1 for control in controls if control["state"] == CONTROL_CARRIED)
     ended = {}
@@ -1019,6 +1302,8 @@ def _totals(controls, tables):
     )
     totals["removals_confirmed"] = sum(1 for row in tables["removals"] if row["_confirmed"])
     totals["removals_pending"] = sum(1 for row in tables["removals"] if row["_state"] in PENDING_STATES)
+    for key in (DEADLINE_WITHIN, DEADLINE_OVER, DEADLINE_OPEN, DEADLINE_NO_DECISION):
+        totals[f"removals_{key}"] = [row for row in tables["removals"] if row["_deadline"] == key]
     totals["removals_other"] = (
         totals["removals"] - totals["removals_applied"] - totals["removals_failed"] - totals["removals_pending"]
     )
@@ -1029,12 +1314,22 @@ def _totals(controls, tables):
         if row["_has_account_type"]:
             account_types[row["account_type"]] = account_types.get(row["account_type"], 0) + 1
     totals["account_types"] = dict(sorted(account_types.items()))
+    guests = [
+        row for row in tables["members"]
+        if row["_provider"] == MICROSOFT_365 and row["account_type"] == MICROSOFT_365_GUEST
+    ]
+    totals["guest_members"] = len(guests)
+    totals["guest_accounts"] = len({(row["email"] or row["person_name"]).lower() for row in guests})
+    totals["account_type_providers"] = sorted({row["_provider"] for row in tables["members"] if row["_has_account_type"]})
+    totals["providers_without_account_types"] = sorted(
+        {row["_provider"] for row in tables["members"] if row["_provider"]} - set(totals["account_type_providers"])
+    )
     in_period = sorted(
         parse_time(row["_at"]) for row in tables["approvals"] if not row["_carried"] and not row["_ended_on"]
     )
     totals["first_approval"] = in_period[0].strftime("%Y-%m-%d") if in_period else ""
     totals["last_approval"] = in_period[-1].strftime("%Y-%m-%d") if in_period else ""
-    approvers = {row["approved_by"] for row in tables["approvals"] if not row["_carried"]}
+    approvers = {row["approved_by"] for row in tables["approvals"] if not row["_carried"] and row["_by_person"]}
     totals["approvers"] = len(approvers)
     totals["people_deciding"] = len(
         {row["decided_by"] for row in tables["members"] if not row["_decided_by_policy"]} | approvers
