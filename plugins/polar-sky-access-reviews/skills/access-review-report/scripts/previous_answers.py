@@ -3,6 +3,7 @@
 Usage: python3 previous_answers.py [--organization NAME]
 
 Prints one JSON object: the most recent answers for each framework, and the most recent answers of any framework.
+Each answer set also names the answers the skill asks for today that it lacks, with a value read from its earlier text when that is unambiguous.
 A report mapped to several frameworks counts for each of them.
 Only answers the renderer accepts are printed; nothing else from the session files is.
 """
@@ -31,6 +32,35 @@ TEXT_ANSWERS = (
 )
 ACKNOWLEDGMENT_ANSWERS = ("name", "title", "statement")
 COLUMN_ID = re.compile(r"^[a-z0-9_]{1,64}$")
+ASKED_ANSWERS = (
+    (("organization",), None),
+    (("requested_by",), None),
+    (("procedure",), None),
+    (("retention",), None),
+    (("removal_deadline_days",), "removal_deadline"),
+    (("review_interval_months", "review_interval_days"), "review_interval"),
+    (("acknowledgment.name",), None),
+    (("acknowledgment.title",), None),
+    (("acknowledgment.statement",), None),
+)
+INTERVAL_ANSWERS = ("review_interval_months", "review_interval_days")
+LENGTH = re.compile(
+    r"\b(\d+)[\s-]*(?:(calendar|business|working|work|school|banking)[\s-]+)?(days?|weeks?|months?|years?|hours?)\b",
+    re.IGNORECASE,
+)
+INTERVAL_WORDS = re.compile(
+    r"(?<![\w-])((?:semi[\s-]?)?annually|half[\s-]?yearly|monthly|quarterly|yearly)\b", re.IGNORECASE
+)
+QUALIFIED_INTERVAL_WORDS = re.compile(r"\b(?:bi|tri|semi)[\s-]*(?:weekly|monthly|quarterly|yearly)\b|\bbi[\s-]*annually\b",
+                                      re.IGNORECASE)
+INTERVAL_WORD_MONTHS = {"monthly": 1, "quarterly": 3, "semiannually": 6, "halfyearly": 6, "annually": 12, "yearly": 12}
+DEADLINE_START = re.compile(r"^\s*(?:within\s+)?\d+[\s-]*(?:calendar[\s-]+)?days?\b", re.IGNORECASE)
+INTERVAL_START = re.compile(
+    r"^\s*(?:(?:every\s+)?\d+[\s-]*(?:calendar[\s-]+)?(?:days?|months?|years?)"
+    r"|(?:semi[\s-]?)?annually|half[\s-]?yearly|monthly|quarterly|yearly)\b",
+    re.IGNORECASE,
+)
+MODIFYING_WORDS = re.compile(r"\b(?:not|no|never|twice|thrice|times|unless|except|or)\b", re.IGNORECASE)
 
 
 def sessions_folder():
@@ -173,6 +203,82 @@ def clean_answers(inputs, frameworks, columns):
     return answers
 
 
+def _lengths(text):
+    """The distinct lengths of time in a text, each as (number, qualifier, unit), with the unit singular and lower case, or None when the text has a number that is not a length, as in "6-12 months"."""
+    if re.search(r"\d", LENGTH.sub(" ", text)):
+        return None
+    return {
+        (int(number), (qualifier or "").lower(), unit.lower().rstrip("s"))
+        for number, qualifier, unit in LENGTH.findall(text)
+    }
+
+
+def deadline_days_in(text):
+    """The removal deadline in days that a text starting with it states unambiguously, such as 30 for "Within 30 days of the decision", or None."""
+    if not isinstance(text, str) or not DEADLINE_START.match(text) or MODIFYING_WORDS.search(text):
+        return None
+    lengths = _lengths(text)
+    if not lengths or len(lengths) != 1:
+        return None
+    number, qualifier, unit = lengths.pop()
+    if unit != "day" or qualifier not in ("", "calendar") or number < 1:
+        return None
+    return {"removal_deadline_days": number}
+
+
+def interval_in(text):
+    """The review interval that a text starting with it states unambiguously, such as 6 months for "Every 6 months", or None."""
+    if not isinstance(text, str) or not INTERVAL_START.match(text) or MODIFYING_WORDS.search(text):
+        return None
+    found = set()
+    lengths = _lengths(text)
+    if lengths is None:
+        return None
+    for number, qualifier, unit in lengths:
+        if qualifier not in ("", "calendar") or unit not in ("day", "month", "year") or number < 1:
+            return None
+        if unit == "day":
+            found.add(("review_interval_days", number))
+        else:
+            found.add(("review_interval_months", number * 12 if unit == "year" else number))
+    if QUALIFIED_INTERVAL_WORDS.search(text):
+        return None
+    for word in INTERVAL_WORDS.findall(text):
+        found.add(("review_interval_months", INTERVAL_WORD_MONTHS[re.sub(r"[\s-]", "", word.lower())]))
+    if len(found) != 1:
+        return None
+    key, number = found.pop()
+    return {key: number}
+
+
+SUGGESTIONS = {"removal_deadline": deadline_days_in, "review_interval": interval_in}
+
+
+def _given(answers, key):
+    """Whether a cleaned answer set has an answer for an input key, where "acknowledgment.title" names a key inside the acknowledgment."""
+    if "." in key:
+        parent, child = key.split(".", 1)
+        return child in (answers.get(parent) or {})
+    return key in answers
+
+
+def not_given_last_time(answers, frameworks):
+    """The answers the skill asks for today that an earlier answer set lacks, each with a value read from the earlier text when that text states it unambiguously."""
+    needs_interval = any(frameworks[key].get("needs_interval") for key in answer_frameworks(answers))
+    missing = []
+    for keys, source in ASKED_ANSWERS:
+        if keys == INTERVAL_ANSWERS and not needs_interval:
+            continue
+        if any(_given(answers, key) for key in keys):
+            continue
+        item = {"inputs": list(keys)}
+        suggestion = SUGGESTIONS[source](answers.get(source)) if source else None
+        if suggestion:
+            item.update(suggestion=suggestion, read_from=source)
+        missing.append(item)
+    return missing
+
+
 def _written_inputs(line):
     """Yield the record time and content of each Write of an access review inputs.json in one session file line."""
     try:
@@ -282,7 +388,7 @@ def find_previous_answers(folder=None, organization=None):
                 continue
     by_framework = {
         framework: {"date": when.strftime("%Y-%m-%d"), "answers": answers, "last_report": last_report,
-                    "columns": columns_note}
+                    "columns": columns_note, "not_given_last_time": not_given_last_time(answers, frameworks)}
         for framework, (when, answers, last_report, columns_note) in newest.items()
     }
     latest = max(newest, key=lambda framework: newest[framework][0], default=None)

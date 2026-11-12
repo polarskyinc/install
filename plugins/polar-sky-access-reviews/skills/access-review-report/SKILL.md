@@ -41,7 +41,20 @@ If it found answers, use the newest of those for the frameworks the person asked
 2. The answers as one short list, headed "From your last <framework names> report on <date>:", one answer per line with its label from the list below. Leave out the period, report ID and acknowledgment date, which are new each time.
 3. "Anything to change?" Use the earlier answers only once the person has confirmed them or given new ones; a logo is shown with its full path so the person sees which file the cover will carry.
 4. The answers that are new for this report: the review period (if the person has not given it), the report ID, and the management acknowledgment date. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
-5. Any answer from the list below that the earlier report did not have, except the optional ones.
+5. The answers the earlier report did not have, from `not_given_last_time` printed next to those answers, under the heading "Not given last time:", one line each in its order, with its label and example from the table below. Leave out the review interval when no framework asked for now has `needs_interval`. When an item has a `suggestion`, the script read that value from the earlier answer named in `read_from`: quote that answer and ask the person to confirm the value, for example "Removal deadline in days (for example 30): your last answer says "30 days after the decision". Use 30?" or "Review interval as a number (for example 6 months): your last answer says "Every 6 months". Use 6 months?". Without a `suggestion`, ask with the example only. Never put one of these in `inputs.json` until the person has confirmed it or given their own.
+
+   | `inputs` | Label and example |
+   |---|---|
+   | `organization` | Organization name (for example Northwind Traders) |
+   | `requested_by` | Who requested the report, name and title (for example Steve Morgan, Director of Security Operations) |
+   | `procedure` | Review procedure, name and version (for example User Access Review Procedure, version 3.2) |
+   | `retention` | Retention period (for example 3 years) |
+   | `removal_deadline_days` | Removal deadline in days (for example 30) |
+   | `review_interval_months`, `review_interval_days` | Review interval as a number (for example 6 months or 90 days) |
+   | `acknowledgment.name` | Management acknowledgment: name (for example Laura Kim) |
+   | `acknowledgment.title` | Management acknowledgment: title (for example Senior Manager, IT Compliance) |
+   | `acknowledgment.statement` | Management acknowledgment: statement (offer the default statement below) |
+
 6. The columns, from the `columns` printed next to those answers. Never list every column here:
    - When `last_time` is `defaults`, the earlier report kept the default columns. Ask "Same columns as last time (the default columns)?"
    - When `last_time` is `chosen`, ask "Same columns as last time?" and show only the tables in `changed_tables`, each headed by its `title` from `references/columns.json`, with its saved columns from `answers.columns`, one `header` per line.
