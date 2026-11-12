@@ -1,0 +1,125 @@
+{
+  "members": {
+    "title": "Members at report time",
+    "file": "members.csv",
+    "description": "One row per member of each folder set at report time, not as at the end of the period: whether they keep access, through what, who proposed, added or changed their access and why.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "folders", "header": "Folders", "default": true},
+      {"id": "person_name", "header": "Person", "default": true},
+      {"id": "email", "header": "Email", "default": true},
+      {"id": "title", "header": "Job title", "default": true},
+      {"id": "department", "header": "Department", "default": false},
+      {"id": "account_type", "header": "Account type", "default": true},
+      {"id": "role", "header": "Permission", "default": true},
+      {"id": "through_groups", "header": "Through groups", "default": true},
+      {"id": "individual_access", "header": "Own grant", "default": false},
+      {"id": "keeps_access", "header": "Keeps access", "default": true},
+      {"id": "is_owner", "header": "Data owner", "default": false},
+      {"id": "decided_by", "header": "Proposed, added or changed by", "default": true},
+      {"id": "decided_on", "header": "Proposed, added or changed on", "default": true},
+      {"id": "last_action", "header": "Last change", "default": false},
+      {"id": "reason", "header": "Reason", "default": true},
+      {"id": "reviewed_by", "header": "Access approved by", "default": true},
+      {"id": "reviewed_on", "header": "Access approved on", "default": true},
+      {"id": "as_of", "header": "Members as at", "default": true}
+    ]
+  },
+  "groups": {
+    "title": "Groups",
+    "file": "groups.csv",
+    "description": "One row per group kept or dropped on each folder set.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "folders", "header": "Folders", "default": true},
+      {"id": "group_name", "header": "Group", "default": true},
+      {"id": "group_email", "header": "Group email", "default": false},
+      {"id": "outcome", "header": "Outcome", "default": true},
+      {"id": "role", "header": "Permission", "default": true},
+      {"id": "people_count", "header": "People", "default": true},
+      {"id": "membership_complete", "header": "All members listed", "default": true},
+      {"id": "external_recipients", "header": "Outside the directory", "default": false},
+      {"id": "reviewed_by", "header": "Access approved by", "default": true},
+      {"id": "reviewed_on", "header": "Access approved on", "default": true}
+    ]
+  },
+  "shares": {
+    "title": "Kept direct shares",
+    "file": "shares.csv",
+    "description": "One row per direct share kept on each folder set, read when the report was generated.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "person_name", "header": "Person", "default": true},
+      {"id": "email", "header": "Email", "default": true},
+      {"id": "item_kind", "header": "Item type", "default": true},
+      {"id": "item", "header": "Item", "default": true},
+      {"id": "role", "header": "Permission", "default": true},
+      {"id": "read_at", "header": "Read at", "default": true}
+    ]
+  },
+  "removals": {
+    "title": "Removals",
+    "file": "removals.csv",
+    "description": "One row per change Polar Sky applied, or tried to apply, that took access away or lowered it in the period.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "folders", "header": "Folders", "default": false},
+      {"id": "action", "header": "Action", "default": true},
+      {"id": "step", "header": "Change", "default": true},
+      {"id": "target_kind", "header": "Target type", "default": false},
+      {"id": "target", "header": "Target", "default": true},
+      {"id": "principal", "header": "Person or group", "default": true},
+      {"id": "role", "header": "Permission", "default": true},
+      {"id": "link_scope", "header": "Link scope", "default": false},
+      {"id": "state", "header": "Result", "default": true},
+      {"id": "state_at", "header": "Date", "default": true},
+      {"id": "state_reason", "header": "Result detail", "default": true},
+      {"id": "confirmed_on", "header": "Confirmed by re-scan", "default": true}
+    ]
+  },
+  "approvals": {
+    "title": "Approvals",
+    "file": "approvals.csv",
+    "description": "One row per approval of a folder set's access in the period, plus any approval from before the period that was still in force when it began, with when and how an approval ended in the period.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "folders", "header": "Folders", "default": true},
+      {"id": "approved_by", "header": "Approved by", "default": true},
+      {"id": "approved_at", "header": "Approved at", "default": true},
+      {"id": "carried_into_period", "header": "Approved before the period", "default": true},
+      {"id": "ended", "header": "Approval ended", "default": true},
+      {"id": "surface", "header": "Through", "default": true},
+      {"id": "assistant_client", "header": "AI assistant", "default": false}
+    ]
+  },
+  "extract": {
+    "title": "Extract rows",
+    "file": "extract.csv",
+    "description": "One row per grant, link or group member on each covered folder, as Polar Sky read it live at the extract's as-of time, in the stored file's order. The CSV is a rendering of the stored file, so its SHA-256 differs from the stored file's.",
+    "columns": [
+      {"id": "folder_set", "header": "Folder set", "default": true},
+      {"id": "folder", "header": "Folder", "default": true},
+      {"id": "row_kind", "header": "Row kind", "default": true},
+      {"id": "grantee_type", "header": "Grantee type", "default": true},
+      {"id": "principal_name", "header": "Person or group", "default": true},
+      {"id": "principal_email", "header": "Email", "default": true},
+      {"id": "login_name", "header": "Login name", "default": false},
+      {"id": "roles", "header": "Permission", "default": true},
+      {"id": "inherited", "header": "Inherited", "default": true},
+      {"id": "via_group", "header": "Through group", "default": true},
+      {"id": "link_scope", "header": "Link scope", "default": true},
+      {"id": "link_type", "header": "Link type", "default": true},
+      {"id": "link_expires_at", "header": "Link expires", "default": true},
+      {"id": "granted_on", "header": "Granted on", "default": false},
+      {"id": "group_owners_only", "header": "Group owners only", "default": false},
+      {"id": "recipients_sampled", "header": "Link recipients sampled", "default": false},
+      {"id": "recipient_total_count", "header": "Link recipients", "default": false},
+      {"id": "permission_id", "header": "Permission id", "default": true},
+      {"id": "principal_id", "header": "Principal id", "default": false},
+      {"id": "folder_set_id", "header": "Folder set id", "default": false},
+      {"id": "folder_item_id", "header": "Folder item id", "default": false},
+      {"id": "drive_id", "header": "Drive id", "default": false},
+      {"id": "as_of", "header": "Read at", "default": true}
+    ]
+  }
+}

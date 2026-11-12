@@ -75,6 +75,19 @@ Polar Sky's team checks the install on its own side, later and without the perso
 
 Tell the person in one line that Polar Sky checks the install on its side and contacts them only if something needs their help. The person has nothing to arrange.
 
+## Add Polar Sky's skills to Claude Code
+
+Only in Claude Code; skip this in Codex. These skills let the person's team ask Claude for Polar Sky work, such as an access review report for their auditor. The final plan's yes covers this step, so do not ask again. Show the two commands, then run them:
+
+```bash
+claude plugin marketplace add polarskyinc/install
+claude plugin install polar-sky-access-reviews@polar-sky --scope user
+```
+
+If the first command says the marketplace is already added, run `claude plugin marketplace update polar-sky` instead, then the second command. If a command fails, call `report_issue`, tell the person the install is done without the skills, and give them the two commands to run later. Do not try another way.
+
+Tell the person in one line: the skills work in a new Claude Code session, once Polar Sky turns on reviewing from their AI assistant.
+
 ## Clean up the install folder
 
 Ask the person before deleting anything. Suggest:

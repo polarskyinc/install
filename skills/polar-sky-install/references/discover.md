@@ -216,7 +216,9 @@ Once the answers are in, write one message with the final plan:
 
    For Google Workspace in On-Prem, the stages are the cluster, the Google service accounts, the engine certificate, the engine, the connection check, and the Google Workspace connection with what Polar Sky monitors. In both On-Prem installs, for a new GKE cluster, name the free preparation steps: turning on the Cloud Billing and Compute Engine APIs in the cluster's project, and the Kubernetes Engine and IAM APIs if the name check in phase 3 needs them. Say which steps run at the same time, as the phase order in [SKILL.md](../SKILL.md#phases) says.
 
+   In Claude Code, in either model, add Polar Sky's skills as the last step: Claude Code gets Polar Sky's skills, such as the access review report for auditors (1 minute, nothing for the person to do).
+
    When the plan has a new project, creating it is the first stage, with its own yes, as [Google identities](google-identities.md#create-a-new-project) says. Name in the plan what the person may still lack for it, as a blocker with its two ways out.
 3. **One approval question,** last: "Does this look right? Any changes, or shall I go ahead?"
 
-This is the one plan approval. Each stage still gets its own yes, as in the hard rules in `SKILL.md`, except saving what Polar Sky monitors: the plan's yes covers that save, as [Google Workspace](workspace.md#choose-in-the-conversation) says. Once the person approves the final plan, start the first stage. Do not ask again for what the plan already settled.
+This is the one plan approval. Each stage still gets its own yes, as in the hard rules in `SKILL.md`, except saving what Polar Sky monitors and, in Claude Code, adding Polar Sky's skills: the plan's yes covers both, as [Google Workspace](workspace.md#choose-in-the-conversation) and [Done](done.md#add-polar-skys-skills-to-claude-code) say. Once the person approves the final plan, start the first stage. Do not ask again for what the plan already settled.

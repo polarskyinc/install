@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCI DSS Access Review Report, Northwind Traders, AR-2026-H2-0001</title>
+<style>
+@font-face { font-family: "Sora"; font-weight: 400; font-style: normal; src: url("fonts/sora/Sora-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Sora"; font-weight: 500; font-style: normal; src: url("fonts/sora/Sora-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Sora"; font-weight: 600; font-style: normal; src: url("fonts/sora/Sora-SemiBold.ttf") format("truetype"); }
+@font-face { font-family: "Sora"; font-weight: 700; font-style: normal; src: url("fonts/sora/Sora-Bold.ttf") format("truetype"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-style: normal; src: url("fonts/jetbrains-mono/JetBrainsMono-Regular.ttf") format("truetype"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-style: normal; src: url("fonts/jetbrains-mono/JetBrainsMono-Medium.ttf") format("truetype"); }
+:root {
+  --font-sans: "Sora", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+  --ink: #252529; --ink-2: #5C5C64; --ink-3: #84848C; --ink-4: #A8A8B0;
+  --paper: #FFFFFF; --raised: #F8F8F8; --ground: #F1F1F1;
+  --hair: #D6D6D6; --soft: #E4E4E4;
+  --self: #380081; --violet: #7A08FF; --customer: #00B2E2; --third: #4A4A4E;
+  --self-wash: #E4D2F2; --self-wash-ink: #4B21A8;
+}
+@page {
+  size: Letter;
+  margin: 0.8in 0.65in 0.75in;
+  @top-left { content: "PCI DSS Access Review Report"; font: 500 8pt var(--font-mono); color: #5C5C64; }
+  @top-right { content: "AR-2026-H2-0001"; font: 500 8pt var(--font-mono); color: #5C5C64; }
+  @bottom-left { content: "Confidential. Test report with fictional data."; font: 400 8pt var(--font-mono); color: #5C5C64; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 400 8pt var(--font-mono); color: #5C5C64; }
+}
+@page cover {
+  margin: 0;
+  @top-left { content: none; } @top-right { content: none; }
+  @bottom-left { content: none; } @bottom-right { content: none; }
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-sans); font-size: 9.5pt; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet { max-width: 8.5in; margin: 0 auto; }
+@media screen { .sheet > section { padding: 0.6in 0.65in; } body { background: var(--ground); } .sheet { background: var(--paper); } }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; margin: 0; }
+h2 { font-size: 17pt; margin: 0 0 14pt; }
+h3 { font-size: 11.5pt; margin: 18pt 0 6pt; }
+p { margin: 0 0 9pt; max-width: 6.4in; }
+code { font-family: var(--font-mono); font-size: 8pt; background: var(--ground); padding: 1px 4px; border-radius: 4px; white-space: nowrap; }
+.eyebrow { font-family: var(--font-mono); font-weight: 500; font-size: 7.5pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--violet); margin: 0 0 6pt; }
+.page { break-before: page; }
+
+.cover { page: cover; height: 11in; display: grid; grid-template-rows: auto 1fr auto; padding: 0.8in 0.75in 0.7in; background: var(--paper); position: relative; overflow: hidden; }
+.cover::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2.3in; background: var(--self); }
+.cover-top { display: flex; justify-content: space-between; align-items: center; }
+.customer-logo { display: block; width: 1.7in; height: 0.6in; object-fit: contain; object-position: left center; }
+.cover-title { align-self: center; }
+.cover-title h1 { font-size: 34pt; letter-spacing: -0.025em; margin: 8pt 0 10pt; }
+.cover-title .sub { font-size: 13pt; color: var(--ink-2); margin: 0 0 26pt; }
+.cover-meta { display: grid; grid-template-columns: 1.6in 1fr; gap: 6pt 14pt; font-size: 9.5pt; max-width: 5.6in; }
+.cover-meta dt { font-family: var(--font-mono); font-size: 7.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); padding-top: 2pt; }
+.cover-meta dd { margin: 0; }
+.cover-foot { position: relative; z-index: 1; color: var(--paper); display: flex; justify-content: space-between; align-items: flex-end; font-size: 8.5pt; }
+.cover-foot .conf { font-family: var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; font-size: 8pt; }
+.cover-foot p { margin: 0; max-width: 4.2in; color: var(--paper); }
+.wordmark { display: block; width: auto; margin-left: auto; }
+
+.ps-table { width: 100%; border-collapse: collapse; margin: 8pt 0 14pt; font-size: 8pt; line-height: 1.4; }
+.ps-table th { text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: 6.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); padding: 5pt 6pt; border-bottom: 1px solid var(--hair); vertical-align: bottom; }
+.ps-table td { padding: 5pt 6pt; border-bottom: 1px solid var(--soft); vertical-align: top; }
+.ps-table td.p { overflow-wrap: anywhere; min-width: 0.8in; }
+.ps-table td.p code { white-space: normal; overflow-wrap: anywhere; }
+.ps-table tr:last-child td { border-bottom: 0; }
+.ps-table thead { display: table-header-group; }
+.ps-table tr { break-inside: avoid; }
+.ps-table td.d, .ps-table td.nw { white-space: nowrap; }
+.kv td:first-child { width: 2in; font-family: var(--font-mono); font-size: 7pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+.kv { font-size: 8.5pt; }
+.lists td:nth-child(4) { text-align: right; }
+.lists th:nth-child(4) { text-align: right; }
+.appendix { font-size: 7.5pt; }
+.appendix td { padding: 3pt 6pt; }
+.appendix tr.group td { padding: 10pt 6pt 5pt; border-bottom: 1px solid var(--hair); background: var(--raised); }
+.appendix tr.group { break-after: avoid; }
+.gcode { font-family: var(--font-mono); font-weight: 500; color: var(--violet); margin-right: 4pt; }
+.gmeta { color: var(--ink-2); margin-left: 4pt; }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8pt; margin: 12pt 0 16pt; }
+.stat { background: var(--raised); border: 1px solid var(--soft); border-radius: 8px; padding: 9pt 11pt; }
+.stat .k { display: block; font-family: var(--font-mono); font-size: 6.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+.stat .v { display: block; font-size: 17pt; font-weight: 600; margin-top: 2pt; }
+.stat .v small { font-size: 9pt; font-weight: 400; color: var(--ink-2); }
+.cell-note { font-size: 8pt; color: var(--ink-2); }
+
+.half { width: 36%; margin: 8pt 0 2pt; }
+.checklist td:first-child { width: 2.4in; }
+.checklist td.met { white-space: nowrap; font-weight: 600; }
+.checklist td.met::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #0BFFA1; margin-right: 5px; vertical-align: 0; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 22pt; margin: 6pt 0 10pt; }
+.chart { margin: 0; break-inside: avoid; }
+.chart.wide { grid-column: 1 / -1; }
+.chart figcaption { font-family: var(--font-mono); font-size: 7pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 6pt; }
+.bar-strip { width: 100%; height: 28px; display: block; }
+.legend { list-style: none; padding: 0; margin: 7pt 0 0; display: flex; flex-wrap: wrap; gap: 4pt 16pt; font-size: 8pt; }
+.legend .key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.columns { width: 100%; height: auto; display: block; }
+.columns .axis { stroke: var(--hair); stroke-width: 1; }
+.columns .tick { font: 400 8px var(--font-mono); fill: var(--ink-2); text-anchor: middle; }
+.columns .val { font: 600 9px var(--font-sans); fill: var(--ink); text-anchor: middle; }
+
+.toc { list-style: none; padding: 0; margin: 6pt 0 0; max-width: 5in; }
+.toc li { display: flex; gap: 10pt; padding: 5pt 0; border-bottom: 1px solid var(--soft); font-size: 9.5pt; }
+.toc li span { font-family: var(--font-mono); color: var(--violet); width: 0.35in; }
+
+.attest { border: 1px solid var(--soft); border-radius: 8px; background: var(--raised); padding: 12pt 14pt; margin: 10pt 0 16pt; max-width: 6.4in; }
+.attest .label { font-family: var(--font-mono); font-size: 7pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 6pt; }
+.attest p:last-child { margin-bottom: 0; }
+.signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 28pt; margin-top: 18pt; }
+
+.note { font-size: 8pt; color: var(--ink-2); margin: 6pt 0 0; max-width: none; }
+.cover-meta { grid-template-columns: 1.05in 2.35in 1.05in 2.35in; max-width: none; }
+.sig .who { font-size: 8.5pt; margin-top: 4pt; }
+.sig { display: flex; flex-direction: column; }
+.sig .cert { font-size: 9.5pt; margin: 0 0 14pt; flex: 1; }
+.sig .who span { display: block; color: var(--ink-2); font-size: 8pt; }
+
+
+.attest dl { display: grid; grid-template-columns: 1.5in 1fr; gap: 3pt 10pt; margin: 8pt 0 0; font-size: 8.5pt; }
+.attest dt { font-family: var(--font-mono); font-size: 7pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); padding-top: 1pt; }
+.attest dd { margin: 0; }
+.tbd { color: var(--violet); font-weight: 600; }
+.num td.n, .num th.n { text-align: right; }
+.num td.n { white-space: nowrap; }
+.ps-table.wide { font-size: 7pt; }
+.ps-table.wide th { font-size: 6pt; letter-spacing: 0; padding: 4pt 3pt; }
+.ps-table.wide td { padding: 4pt 3pt; }
+tr.total td { font-weight: 600; border-top: 1px solid var(--hair); }
+.owners { font-size: 7.5pt; }
+.owners td { padding: 3pt 6pt; }
+h3 { break-after: avoid; }
+.attest { break-inside: avoid; }
+a.stat { display: block; color: inherit; text-decoration: none; }
+.stat .go { display: block; font-family: var(--font-mono); font-size: 6.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--violet); margin-top: 3pt; }
+a.xref { color: var(--violet); text-decoration: none; }
+.ps-table tbody.att { break-inside: avoid; }
+.ps-table tr.has-hash td { border-bottom: 0; padding-bottom: 2pt; }
+.ps-table td.hk { font-family: var(--font-mono); font-size: 6.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+.toc a { color: inherit; text-decoration: none; display: flex; gap: 10pt; }
+.na { color: var(--ink-2); font-style: italic; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<section class="cover">
+  <div class="cover-top">
+    <svg class="wordmark" viewBox="0 0 482.6 122.33" style="height:26px" role="img" aria-label="Polar Sky"><path fill="#252529" d="M112.28,23.75h-13.79c-13.93,0-25.27,11.33-25.27,25.27v23.85c0,13.93,11.34,25.27,25.27,25.27h13.79c13.93,0,25.27-11.33,25.27-25.27v-23.85c0-13.93-11.34-25.27-25.27-25.27ZM125.77,49.02v23.85c0,7.44-6.05,13.49-13.49,13.49h-13.79c-7.44,0-13.49-6.05-13.49-13.49v-23.85c0-7.44,6.05-13.49,13.49-13.49h13.79c7.44,0,13.49,6.05,13.49,13.49Z"/>
+<path fill="#252529" d="M322.14,57.39l-13.57-3.61c-3.94-1.14-6.82-2.49-8.56-4-1.69-1.48-2.55-3.41-2.55-5.74,0-3.42,1.4-6.11,4.15-7.99,2.8-1.91,6.43-2.88,10.8-2.88,4.67,0,8.45,1.22,11.45,3.34,4.64,3.26,4.42,9.38,4.42,9.38h10.66s1.24-10.67-7.62-17.09c-5.03-3.65-11.19-5.52-18.35-5.52s-13.4,1.77-18.57,5.25c-5.21,3.51-7.86,8.78-7.86,15.66.04,9.51,6.28,15.94,18.54,19.09l13.12,3.61c3.59.96,6.26,2.2,7.95,3.67,1.65,1.44,2.48,3.44,2.48,5.94,0,3.6-1.6,6.49-4.75,8.59-3.2,2.13-7.37,3.22-12.41,3.22s-9.37-1.38-12.73-3.57c-4.87-3.18-4.93-10.57-4.93-10.57l-10.55.21s-.82,11.96,8.11,17.98c5.5,3.71,12.06,5.93,19.96,5.93s14.99-2.01,20.29-5.96c5.34-3.98,8.04-9.44,8.04-16.22,0-9.33-5.9-15.62-17.54-18.69Z"/>
+<rect fill="#252529" x="147.27" y="0" width="11.41" height="97.39"/>
+<path fill="#252529" d="M221.88,29.43c-4.71-4.33-11.58-6.52-20.42-6.52s-14.04.61-22.44,6.63c-9.63,6.9-8.94,18.95-8.94,18.95h11.59s-.22-7.18,5.36-11.17c3.56-2.54,8.16-3.97,13.9-3.97,5.29,0,9.48,1.18,12.45,3.5,2.95,2.3,4.44,5.48,4.44,9.44,0,2.59-.73,4.47-2.17,5.6-1.48,1.16-4.17,1.96-8.01,2.4l-14.99,1.87c-7.22.85-13.02,3.09-17.22,6.64-4.24,3.58-6.39,8.54-6.39,14.74s2.17,11.42,6.46,15c4.26,3.56,9.78,5.37,16.4,5.37,5.8,0,10.83-1.41,14.93-4.18,4.04-2.73,7.07-6.59,9.01-11.48h1.99l.05,15.05,11.12-.09v-48.79c0-8.28-2.39-14.67-7.11-19.01ZM217.81,64.36c0,7.53-2.22,13.45-6.61,17.6-4.39,4.15-9.83,6.25-16.17,6.25-4.26,0-7.69-1.03-10.17-3.06-2.46-2.01-3.71-4.87-3.71-8.48s1.19-6.1,3.54-7.94c2.39-1.87,6.07-3.22,10.94-4.01l11.38-1.81c2.72-.45,4.69-1.09,5.87-1.9,1.15-.79,2.14-2.13,2.95-3.98h2v7.33Z"/>
+<path fill="#252529" d="M482.6,23.85l-13.13.06-18.15,46.05c-1.6,4.14-2.44,7.89-2.5,11.14h-2.77l-21.98-57.2-26.3.12-31.57,33.45c-1.48,1.57-2.25,4.12-2.31,7.58h-3.22s-.07-64.97-.07-64.97l-11.28.07.02,97.16h11.31l-.1-20.92,13.16-12.64,28.07,33.54,14.81.03-34.53-40.77,30.01-31.15,27.74,70.19-11.43,26.68,14.22.02,39.97-98.43Z"/>
+<path fill="#252529" d="M252.96,97.31v-51.55c0-4.24-2.07-6.58-6.16-6.96v-3.25l34.27.09v-11.77h-25.72c-7.61,0-13.77,6.16-13.77,13.76v59.63s11.5.04,11.38.04Z"/>
+<path fill="#252529" d="M39.05,23.89l-39.05-.02v31.01c0,4.32,3.53,7.85,7.85,7.85h9.69c5.14,0,9.31,4.16,9.31,9.31v6.53h3.64v-6.53c0-5.14,4.17-9.31,9.31-9.31h6.53v-3.64h-6.53c-5.14,0-9.31-4.17-9.31-9.31v-6.53h-3.64v6.53c0,5.15-4.17,9.32-9.32,9.31h-4.6c-.87,0-1.57-.71-1.57-1.58v-11.74c.01-4.24-2.06-6.58-6.14-6.96v-3.25l33.83.11c7.45,0,13.49,6.04,13.49,13.49v23.72c0,7.45-6.04,13.49-13.49,13.49H7.89c-4.33,0-7.85,3.52-7.85,7.85l.05,28.11,11.72-.04v-24.14h27.24c13.95,0,25.27-11.31,25.27-25.27v-23.72c0-13.95-11.31-25.27-25.27-25.27Z"/></svg>
+  </div>
+  <div class="cover-title">
+    <p class="eyebrow">Payment Card Industry Data Security Standard v4.0.1</p>
+    <h1>PCI DSS Access Review Report</h1>
+    <p class="sub">Requirement 7.2.4 review of access to PCI-scoped data in Northwind Traders&#x27;s Microsoft 365 tenant</p>
+    <dl class="cover-meta"><dt>Organization</dt><dd>Northwind Traders</dd><dt>Report ID</dt><dd>AR-2026-H2-0001</dd><dt>Review period</dt><dd>2026-05-01 to 2026-10-31</dd><dt>Issued</dt><dd>2026-11-03</dd><dt>Prepared for</dt><dd>Northwind Traders&#x27;s Qualified Security Assessor</dd><dt>Requested by</dt><dd>Steve Morgan, Director of Security Operations</dd></dl>
+  </div>
+  <div class="cover-foot">
+    <p>This report contains confidential information about Northwind Traders&#x27;s systems and personnel. Distribute only to people involved in Northwind Traders&#x27;s PCI DSS assessment.</p>
+    <span class="conf">Confidential</span>
+  </div>
+</section>
+
+<section class="page">
+  <h2>Contents</h2>
+  <ol class="toc"><li><a href="#s1"><span>1</span>Executive summary</a></li><li><a href="#s2"><span>2</span>Scope and method</a></li><li><a href="#s3"><span>3</span>Review population</a></li><li><a href="#s4"><span>4</span>Why people have access</a></li><li><a href="#s5"><span>5</span>Review results</a></li><li><a href="#s6"><span>6</span>Access removed</a></li><li><a href="#s7"><span>7</span>Exceptions</a></li><li><a href="#s8"><span>8</span>Sign-off and management acknowledgment</a></li><li><a href="#s9"><span>9</span>Attachments</a></li></ol>
+  <h2 style="margin-top:30pt">Report details</h2>
+  <table class="ps-table kv"><tbody><tr><td>Requirement</td><td>PCI DSS v4.0.1 Requirement 7.2.4, user access review</td></tr><tr><td>Review owner</td><td>Laura Kim, Senior Manager, IT Compliance</td></tr><tr><td>Review procedure</td><td>Northwind Traders User Access Review Procedure, version 3.2</td></tr><tr><td>Removal deadline</td><td>30 days after the decision, per the review procedure</td></tr><tr><td>Retention</td><td>Report and attachments kept for 3 years, per the review procedure</td></tr><tr><td>Previous review</td><td>Completed 2026-04-30 in Northwind Traders&#x27;s previous access review tool, campaign UAR-2026-H1</td></tr><tr><td>Data source</td><td>Microsoft 365 tenant northwind-demo.onmicrosoft.com, read by Polar Sky</td></tr><tr><td>Generated</td><td>2026-11-02 14:02 UTC by the Polar Sky compliance report skill. The skill&#x27;s renderer computed every count and hash from Polar Sky records.</td></tr><tr><td>Acknowledged</td><td>2026-11-03 by Ravi Menon, Vice President, Information Security</td></tr><tr><td>Issued</td><td>2026-11-03 09:45 UTC</td></tr></tbody></table>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s1">Section 1</p>
+  <h2>Executive summary</h2>
+  <p>Northwind Traders reviewed access to PCI-scoped data in Microsoft 365 from 2026-05-01 to 2026-10-31 for 3 folder sets. Each folder set is one folder, or a group of folders, with a data owner. For each folder set, Polar Sky proposed who should keep access and why, and the data owner or another authorized approver reviewed and approved that access in Polar Sky. 1 person approved access or added or changed it. 1 folder set approved, then withdrawn: Model Eval Results, approved 2026-03-02, withdrawn 2026-10-19.</p>
+  <div class="stats"><a class="stat" href="#s5"><span class="k">Folder sets approved</span><span class="v">2 <small>of 3</small></span><span class="go">Section 5</span></a><a class="stat" href="#s3"><span class="k">Access decisions</span><span class="v">10</span><span class="go">Section 3</span></a><a class="stat" href="#s6"><span class="k">Removals</span><span class="v">1 <small>applied of 1</small></span><span class="go">Section 6</span></a><a class="stat" href="#s5"><span class="k">Kept direct shares</span><span class="v">2</span><span class="go">Section 5</span></a></div>
+  <table class="ps-table checklist"><thead><tr><th>Requirement 7.2.4</th><th>Evidence</th><th>Section</th></tr></thead><tbody><tr><td>Reviewed at least every six months</td><td>Previous review: Completed 2026-04-30 in Northwind Traders&#x27;s previous access review tool, campaign UAR-2026-H1. Access to 2 of 3 folder sets reviewed and approved 2026-08-04 to 2026-09-15. 1 folder set approved, then withdrawn: Model Eval Results, approved 2026-03-02, withdrawn 2026-10-19.</td><td><a class="xref" href="#s5">5</a></td></tr><tr><td>All accounts and access reviewed</td><td>7 members at report time, as at 2026-11-02, each with who decided and when. 2 kept direct shares, read 2026-11-02.</td><td><a class="xref" href="#s3">3</a>, <a class="xref" href="#s5">5</a></td></tr><tr><td>Access matches job function</td><td>5 proposed by Polar Sky. 2 added or changed by a person. 2 of them had their access approved only until their folder set&#x27;s approval was withdrawn.</td><td><a class="xref" href="#s4">4</a>, <a class="xref" href="#s5">5</a></td></tr><tr><td>Vendor accounts included</td><td>Account type: not available in this version.</td><td><a class="xref" href="#s5">5</a></td></tr><tr><td>Inappropriate access addressed</td><td>1 applied, 0 failed, 0 pending, 0 not applied. Re-scan confirmation: not available in this version.</td><td><a class="xref" href="#s6">6</a></td></tr><tr><td>Management acknowledgment</td><td>Ravi Menon, Vice President, Information Security, 2026-11-03.</td><td><a class="xref" href="#s8">8</a></td></tr></tbody></table>
+  <figure class="chart"><figcaption>Outcome of the 10 access decisions</figcaption><svg viewBox="0 0 640 28" preserveAspectRatio="none" class="bar-strip" role="img" aria-label="Outcome of the 10 access decisions"><rect x="0.0" y="0" width="317.0" height="28" rx="2" fill="#380081"><title>Proposed by Polar Sky: 5</title></rect><rect x="319.0" y="0" width="126.8" height="28" rx="2" fill="#00B2E2"><title>Added or changed by a person: 2</title></rect><rect x="447.8" y="0" width="126.8" height="28" rx="2" fill="#BEDEF0"><title>Kept direct shares: 2</title></rect><rect x="576.6" y="0" width="63.4" height="28" rx="2" fill="#4A4A4E"><title>Removals: 1</title></rect></svg><ul class="legend"><li><span class="key" style="background:#380081"></span>Proposed by Polar Sky <b>5</b></li><li><span class="key" style="background:#00B2E2"></span>Added or changed by a person <b>2</b></li><li><span class="key" style="background:#BEDEF0"></span>Kept direct shares <b>2</b></li><li><span class="key" style="background:#4A4A4E"></span>Removals <b>1</b></li></ul></figure>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s2">Section 2</p>
+  <h2>Scope and method</h2>
+  <p>This report documents Northwind Traders&#x27;s review of access to PCI-scoped data in Microsoft 365 from 2026-05-01 to 2026-10-31. It was prepared to support Northwind Traders&#x27;s PCI DSS Attestation of Compliance for the assessment period ending 2026-10-31.</p>
+  <p><b>Scope.</b> The 3 folder sets whose access approval was in force during the period, and the access Polar Sky records for them: every member, every group kept or dropped, and every direct share kept.</p>
+  <p><b>How the review was done.</b> Access was reviewed as it changed during the period, not in a single campaign at the end. For each folder set, Polar Sky proposed who should keep access and why, and the data owner or another authorized approver reviewed and approved that access in Polar Sky. Polar Sky made the removals in Microsoft 365 and recorded the result of each one.</p>
+  <p><b>Who decided.</b> For people Polar Sky proposed, the decision is the approval of their folder set&#x27;s access that included them; Attachment A shows anyone proposed after an approval was withdrawn. A person who added someone or changed their access is named, with the date. Each approval is recorded with who approved it and when.</p>
+  <p><b>Requirement.</b> PCI DSS v4.0.1 Requirement 7.2.4: all user accounts and related access privileges, including third-party and vendor accounts, are reviewed at least once every six months. The review confirms that access remains appropriate for each person&#x27;s job function, that inappropriate access is addressed, and that management acknowledges the remaining access is appropriate.</p>
+</section>
+
+<section style="margin-top:30pt">
+  <p class="eyebrow" id="s3">Section 3</p>
+  <h2>Review population</h2>
+  <p>The access in scope comes from Polar Sky&#x27;s records of each folder set. Polar Sky also read who has access live from Microsoft 365 at 2026-11-02 13:55 UTC and stored that read once, as a file that cannot change. Attachment F names the file and its SHA-256, and holds its rows as a CSV file.</p>
+  <table class="ps-table kv"><tbody><tr><td>Source</td><td>Polar Sky records of Microsoft 365: folder sets, approvals, members, groups, kept direct shares and removals</td></tr><tr><td>Folder sets</td><td>3: 2 approved in the period; 1 approved, then withdrawn</td></tr><tr><td>Folders</td><td>4 folders on 2 sites</td></tr><tr><td>Sites</td><td>Catalog; Customer Support</td></tr><tr><td>Groups</td><td>2 kept, 1 dropped</td></tr><tr><td>Members at report time</td><td>7: 5 proposed by Polar Sky, 2 added or changed by a person. 2 of them had their access approved only until their folder set&#x27;s approval was withdrawn. Read 2026-11-02 13:55 UTC, as they are at report time, not as at the end of the period</td></tr><tr><td>Kept direct shares</td><td>2, read 2026-11-02 14:01 UTC. Read as they are now, not as at approval; Polar Sky does not record who decided to keep them or when</td></tr><tr><td>Access decisions</td><td>10: 7 members, 2 kept direct shares and 1 removal in the period</td></tr><tr><td>Extract taken</td><td>2026-11-02 13:55 UTC</td></tr><tr><td>Extract days</td><td>Folder sets with an approval in force 2026-05-01 to 2026-10-31</td></tr><tr><td>Extract file</td><td>access-review-extracts/northwind-demo/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.jsonl, 2,961 bytes, JSON lines, one row per grant, link or group member per folder</td></tr><tr><td>SHA-256 of extract</td><td><code>3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b</code></td></tr><tr><td>Hash checked</td><td>Yes. Polar Sky checked the whole stored file against this SHA-256 when its rows were read.</td></tr><tr><td>Extract rows</td><td>6: grant 3, group member 2, link 1. From 3 folder sets and 3 folders read</td></tr><tr><td>Rows read</td><td>6, all in Attachment F</td></tr><tr><td>Independent count</td><td>3 groups counted. 1 matches Microsoft 365&#x27;s own count. 1 differs: catalog-customer-data (Polar Sky counted 3, Microsoft 365 reports 4). 1 has no count from Microsoft 365.</td></tr><tr><td>Could not be read</td><td>1 item, listed in 3.2 with the reason</td></tr><tr><td>How the list was built</td><td>Polar Sky read each folder&#x27;s permissions live from Microsoft 365, and listed the members of every Entra group and SharePoint group they grant, with Microsoft 365&#x27;s own count of each Entra group. 3.2 lists what was left out and why</td></tr><tr><td>Link types not listed</td><td>The extract lists every link on the folders it read. Sharing links on files and subfolders inside the folders are not listed: the extract reads the folders&#x27; permissions only</td></tr></tbody></table>
+  <h3>3.1 Group member counts</h3>
+  <table class="ps-table num"><thead><tr><th>Group</th><th>Kind</th><th class="n">Counted by Polar Sky</th><th class="n">Microsoft 365&#x27;s count</th><th>Result</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td>Entra group</td><td class="n">2</td><td class="n">2</td><td>Matches</td></tr><tr><td>catalog-customer-data</td><td>Entra group</td><td class="n">3</td><td class="n">4</td><td>Differs</td></tr><tr><td>Catalog Members</td><td>SharePoint group</td><td class="n">5</td><td class="n"></td><td>No count from Microsoft 365</td></tr></tbody></table>
+  <h3>3.2 Could not be read</h3>
+  <table class="ps-table"><thead><tr><th>Folder set</th><th>Not read</th><th>Reason</th></tr></thead><tbody><tr><td>Model Eval Results</td><td>Catalog / Model Eval Results</td><td>The folder has no Microsoft 365 id on record.</td></tr></tbody></table>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s4">Section 4</p>
+  <h2>Why people have access</h2>
+  <p>For each folder set, Polar Sky proposed who should keep access and why, and the data owner or another authorized approver reviewed and approved it. The reason below applies to the people Polar Sky proposed. For people a person added or whose access a person changed, Attachment A names who made the change and when.</p>
+  <table class="ps-table num"><thead><tr><th>Folder set</th><th>Folders</th><th>Data owner</th><th>Reason for access</th><th class="n">Proposed by Polar Sky</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td>Catalog / Product Adoption / APAC; Catalog / Product Adoption / EMEA</td><td>Dana Whitfield</td><td>Members of the Catalog product and business development teams who report on product adoption.</td><td class="n">2</td></tr><tr><td>Customer Records</td><td>Customer Support / Customer Records</td><td>Tess Quinn</td><td>Account engineers and escalation managers on sub-team B accounts.</td><td class="n">1</td></tr><tr><td>Model Eval Results</td><td>Catalog / Model Eval Results</td><td>Omar Haddad</td><td>Evaluation results for Catalog models.</td><td class="n">2</td></tr></tbody></table>
+  <p class="note">Separate access rules with their own approvals: not available in this version.</p>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s5">Section 5</p>
+  <h2>Review results</h2>
+  <h3>5.1 By folder set</h3>
+  <p>Members are read as they are at report time, 2026-11-02 13:55 UTC, not as at the end of the period. Attachment A lists every member with who decided their access, and Attachment B every group.</p>
+  <p>Changes in period counts the same events as the Polar Sky audit trail: access approved, approval withdrawn or replaced by a later approval, member added or removed, permission changed, made owner, group kept or dropped, and approved changes carried out in full or in part. Polar Sky proposing access, or sending a proposal for review, is not counted. Removals have their own column.</p>
+  <table class="ps-table num wide"><thead><tr><th>Folder set</th><th class="n">Folders</th><th class="n">Groups kept</th><th class="n">Members at report time</th><th class="n">Proposed by Polar Sky</th><th class="n">Added or changed by a person</th><th class="n">Direct shares</th><th class="n">Removals</th><th class="n">Changes in period</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td class="n">2</td><td class="n">1</td><td class="n">3</td><td class="n">2</td><td class="n">1</td><td class="n">2</td><td class="n">1</td><td class="n">3</td></tr><tr><td>Customer Records</td><td class="n">1</td><td class="n">1</td><td class="n">2</td><td class="n">1</td><td class="n">1</td><td class="n">0</td><td class="n">0</td><td class="n">2</td></tr><tr><td>Model Eval Results<br><span class="cell-note">Approved 2026-03-02, withdrawn 2026-10-19</span></td><td class="n">1</td><td class="n">0</td><td class="n">2</td><td class="n">2</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1</td></tr><tr class="total"><td>Total</td><td class="n">4</td><td class="n">2</td><td class="n">7</td><td class="n">5</td><td class="n">2</td><td class="n">2</td><td class="n">1</td><td class="n">6</td></tr></tbody></table>
+  <h3>5.2 Access approvals</h3>
+  <p>Each approval is a person's review and sign-off of the access to one folder set, recorded in Polar Sky with the date and who approved it. Approvers do not sign again at period end. The table below shows how many folder sets each person approved in the period, and when; Attachment E lists every approval, including any from before the period that was still in force when it began.</p>
+  <table class="ps-table owners num"><thead><tr><th>Approved by</th><th class="n">Folder sets</th><th>First approval</th><th>Last approval</th></tr></thead><tbody><tr><td>Dana Whitfield</td><td class="n">2</td><td>2026-08-04</td><td>2026-09-15</td></tr></tbody></table>
+  <h3>5.3 Groups</h3>
+  <table class="ps-table num wide"><thead><tr><th>Folder set</th><th>Folders</th><th>Group</th><th>Outcome</th><th>Permission</th><th class="n">People</th><th>All members listed</th><th>Access approved by</th><th>Access approved on</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td class="p">Catalog <wbr>/ Product Adoption <wbr>/ APAC; Catalog <wbr>/ Product Adoption <wbr>/ EMEA</td><td>Catalog-Client-Viewers</td><td>Kept</td><td>Viewer</td><td class="n">3</td><td>Yes</td><td>Dana Whitfield</td><td class="d">2026-09-15</td></tr><tr><td>Customer Records</td><td class="p">Customer Support <wbr>/ Customer Records</td><td>catalog-customer-data</td><td>Kept</td><td>Editor</td><td class="n">2</td><td>No</td><td>Dana Whitfield</td><td class="d">2026-08-04</td></tr><tr><td>Customer Records</td><td class="p">Customer Support <wbr>/ Customer Records</td><td>All Support Staff</td><td>Dropped</td><td>Viewer</td><td class="n">214</td><td></td><td>Dana Whitfield</td><td class="d">2026-08-04</td></tr></tbody></table>
+  <h3>5.4 Kept direct shares</h3>
+  <p>Direct shares are read as they are now, not as at approval. Polar Sky does not record who decided to keep them or when.</p>
+  <table class="ps-table"><thead><tr><th>Folder set</th><th>Person</th><th>Email</th><th>Item type</th><th>Item</th><th>Permission</th><th>Read at</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td>	Tab Person</td><td class="p">tab<wbr>.person@<wbr>northwind<wbr>-demo<wbr>.com</td><td>File</td><td class="p">Carriage return item<wbr>.docx</td><td>Read</td><td class="d">2026-11-02 14:01 UTC</td></tr><tr><td>Catalog-Client-Viewers</td><td>Sam Ortiz</td><td class="p">sam<wbr>.ortiz@<wbr>northwind<wbr>-demo<wbr>.com</td><td>File</td><td class="p">Catalog <wbr>/ Product Adoption <wbr>/ APAC <wbr>/ Q3 adoption<wbr>.xlsx</td><td>Read</td><td class="d">2026-11-02 14:01 UTC</td></tr></tbody></table>
+  <h3>5.5 Site owners and applications</h3>
+  <p><span class="na">Not available in this version</span>.</p>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s6">Section 6</p>
+  <h2>Access removed</h2>
+  <p>Polar Sky made each removal in Microsoft 365 after the access was approved, and recorded whether it was applied or failed. Attachment D lists every removal with its result and date.</p>
+  <h3>6.1 Removals</h3>
+  <table class="ps-table wide"><thead><tr><th>Folder set</th><th>Action</th><th>Change</th><th>Target</th><th>Person or group</th><th>Permission</th><th>Result</th><th>Date</th><th>Result detail</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td>Remove a member from a group</td><td>Remove Jordan Lee from Catalog-Client-Viewers.</td><td class="p">Catalog<wbr>-Client<wbr>-Viewers</td><td>Jordan Lee</td><td>Viewer</td><td>Applied</td><td class="d">2026-09-16</td><td></td></tr></tbody></table>
+  <h3>6.2 Verification</h3>
+  <table class="ps-table kv"><tbody><tr><td>Applied</td><td>1 of 1</td></tr><tr><td>Failed</td><td>0</td></tr><tr><td>Pending</td><td>0</td></tr><tr><td>Not applied</td><td>0</td></tr><tr><td>Confirmed by re-scan</td><td><span class="na">Not available in this version</span></td></tr><tr><td>Removal deadline</td><td>30 days after the decision, per the review procedure</td></tr><tr><td>Within the deadline</td><td><span class="na">Not available in this version</span></td></tr></tbody></table>
+</section>
+
+<section style="margin-top:30pt">
+  <p class="eyebrow" id="s7">Section 7</p>
+  <h2>Exceptions</h2>
+  <p><span class="na">Not available in this version</span>. Polar Sky does not record exceptions or time-limited access yet.</p>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s8">Section 8</p>
+  <h2>Sign-off and management acknowledgment</h2>
+  <p><b>Approvers.</b> Each approval of a folder set's access is the approver's sign-off, recorded in Polar Sky with the date (Section 5.2). Approvers do not sign this report.</p>
+  <div class="attest"><span class="label">Management acknowledgment</span>
+    <p>I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate.</p>
+    <dl><dt>Name</dt><dd>Ravi Menon, Vice President, Information Security</dd><dt>Recorded</dt><dd>2026-11-03, typed into the Polar Sky compliance report skill in Claude Code</dd><dt>Claude Code session</dt><dd><code>72fad66e-0000-4000-8000-000000000001</code></dd></dl>
+  </div>
+</section>
+
+<section class="page">
+  <p class="eyebrow" id="s9">Section 9</p>
+  <h2>Attachments</h2>
+  <p>The attachments hold the detail behind every count in this report. Each row is complete on its own, so no row needs another file to be understood. Each attachment is delivered with this report, and its SHA-256 hash below ties it to this version.</p>
+  <table class="ps-table "><thead><tr><th></th><th>Attachment</th><th>Contents</th><th>File</th></tr></thead><tbody class="att"><tr class="has-hash"><td>A</td><td>Members at report time</td><td>One row per member of each folder set at report time, not as at the end of the period: whether they keep access, through what, who proposed, added or changed their access and why. 7 rows.</td><td><code>members.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>3fc84a7fb79c9978a6e0dac318b67f4b56563e047158d1c6614333d27140cc7e</code></td></tr></tbody><tbody class="att"><tr class="has-hash"><td>B</td><td>Groups</td><td>One row per group kept or dropped on each folder set. 3 rows.</td><td><code>groups.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>87461d7fa2d43e9158e2f76983964ef04ddc408389f11fc104e75dfe45d79524</code></td></tr></tbody><tbody class="att"><tr class="has-hash"><td>C</td><td>Kept direct shares</td><td>One row per direct share kept on each folder set, read when the report was generated. 2 rows.</td><td><code>shares.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>4a264634b27e335f3a3e1c6c27269eca3b6ac8f28799ed0dc54c2f3c217e473d</code></td></tr></tbody><tbody class="att"><tr class="has-hash"><td>D</td><td>Removals</td><td>One row per change Polar Sky applied, or tried to apply, that took access away or lowered it in the period. 1 rows.</td><td><code>removals.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>e265f5867076c25099ebeb6987fa5b3c6efd199a9b64ea23189c9504117c34fa</code></td></tr></tbody><tbody class="att"><tr class="has-hash"><td>E</td><td>Approvals</td><td>One row per approval of a folder set&#x27;s access in the period, plus any approval from before the period that was still in force when it began, with when and how an approval ended in the period. 4 rows.</td><td><code>approvals.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>47b155f5f2bdf304b95f94e25ca1dba9de3542a8c7e169b51d49b2e90d170399</code></td></tr></tbody><tbody class="att"><tr class="has-hash"><td>F</td><td>Original extract</td><td>The stored extract that Section 3 counts from, kept write-once in Polar Sky. 6 rows.</td><td class="p"><code>access-review-extracts/northwind-demo/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.jsonl</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b</code></td></tr><tr class="has-hash"><td></td><td>Extract rows</td><td>One row per grant, link or group member on each covered folder, as Polar Sky read it live at the extract&#x27;s as-of time, in the stored file&#x27;s order. The CSV is a rendering of the stored file, so its SHA-256 differs from the stored file&#x27;s. 6 rows.</td><td><code>extract.csv</code></td></tr><tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>462cffbd68ad77b38bc31d2844ad939d1ec437759ddde975b8d790136672ef39</code></td></tr></tbody></table>
+</section>
+
+</div>
+</body>
+</html>

@@ -9,6 +9,11 @@
       "name": "polar-sky-status",
       "source": "./plugins/polar-sky-status",
       "description": "Shows Polar Sky folder and control status above the prompt"
+    },
+    {
+      "name": "polar-sky-access-reviews",
+      "source": "./plugins/polar-sky-access-reviews",
+      "description": "Builds access review reports and audit trails for auditors from the controls data owners approved"
     }
   ]
 }

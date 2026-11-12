@@ -1,0 +1,87 @@
+{
+  "pci_dss": {
+    "name": "PCI DSS 4.0.1 Requirement 7.2.4",
+    "wording_source": "sample report (PR #1947)",
+    "eyebrow": "Payment Card Industry Data Security Standard v4.0.1",
+    "title": "PCI DSS Access Review Report",
+    "subtitle": "Requirement 7.2.4 review of access to PCI-scoped data in {organization}'s {provider_scope}",
+    "control": "PCI DSS v4.0.1 Requirement 7.2.4, user access review",
+    "scope_noun": "PCI-scoped data",
+    "prepared_for": "{organization}'s Qualified Security Assessor",
+    "confidentiality": "This report contains confidential information about {organization}'s systems and personnel. Distribute only to people involved in {organization}'s PCI DSS assessment.",
+    "purpose": "It was prepared to support {organization}'s PCI DSS Attestation of Compliance for the assessment period ending {period_to}.",
+    "requirement": "PCI DSS v4.0.1 Requirement 7.2.4: all user accounts and related access privileges, including third-party and vendor accounts, are reviewed at least once every six months. The review confirms that access remains appropriate for each person's job function, that inappropriate access is addressed, and that management acknowledges the remaining access is appropriate.",
+    "checklist_heading": "Requirement 7.2.4",
+    "checklist": [
+      {"requirement": "Reviewed at least every six months", "evidence": "approvals", "sections": ["5"]},
+      {"requirement": "All accounts and access reviewed", "evidence": "decisions", "sections": ["3", "5"]},
+      {"requirement": "Access matches job function", "evidence": "who_decided", "sections": ["4", "5"]},
+      {"requirement": "Vendor accounts included", "evidence": "account_types", "sections": ["5"]},
+      {"requirement": "Inappropriate access addressed", "evidence": "removals", "sections": ["6"]},
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+    ]
+  },
+  "soc2": {
+    "name": "SOC 2 CC6.2 and CC6.3",
+    "wording_source": "drafted from the report template's framework list; not reviewed by an auditor or lawyer",
+    "eyebrow": "SOC 2 Trust Services Criteria",
+    "title": "SOC 2 Access Review Report",
+    "subtitle": "CC6.2 and CC6.3 review of access to in-scope data in {organization}'s {provider_scope}",
+    "control": "SOC 2 Trust Services Criteria CC6.2 and CC6.3, user access review",
+    "scope_noun": "in-scope data",
+    "prepared_for": "{organization}'s SOC 2 auditor",
+    "confidentiality": "This report contains confidential information about {organization}'s systems and personnel. Distribute only to people involved in {organization}'s SOC 2 examination.",
+    "purpose": "It was prepared as evidence for {organization}'s SOC 2 examination covering the period ending {period_to}.",
+    "requirement": "SOC 2 Trust Services Criteria CC6.2 and CC6.3: access is authorized before it is granted, and is reviewed, changed and removed so that unnecessary and inappropriate individuals do not keep it. The company sets the review interval, and this report states it.",
+    "checklist_heading": "CC6.2 and CC6.3",
+    "checklist": [
+      {"requirement": "Reviewed at the interval the company set", "evidence": "interval", "sections": ["5"]},
+      {"requirement": "All accounts and access reviewed", "evidence": "decisions", "sections": ["3", "5"]},
+      {"requirement": "Access authorized by a named person", "evidence": "who_decided", "sections": ["4", "5"]},
+      {"requirement": "Unnecessary and inappropriate access removed", "evidence": "removals", "sections": ["6"]},
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+    ]
+  },
+  "hipaa": {
+    "name": "HIPAA 164.308(a)(4)",
+    "wording_source": "drafted from the report template's framework list; not reviewed by an auditor or lawyer",
+    "eyebrow": "HIPAA Security Rule, 45 CFR 164.308(a)(4)",
+    "title": "HIPAA Access Review Report",
+    "subtitle": "Information access management review of access to patient data in {organization}'s {provider_scope}",
+    "control": "HIPAA Security Rule 45 CFR 164.308(a)(4), information access management",
+    "scope_noun": "patient data",
+    "prepared_for": "{organization}'s HIPAA compliance assessor",
+    "confidentiality": "This report contains confidential information about {organization}'s systems and personnel. Distribute only to people involved in {organization}'s HIPAA compliance review.",
+    "purpose": "It was prepared as evidence for {organization}'s HIPAA Security Rule compliance for the period ending {period_to}.",
+    "requirement": "HIPAA Security Rule 45 CFR 164.308(a)(4), information access management: policies and procedures for authorizing access to electronic protected health information, and for establishing, documenting, reviewing and modifying each person's access. The rule sets no review interval. Section 3 names the sites that hold patient data.",
+    "checklist_heading": "164.308(a)(4)",
+    "checklist": [
+      {"requirement": "Sites that hold patient data named", "evidence": "sites", "sections": ["3"]},
+      {"requirement": "Access authorized by a named person", "evidence": "who_decided", "sections": ["4", "5"]},
+      {"requirement": "Access reviewed and documented", "evidence": "decisions", "sections": ["5"]},
+      {"requirement": "Access modified or removed", "evidence": "removals", "sections": ["6"]},
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+    ]
+  },
+  "sox": {
+    "name": "SOX ITGC user access review",
+    "wording_source": "drafted from the report template's framework list; not reviewed by an auditor or lawyer",
+    "eyebrow": "Sarbanes-Oxley Act, IT general controls",
+    "title": "SOX User Access Review Report",
+    "subtitle": "IT general controls review of access to financial reporting data in {organization}'s {provider_scope}",
+    "control": "SOX IT general controls, user access review",
+    "scope_noun": "financial reporting data",
+    "prepared_for": "{organization}'s external auditor",
+    "confidentiality": "This report contains confidential information about {organization}'s systems and personnel. Distribute only to people involved in {organization}'s SOX audit.",
+    "purpose": "It was prepared as evidence for {organization}'s SOX IT general controls testing for the period ending {period_to}.",
+    "requirement": "SOX IT general controls, user access review: access to data that supports financial reporting is reviewed by an appropriate person at the interval the company sets, and inappropriate access is removed. This report states the interval.",
+    "checklist_heading": "User access review",
+    "checklist": [
+      {"requirement": "Reviewed at the interval the company set", "evidence": "interval", "sections": ["5"]},
+      {"requirement": "All accounts and access reviewed", "evidence": "decisions", "sections": ["3", "5"]},
+      {"requirement": "Reviewed by an appropriate person", "evidence": "who_decided", "sections": ["4", "5"]},
+      {"requirement": "Inappropriate access removed", "evidence": "removals", "sections": ["6"]},
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+    ]
+  }
+}

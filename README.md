@@ -19,7 +19,7 @@ If a person asked you to install Polar Sky from this repository, start a convers
    ```
 
    Polar Sky supports Claude Code and Codex. In another agent, tell the person that Polar Sky does not support it yet, and stop.
-2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
+2. **Get the skill.** If you can install skills, run `npx skills@1.7.4 add polarskyinc/install -g --skill polar-sky-install`. If you cannot, read [`skills/polar-sky-install/SKILL.md`](skills/polar-sky-install/SKILL.md) in this repository and follow it, with the files it links to.
 3. **Start.** In Claude Code, the person first types `/mcp`: if `polar-sky-install` is listed, they choose it and **Authenticate**, and the tools load without a restart. Otherwise, or in Codex, tell the person that they need to restart you before the MCP server loads, and how. Then start phase 1 of the skill.
 
 The skill's hard rules apply from the first command. Read them in the "Hard rules" section of `SKILL.md` before you run anything.
@@ -92,7 +92,7 @@ codex mcp add polar-sky-install --url https://mcp.polarsky.ai/install
 Then add the skill:
 
 ```bash
-npx skills@1.7.4 add polarskyinc/install -g
+npx skills@1.7.4 add polarskyinc/install -g --skill polar-sky-install
 ```
 
 Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-install` and **Authenticate**; in Codex, run `codex mcp login polar-sky-install`. Both open Polar Sky's sign-in page in your browser.
@@ -102,6 +102,15 @@ Then sign in to Polar Sky: in Claude Code, type `/mcp`, choose `polar-sky-instal
 Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar Sky, reading your organization's install values and looking at your machine. Then it asks whether you use Google Workspace or Microsoft 365, and whether you want a Cloud or an On-Prem deployment.
 
 The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs, the Microsoft 365 tenant ID and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key for Google Workspace, or the cloud app's certificate bundle for Microsoft 365, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
+
+## Polar Sky skills in Claude Code
+
+At the end of the install, in Claude Code, the agent adds Polar Sky's skills with the `polar-sky-access-reviews` plugin. With it, you can ask Claude for an access review report for your auditor, or for the audit trail of what changed in a date range. To add it yourself, run:
+
+```bash
+claude plugin marketplace add polarskyinc/install
+claude plugin install polar-sky-access-reviews@polar-sky --scope user
+```
 
 ## Polar Sky status in Claude Code
 
@@ -121,6 +130,7 @@ See [`plugins/polar-sky-status/README.md`](plugins/polar-sky-status/README.md) f
 | `skills/polar-sky-install/references/` | One file for each phase |
 | `skills/polar-sky-install/scripts/` | Helper scripts: detection, value check, preflight checks, certificate check, and the Microsoft app registration's permission list and check |
 | `plugins/polar-sky-status/` | The Polar Sky status mod for Claude Code, listed in `.claude-plugin/marketplace.json` |
+| `plugins/polar-sky-access-reviews/` | Polar Sky's access review skills for Claude Code, the access review report and the audit trail, listed in `.claude-plugin/marketplace.json` |
 | `recipes/` | Polar Sky's OpenTofu/Terraform recipes for a new GKE, EKS or AKS cluster; the skill downloads the one for your platform |
 
 ## Changes

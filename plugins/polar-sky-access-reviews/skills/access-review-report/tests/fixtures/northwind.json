@@ -1,0 +1,375 @@
+{
+  "inputs": {
+    "organization": "Northwind Traders",
+    "report_id": "AR-2026-H2-0001",
+    "framework": "pci_dss",
+    "period": {"from": "2026-05-01", "to": "2026-10-31"},
+    "requested_by": "Steve Morgan, Director of Security Operations",
+    "procedure": "Northwind Traders User Access Review Procedure, version 3.2",
+    "removal_deadline": "30 days after the decision, per the review procedure",
+    "retention": "Report and attachments kept for 3 years, per the review procedure",
+    "previous_review": "Completed 2026-04-30 in Northwind Traders's previous access review tool, campaign UAR-2026-H1",
+    "control_owner": "Laura Kim, Senior Manager, IT Compliance",
+    "data_source": "Microsoft 365 tenant northwind-demo.onmicrosoft.com, read by Polar Sky",
+    "generated_at": "2026-11-02T14:02:00Z",
+    "issued_at": "2026-11-03T09:45:00Z",
+    "running_footer": "Confidential. Test report with fictional data.",
+    "acknowledgment": {
+      "name": "Ravi Menon",
+      "title": "Vice President, Information Security",
+      "date": "2026-11-03",
+      "statement": "I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate."
+    },
+    "session": {"id": "72fad66e-0000-4000-8000-000000000001", "source": "CLAUDE_CODE_SESSION_ID"},
+    "columns": {
+      "removals": ["folder_set", "action", "step", "target", "principal", "role", "state", "state_at", "state_reason"]
+    }
+  },
+  "responses": [
+    {
+      "tool": "get_access_review_evidence",
+      "arguments": {"from": "2026-05-01", "to": "2026-10-31"},
+      "response": {
+        "request_id": "req-1",
+        "from": "2026-05-01",
+        "to": "2026-10-31",
+        "total": 3,
+        "offset": 0,
+        "next_offset": null,
+        "kept_direct_shares_as_of": "2026-11-02T14:01:12.123456789Z",
+        "controls": [
+          {
+            "control_id": "11111111-1111-4111-8111-111111111111",
+            "name": "Catalog-Client-Viewers",
+            "status": "approved",
+            "folders": ["Catalog / Product Adoption / APAC", "Catalog / Product Adoption / EMEA"],
+            "approvals": [
+              {
+                "at": "2026-09-15T16:20:00Z",
+                "carried_into_range": false,
+                "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Dana Whitfield"}
+              }
+            ],
+            "kept_direct_shares": [
+              {"person": "Sam Ortiz", "email": "sam.ortiz@northwind-demo.com", "item_kind": "file", "item": "Catalog / Product Adoption / APAC / Q3 adoption.xlsx", "role": "read"},
+              {"person": "\tTab Person", "email": "tab.person@northwind-demo.com", "item_kind": "file", "item": "\rCarriage return item.docx", "role": "read"}
+            ],
+            "removals": [
+              {
+                "action": "Remove a member from a group",
+                "step": "Remove Jordan Lee from Catalog-Client-Viewers.",
+                "target_kind": "group_member",
+                "target": "Catalog-Client-Viewers",
+                "state": "applied",
+                "at": "2026-09-16T08:03:41.5Z",
+                "principal": "Jordan Lee",
+                "role": "Viewer"
+              }
+            ]
+          },
+          {
+            "control_id": "22222222-2222-4222-8222-222222222222",
+            "name": "Customer Records",
+            "status": "approved",
+            "folders": ["Customer Support / Customer Records"],
+            "approvals": [
+              {
+                "at": "2026-04-20T10:00:00Z",
+                "carried_into_range": true,
+                "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Dana Whitfield"}
+              },
+              {
+                "at": "2026-08-04T12:30:00Z",
+                "carried_into_range": false,
+                "actor": {"type": "user", "surface": "connector", "assistant_client": "Claude", "name": "Dana Whitfield"}
+              }
+            ],
+            "kept_direct_shares": [],
+            "removals": []
+          },
+          {
+            "control_id": "33333333-3333-4333-8333-333333333333",
+            "name": "Model Eval Results",
+            "status": "approved",
+            "folders": ["Catalog / Model Eval Results"],
+            "approvals": [
+              {
+                "at": "2026-03-02T09:15:00Z",
+                "carried_into_range": true,
+                "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Omar Haddad"}
+              }
+            ],
+            "kept_direct_shares": [],
+            "removals": []
+          }
+        ]
+      }
+    },
+    {
+      "tool": "get_control",
+      "arguments": {"control_id": "11111111-1111-4111-8111-111111111111"},
+      "response": {
+        "request_id": "req-2",
+        "control": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "name": "Catalog-Client-Viewers",
+          "status": "approved",
+          "provider": "microsoft365",
+          "purpose": "Product adoption data for each geo, for the cross-functional Catalog team.",
+          "reason": "Members of the Catalog product and business development teams who report on product adoption.",
+          "folders": [
+            {"path": "Catalog / Product Adoption / APAC", "scope_kind": "folder", "site": "Catalog", "document_count": 41, "sensitivity": "confidential", "current_access_people_count": 7},
+            {"path": "Catalog / Product Adoption / EMEA", "scope_kind": "folder", "site": "Catalog", "document_count": 28, "sensitivity": "confidential", "current_access_people_count": 6}
+          ],
+          "kept_groups": [
+            {"id": "g-1", "name": "Catalog-Client-Viewers", "email": "catalog-client-viewers@northwind-demo.com", "role": "Viewer", "missing": false, "people_count": 3, "external_recipients": [], "unexpanded_groups": [], "membership_incomplete": false, "new": false, "people": []}
+          ],
+          "dropped_groups": []
+        }
+      }
+    },
+    {
+      "tool": "get_control",
+      "arguments": {"control_id": "22222222-2222-4222-8222-222222222222"},
+      "response": {
+        "request_id": "req-3",
+        "control": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Customer Records",
+          "status": "approved",
+          "provider": "microsoft365",
+          "purpose": "Sensitive customer information for sub-team B.",
+          "reason": "Account engineers and escalation managers on sub-team B accounts.",
+          "folders": [
+            {"path": "Customer Support / Customer Records", "scope_kind": "folder", "site": "Customer Support", "document_count": 312, "sensitivity": "highly_confidential", "current_access_people_count": 2}
+          ],
+          "kept_groups": [
+            {"id": "g-2", "name": "catalog-customer-data", "email": "catalog-customer-data@northwind-demo.com", "role": "Editor", "missing": false, "people_count": 2, "external_recipients": [], "unexpanded_groups": ["vendors-escalation@partner.example"], "membership_incomplete": true, "new": false, "people": []}
+          ],
+          "dropped_groups": [
+            {"id": "g-3", "name": "All Support Staff", "email": "all-support@northwind-demo.com", "role": "Viewer", "missing": false, "people_count": 214}
+          ]
+        }
+      }
+    },
+    {
+      "tool": "get_control",
+      "arguments": {"control_id": "33333333-3333-4333-8333-333333333333"},
+      "response": {
+        "request_id": "req-4",
+        "control": {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Model Eval Results",
+          "status": "approved",
+          "provider": "microsoft365",
+          "purpose": "Evaluation results for Catalog models.",
+          "reason": "",
+          "folders": [
+            {"path": "Catalog / Model Eval Results", "scope_kind": "folder", "site": "Catalog", "document_count": 9, "sensitivity": "internal", "current_access_people_count": 1}
+          ],
+          "kept_groups": [],
+          "dropped_groups": []
+        }
+      }
+    },
+    {
+      "tool": "list_control_members",
+      "arguments": {"control_id": "11111111-1111-4111-8111-111111111111", "limit": 2},
+      "response": {
+        "request_id": "req-5",
+        "control_id": "11111111-1111-4111-8111-111111111111",
+        "total": 3,
+        "matching": 3,
+        "offset": 0,
+        "next_offset": 2,
+        "members": [
+          {
+            "id": "m-1", "name": "Dana Whitfield", "email": "dana.whitfield@northwind-demo.com",
+            "title": "Product Manager", "department": "AI Software", "role": "Editor", "is_owner": true,
+            "keeps_access": true, "through_groups": ["Catalog-Client-Viewers"], "individual_access": true, "in_managed_group": false,
+            "provenance": {"origin": "system_suggested", "last_action": "proposed", "by": "system", "surface": "", "at": "2026-05-04T08:00:00Z"}
+          },
+          {
+            "id": "m-2", "name": "Sam Ortiz", "email": "sam.ortiz@northwind-demo.com",
+            "title": "Senior Director, Business Development, APAC", "department": "Business Development", "role": "Viewer", "is_owner": false,
+            "keeps_access": true, "through_groups": [], "individual_access": true, "in_managed_group": false,
+            "basis": "Presents APAC product adoption to regional leadership; reports to the VP of Business Development, Worldwide.",
+            "provenance": {"origin": "user_added", "last_action": "added", "by": "user", "surface": "console", "at": "2026-09-15T16:11:02.987654321Z", "by_name": "Dana Whitfield"}
+          }
+        ]
+      }
+    },
+    {
+      "tool": "list_control_members",
+      "arguments": {"control_id": "11111111-1111-4111-8111-111111111111", "limit": 2, "offset": 2},
+      "response": {
+        "request_id": "req-6",
+        "control_id": "11111111-1111-4111-8111-111111111111",
+        "total": 3,
+        "matching": 3,
+        "offset": 2,
+        "next_offset": null,
+        "members": [
+          {
+            "id": "m-3", "name": "Leah Brooks", "email": "leah.brooks@northwind-demo.com",
+            "title": "Data Analyst", "department": "AI Software", "role": "Viewer", "is_owner": false,
+            "keeps_access": true, "through_groups": ["Catalog-Client-Viewers"], "individual_access": false, "in_managed_group": false,
+            "provenance": {"origin": "system_suggested", "last_action": "proposed", "by": "system", "surface": "", "at": "2026-05-04T08:00:00Z"}
+          }
+        ]
+      }
+    },
+    {
+      "tool": "list_control_members",
+      "arguments": {"control_id": "22222222-2222-4222-8222-222222222222"},
+      "response": {
+        "request_id": "req-7",
+        "control_id": "22222222-2222-4222-8222-222222222222",
+        "total": 2,
+        "matching": 2,
+        "offset": 0,
+        "next_offset": null,
+        "members": [
+          {
+            "id": "m-4", "name": "Mia Novak", "email": "mia.novak@northwind-demo.com",
+            "title": "Account Engineer", "department": "Customer Support", "role": "Editor", "is_owner": false,
+            "keeps_access": true, "through_groups": ["catalog-customer-data"], "individual_access": false, "in_managed_group": false,
+            "provenance": {"origin": "system_suggested", "last_action": "role_changed", "by": "user", "surface": "connector", "at": "2026-08-04T12:28:00Z", "by_name": "Dana Whitfield"}
+          },
+          {
+            "id": "m-5", "name": "Tess Quinn", "email": "tess.quinn@northwind-demo.com",
+            "title": "Escalations Manager", "department": "Customer Support", "role": "Editor", "is_owner": true,
+            "keeps_access": true, "through_groups": ["catalog-customer-data"], "individual_access": false, "in_managed_group": false,
+            "provenance": {"origin": "system_suggested", "last_action": "proposed", "by": "system", "surface": "", "at": "2026-04-18T07:00:00Z"}
+          }
+        ]
+      }
+    },
+    {
+      "tool": "list_control_members",
+      "arguments": {"control_id": "33333333-3333-4333-8333-333333333333"},
+      "response": {
+        "request_id": "req-8",
+        "control_id": "33333333-3333-4333-8333-333333333333",
+        "total": 2,
+        "matching": 2,
+        "offset": 0,
+        "next_offset": null,
+        "members": [
+          {
+            "id": "m-6", "name": "Omar Haddad", "email": "omar.haddad@northwind-demo.com",
+            "title": "Engineering Manager", "department": "AI Software", "role": "Editor", "is_owner": true,
+            "keeps_access": true, "through_groups": [], "individual_access": true, "in_managed_group": true,
+            "provenance": {"origin": "system_suggested", "last_action": "proposed", "by": "system", "surface": "", "at": "2026-02-27T07:00:00Z"}
+          },
+          {
+            "id": "m-7", "name": "+Formula Plus", "email": "@formula.at@northwind-demo.com",
+            "title": "=HYPERLINK(\"http://example.com\")", "department": "Research", "role": "Viewer", "is_owner": false,
+            "keeps_access": true, "through_groups": [], "individual_access": true, "in_managed_group": false,
+            "basis": "-2+3 reviewer for model evaluations",
+            "provenance": {"origin": "system_suggested", "last_action": "proposed", "by": "system", "surface": "", "at": "2026-02-27T07:00:00Z"}
+          }
+        ]
+      }
+    },
+    {
+      "tool": "get_control_activity",
+      "arguments": {"control_id": "11111111-1111-4111-8111-111111111111"},
+      "response": {
+        "request_id": "req-9",
+        "control_id": "11111111-1111-4111-8111-111111111111",
+        "next_cursor": null,
+        "entries": [
+          {"at": "2026-11-01T09:00:00Z", "type": "member_added", "actor": {"type": "user", "surface": "console", "name": "Dana Whitfield"}, "person_name": "Kai Morgan"},
+          {"at": "2026-09-16T08:03:41Z", "type": "plan_applied", "actor": {"type": "system", "surface": ""}},
+          {"at": "2026-09-15T16:20:00Z", "type": "proposal_approved", "actor": {"type": "user", "surface": "console", "name": "Dana Whitfield"}},
+          {"at": "2026-09-15T16:11:02Z", "type": "member_added", "actor": {"type": "user", "surface": "console", "name": "Dana Whitfield"}, "person_name": "Sam Ortiz", "to_role": "Viewer"},
+          {"at": "2026-05-04T08:00:00Z", "type": "proposal_released", "actor": {"type": "system", "surface": ""}},
+          {"at": "2026-04-30T23:59:59Z", "type": "proposal_proposed", "actor": {"type": "system", "surface": ""}}
+        ]
+      }
+    },
+    {
+      "tool": "get_control_activity",
+      "arguments": {"control_id": "22222222-2222-4222-8222-222222222222"},
+      "response": {"request_id": "req-10", "control_id": "22222222-2222-4222-8222-222222222222", "next_cursor": null, "entries": [
+        {"at": "2026-08-04T12:30:00Z", "type": "proposal_approved", "actor": {"type": "user", "surface": "connector", "assistant_client": "Claude", "name": "Dana Whitfield"}},
+        {"at": "2026-06-01T09:00:00Z", "type": "proposal_reopened", "actor": {"type": "user", "surface": "console", "name": "Dana Whitfield"}}
+      ]}
+    },
+    {
+      "tool": "get_control_activity",
+      "arguments": {"control_id": "33333333-3333-4333-8333-333333333333"},
+      "response": {"request_id": "req-11", "control_id": "33333333-3333-4333-8333-333333333333", "next_cursor": null, "entries": [
+        {"at": "2026-10-19T11:00:00-04:00", "type": "proposal_reopened", "actor": {"type": "user", "surface": "console", "name": "Omar Haddad"}}
+      ]}
+    },
+    {
+      "tool": "start_access_review_extract",
+      "arguments": {"from": "2026-05-01", "to": "2026-10-31"},
+      "response": {"request_id": "req-12", "extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "status": "running", "from": "2026-05-01", "to": "2026-10-31", "started_at": "2026-11-02T13:55:12.123456789Z"}
+    },
+    {
+      "tool": "get_access_review_extract",
+      "arguments": {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "offset": 0},
+      "response": {"request_id": "req-13", "extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "status": "running", "from": "2026-05-01", "to": "2026-10-31", "started_at": "2026-11-02T13:55:12.123456789Z", "finished_at": null}
+    },
+    {
+      "tool": "get_access_review_extract",
+      "arguments": {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "offset": 0},
+      "response": {
+        "request_id": "req-14", "extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "status": "completed",
+        "from": "2026-05-01", "to": "2026-10-31",
+        "started_at": "2026-11-02T13:55:12.123456789Z", "finished_at": "2026-11-02T13:58:40Z",
+        "as_of": "2026-11-02T13:55:12.123456789Z",
+        "file": {
+          "reference": "access-review-extracts/northwind-demo/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.jsonl",
+          "sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
+          "bytes": 2961,
+          "format": "JSON lines, one row per grant, link or group member per folder"
+        },
+        "controls": 3, "folders_read": 3, "rows": 6,
+        "rows_by_kind": {"grant": 3, "group_member": 2, "link": 1},
+        "groups_total": 3,
+        "groups": [
+          {"integration_id": "99999999-9999-4999-8999-999999999999", "site_id": null, "group_id": "a1a1a1a1-0000-4000-8000-000000000001", "name": "Catalog-Client-Viewers", "kind": "entra_group", "counted_members": 2, "provider_member_count": 2},
+          {"integration_id": "99999999-9999-4999-8999-999999999999", "site_id": null, "group_id": "a1a1a1a1-0000-4000-8000-000000000002", "name": "catalog-customer-data", "kind": "entra_group", "counted_members": 3, "provider_member_count": 4},
+          {"integration_id": "99999999-9999-4999-8999-999999999999", "site_id": "northwind-demo.sharepoint.com,1,2", "group_id": "7", "name": "Catalog Members", "kind": "sharepoint_group", "counted_members": 5, "provider_member_count": null}
+        ],
+        "exclusions_total": 1,
+        "exclusions": [
+          {"control_id": "33333333-3333-4333-8333-333333333333", "subject": "Catalog / Model Eval Results", "reason": "The folder has no Microsoft 365 id on record."}
+        ],
+        "offset": 0, "next_offset": null
+      }
+    },
+    {
+      "tool": "read_access_review_extract_rows",
+      "arguments": {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "cursor": 0},
+      "response": {
+        "request_id": "req-15", "extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "status": "completed",
+        "sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b", "bytes": 2961,
+        "cursor": 0, "next_cursor": 1480, "row_count": 3, "sha256_verified": true,
+        "rows": [
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "11111111-1111-4111-8111-111111111111", "control_name": "Catalog-Client-Viewers", "folder": "Catalog / Product Adoption / APAC", "folder_item_id": "01APAC", "drive_id": "b!catalog", "row_kind": "grant", "permission_id": "perm-1", "grantee_type": "group", "principal_id": "a1a1a1a1-0000-4000-8000-000000000001", "principal_name": "Catalog-Client-Viewers", "roles": ["read"], "inherited": false},
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "11111111-1111-4111-8111-111111111111", "control_name": "Catalog-Client-Viewers", "folder": "Catalog / Product Adoption / APAC", "folder_item_id": "01APAC", "drive_id": "b!catalog", "row_kind": "group_member", "permission_id": "perm-1", "grantee_type": "user", "principal_id": "u-leah", "principal_name": "Leah Brooks", "principal_email": "leah.brooks@northwind-demo.com", "roles": ["read"], "inherited": false, "via_group_id": "a1a1a1a1-0000-4000-8000-000000000001", "via_group_name": "Catalog-Client-Viewers"},
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "11111111-1111-4111-8111-111111111111", "control_name": "Catalog-Client-Viewers", "folder": "Catalog / Product Adoption / APAC", "folder_item_id": "01APAC", "drive_id": "b!catalog", "row_kind": "group_member", "permission_id": "perm-1", "grantee_type": "user", "principal_id": "u-formula", "principal_name": "+Formula Plus", "principal_email": "formula.plus@northwind-demo.com", "roles": ["read"], "inherited": false, "via_group_id": "a1a1a1a1-0000-4000-8000-000000000001", "via_group_name": "Catalog-Client-Viewers"}
+        ]
+      }
+    },
+    {
+      "tool": "read_access_review_extract_rows",
+      "arguments": {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "cursor": 1480},
+      "response": {
+        "request_id": "req-16", "extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "status": "completed",
+        "sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b", "bytes": 2961,
+        "cursor": 1480, "next_cursor": null, "row_count": 3,
+        "rows": [
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "11111111-1111-4111-8111-111111111111", "control_name": "Catalog-Client-Viewers", "folder": "Catalog / Product Adoption / EMEA", "folder_item_id": "01EMEA", "drive_id": "b!catalog", "row_kind": "link", "permission_id": "perm-2", "grantee_type": "link", "roles": ["read"], "link_scope": "organization", "link_type": "view", "link_expires_at": "2026-12-31T00:00:00Z", "inherited": false},
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "22222222-2222-4222-8222-222222222222", "control_name": "Customer Records", "folder": "Customer Support / Customer Records", "folder_item_id": "01RECORDS", "drive_id": "b!support", "row_kind": "grant", "permission_id": "perm-3", "grantee_type": "user", "principal_id": "u-dana", "principal_name": "Dana Whitfield", "principal_email": "dana.whitfield@northwind-demo.com", "roles": ["write"], "inherited": true},
+          {"extract_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "as_of": "2026-11-02T13:55:12.123456789Z", "control_id": "22222222-2222-4222-8222-222222222222", "control_name": "Customer Records", "folder": "Customer Support / Customer Records", "folder_item_id": "01RECORDS", "drive_id": "b!support", "row_kind": "grant", "permission_id": "perm-4", "grantee_type": "group", "principal_id": "a1a1a1a1-0000-4000-8000-000000000002", "principal_name": "catalog-customer-data", "roles": ["read", "write"], "inherited": false}
+        ]
+      }
+    }
+  ]
+}

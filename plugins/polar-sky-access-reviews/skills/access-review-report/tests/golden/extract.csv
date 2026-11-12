@@ -1,0 +1,7 @@
+folder_set,folder,row_kind,grantee_type,principal_name,principal_email,roles,inherited,via_group,link_scope,link_type,link_expires_at,permission_id,as_of
+Catalog-Client-Viewers,Catalog / Product Adoption / APAC,grant,group,Catalog-Client-Viewers,,read,No,,,,,perm-1,2026-11-02 13:55 UTC
+Catalog-Client-Viewers,Catalog / Product Adoption / APAC,group member,user,Leah Brooks,leah.brooks@northwind-demo.com,read,No,Catalog-Client-Viewers,,,,perm-1,2026-11-02 13:55 UTC
+Catalog-Client-Viewers,Catalog / Product Adoption / APAC,group member,user,'+Formula Plus,formula.plus@northwind-demo.com,read,No,Catalog-Client-Viewers,,,,perm-1,2026-11-02 13:55 UTC
+Catalog-Client-Viewers,Catalog / Product Adoption / EMEA,link,link,,,read,No,,organization,view,2026-12-31 00:00 UTC,perm-2,2026-11-02 13:55 UTC
+Customer Records,Customer Support / Customer Records,grant,user,Dana Whitfield,dana.whitfield@northwind-demo.com,write,Yes,,,,,perm-3,2026-11-02 13:55 UTC
+Customer Records,Customer Support / Customer Records,grant,group,catalog-customer-data,,read; write,No,,,,,perm-4,2026-11-02 13:55 UTC

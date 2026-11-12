@@ -1,0 +1,2 @@
+folder_set,action,step,target,principal,role,state,state_at,state_reason
+Catalog-Client-Viewers,Remove a member from a group,Remove Jordan Lee from Catalog-Client-Viewers.,Catalog-Client-Viewers,Jordan Lee,Viewer,Applied,2026-09-16,
