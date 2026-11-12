@@ -4,7 +4,8 @@
 #
 # Registers nvidia.com/gpu as a schedulable resource on the GPU nodes. Its
 # default affinity needs Node Feature Discovery labels this cluster does not
-# have, so it is pinned to the GPU pool's label and tolerates the pool's taint.
+# have, so it is pinned to the accelerator=nvidia label AKS puts on NVIDIA GPU
+# nodes and tolerates the GPU pool's taint.
 
 resource "helm_release" "nvidia_device_plugin" {
   name       = "nvidia-device-plugin"

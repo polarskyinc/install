@@ -1,12 +1,16 @@
 # AKS Cluster and Node Pools
 #
 # Creates an AKS cluster with:
-# - System node pool: Standard_D4s_v5 (4 vCPU, 16 GiB) - on-demand, autoscaling 3-6
+# - System node pool: var.system_node_vm_size (4 vCPU, 16 GiB, Standard_D4s_v5
+#   by default) - on-demand, autoscaling 3-6
 # - GPU node pool: Standard_NC8as_T4_v3 (1x NVIDIA T4) - on-demand, autoscaling
 #
 # Networking is Azure CNI overlay with the Cilium data plane, which enforces the
 # Kubernetes NetworkPolicy resources the Helm chart installs. AKS installs the
 # NVIDIA drivers on GPU nodes; the device plugin is deployed in addons.tf.
+#
+# AKS labels NVIDIA GPU nodes accelerator=nvidia itself and refuses that label
+# on a node pool, so the GPU pool sets only the taint.
 #
 # The GPU pool is on-demand only: Azure taints spot pools with
 # kubernetes.azure.com/scalesetpriority=spot:NoSchedule, which the aks profile
@@ -23,7 +27,7 @@ resource "azurerm_kubernetes_cluster" "polar_sky" {
 
   default_node_pool {
     name                        = "system"
-    vm_size                     = "Standard_D4s_v5"
+    vm_size                     = var.system_node_vm_size
     vnet_subnet_id              = azurerm_subnet.nodes.id
     auto_scaling_enabled        = true
     min_count                   = 3
@@ -67,10 +71,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   auto_scaling_enabled = true
   min_count            = var.gpu_node_min_count
   max_count            = var.gpu_node_max_count
-
-  node_labels = {
-    "accelerator" = "nvidia"
-  }
 
   node_taints = ["sku=gpu:NoSchedule"]
 

@@ -171,6 +171,14 @@ if [ "${deployment_model}" != cloud ]; then
       problem "CLUSTER_KUBERNETES_VERSION must be a minor version such as 1.35, without a patch number"
   fi
 
+  if [ -n "${CLUSTER_SYSTEM_VM_SIZE:-}" ]; then
+    show CLUSTER_SYSTEM_VM_SIZE "${CLUSTER_SYSTEM_VM_SIZE}"
+    case "${CLUSTER_SYSTEM_VM_SIZE}" in
+      Standard_D4s_v5 | Standard_D4ds_v5 | Standard_D4as_v5 | Standard_D4ads_v5 | Standard_D4s_v4 | Standard_D4ds_v4 | Standard_D4as_v4 | Standard_DC4ads_v5) ;;
+      *) problem "CLUSTER_SYSTEM_VM_SIZE must be one of the system pool sizes the AKS recipe takes: Standard_D4s_v5, Standard_D4ds_v5, Standard_D4as_v5, Standard_D4ads_v5, Standard_D4s_v4, Standard_D4ds_v4, Standard_D4as_v4, Standard_DC4ads_v5" ;;
+    esac
+  fi
+
   if [ -n "${CLUSTER_GPU_ZONES:-}" ]; then
     show CLUSTER_GPU_ZONES "${CLUSTER_GPU_ZONES}"
     printf '%s' "${CLUSTER_GPU_ZONES}" | grep -Eq '^\["[a-z0-9-]+"(,"[a-z0-9-]+")*\]$' ||

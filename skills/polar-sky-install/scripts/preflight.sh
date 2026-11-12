@@ -75,6 +75,7 @@ case "${profile}" in
   gke)
     platform="GKE"
     gpu_selector="cloud.google.com/gke-accelerator=nvidia-l4"
+    gpu_label_origin="GKE puts it on each L4 node when the node starts"
     gpu_taint="nvidia.com/gpu=*:NoSchedule"
     storage_class=""
     model_host="storage.googleapis.com"
@@ -82,6 +83,7 @@ case "${profile}" in
   eks)
     platform="EKS"
     gpu_selector="workload-type=gpu,gpu-type=t4"
+    gpu_label_origin="the GPU pool must set it"
     gpu_taint="nvidia.com/gpu=*:NoSchedule"
     storage_class="efs-polarsky-retain"
     model_host="huggingface.co"
@@ -89,6 +91,7 @@ case "${profile}" in
   aks)
     platform="AKS"
     gpu_selector="accelerator=nvidia"
+    gpu_label_origin="AKS puts it on each NVIDIA GPU node when the node starts, so the pool itself shows no label"
     gpu_taint="sku=gpu:NoSchedule"
     storage_class="premium-azurefile-retain"
     model_host="huggingface.co"
@@ -168,7 +171,7 @@ check_gpu_nodes() {
 ${gpu_nodes}
 EOF
   if [ "${count}" -eq 0 ]; then
-    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type, label and taint, and can grow to at least 4 nodes. Otherwise label the GPU nodes as Polar Sky needs on ${platform}"
+    warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type and taint, and can grow to at least 4 nodes; ${gpu_label_origin}. If GPU nodes already run without this label, they do not match what Polar Sky needs on ${platform}"
   elif [ "${total}" -lt 4 ]; then
     warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs 4; fine if the pool can grow to 4"
   else

@@ -42,6 +42,27 @@ variable "kubernetes_version" {
   }
 }
 
+# System Node Pool Configuration
+variable "system_node_vm_size" {
+  description = "Virtual machine size of the system node pool; another listed size only when the subscription may not use Standard_D4s_v5 in the region"
+  type        = string
+  default     = "Standard_D4s_v5"
+
+  validation {
+    condition = contains([
+      "Standard_D4s_v5",
+      "Standard_D4ds_v5",
+      "Standard_D4as_v5",
+      "Standard_D4ads_v5",
+      "Standard_D4s_v4",
+      "Standard_D4ds_v4",
+      "Standard_D4as_v4",
+      "Standard_DC4ads_v5",
+    ], var.system_node_vm_size)
+    error_message = "system_node_vm_size must be one of the sizes Polar Sky approves for the system pool: Standard_D4s_v5, Standard_D4ds_v5, Standard_D4as_v5, Standard_D4ads_v5, Standard_D4s_v4, Standard_D4ds_v4, Standard_D4as_v4, Standard_DC4ads_v5"
+  }
+}
+
 # GPU Node Pool Configuration
 variable "gpu_node_min_count" {
   description = "Minimum number of GPU nodes in the autoscaling pool (0 for cost savings)"

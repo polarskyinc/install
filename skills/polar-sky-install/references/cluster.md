@@ -46,10 +46,10 @@ gcloud auth application-default print-access-token >/dev/null && echo ADC OK
 
 If it does not print `ADC OK`, tell the person to run `gcloud auth application-default login` in their own terminal, and to choose the Google account that may create the cluster in `CLUSTER_PROJECT_ID`. It opens a browser. Run the check again when they are done.
 
-For AKS, check four more things before you plan. Use the subscription from the install plan, and ask only if the plan did not settle it:
+For AKS, check five more things before you plan. Use the subscription from the install plan, and ask only if the plan did not settle it:
 
 1. **Subscription.** Which Azure subscription the cluster goes in. Propose the subscription `az` is signed in to, saying where it came from. Write its ID into `values.env` as `CLUSTER_SUBSCRIPTION_ID`. The person needs Owner, or Contributor and User Access Administrator, on it: the recipe creates a resource group and assigns a role to the cluster. With Contributor alone, `apply` fails at that role assignment.
-2. **Resource providers.** A subscription must register an Azure service's resource provider before it can use that service, and a new subscription may have none of the four the cluster needs. Without them, the version list and the quota check below fail. Check them (read only):
+2. **Resource providers.** A subscription must register an Azure service's resource provider before it can use that service, and a new subscription may have none of the four the cluster needs. Without them, the version list, the machine size check and the quota check below fail. Check them (read only):
 
    ```bash
    . ~/polar-sky-install/values.env && for namespace in Microsoft.ContainerService Microsoft.Compute Microsoft.Network Microsoft.Storage; do echo "${namespace} $(az provider show --namespace "${namespace}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --query registrationState --output tsv)"; done
@@ -71,13 +71,23 @@ For AKS, check four more things before you plan. Use the subscription from the i
 
    Pick the newest minor whose `Preview` is `False` and that is 1.33 or newer. Write it into `values.env` as `CLUSTER_KUBERNETES_VERSION`, the minor only, such as `1.37`, and show it in the plan. If the command fails or lists no such minor, show the person what it printed and do not guess a version: you pick it once the region's list can be read. If it fails because a resource provider is not registered, go back to step 2.
 
-4. **GPU quota.** Check the region's quota (read only):
+4. **Machine sizes.** Do not ask the person for them: check them yourself. A subscription can have quota for a machine size and still not be allowed to use it in a region. Azure's Usage + quotas page does not show that block, and the apply fails on it. The recipe's system pool takes one of these sizes, in this order: `Standard_D4s_v5`, `Standard_D4ds_v5`, `Standard_D4as_v5`, `Standard_D4ads_v5`, `Standard_D4s_v4`, `Standard_D4ds_v4`, `Standard_D4as_v4`, `Standard_DC4ads_v5`. The GPU pool always uses `Standard_NC8as_T4_v3`. List them all with their restrictions (read only). It takes a minute or two: tell the person so in one line.
 
    ```bash
-   az vm list-usage --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --output table
+   . ~/polar-sky-install/values.env && az vm list-skus --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --all --resource-type virtualMachines --query "[?contains(['Standard_D4s_v5','Standard_D4ds_v5','Standard_D4as_v5','Standard_D4ads_v5','Standard_D4s_v4','Standard_D4ds_v4','Standard_D4as_v4','Standard_DC4ads_v5','Standard_NC8as_T4_v3'], name)].{name:name,family:family,locationRestrictions:restrictions[?type=='Location'].reasonCode}" --output json
    ```
 
-   AKS adds one extra node to each pool while it upgrades the pool, so the recipe needs 40 free vCPUs in the NCasT4_v3 family for four GPU nodes and that extra node (56 for the pool's maximum of six), 16 to 28 in the Dsv5 family for the system pool, and the total in the regional vCPU limit. If the NCasT4_v3 limit is too low, stop: the person requests more on the subscription's Usage + quotas page in the Azure portal, and you plan once it is granted.
+   Keep `--all`: without it, Azure leaves a blocked size out instead of showing its restriction. Pick the first system size in the order above whose `locationRestrictions` is empty. A `Zone` restriction alone does not block, because the recipe's pools use no zones, so the command leaves it out. A size missing from the output is not offered in the region: skip it like a blocked one. Write the size you picked into `values.env`, for example `export CLUSTER_SYSTEM_VM_SIZE='Standard_D4s_v5'`. Keep the `family` of that size and of `Standard_NC8as_T4_v3` for the quota check.
+
+   If no system size in the list is allowed, or `Standard_NC8as_T4_v3` has a `Location` restriction, stop. Tell the person the two ways out: they ask Azure support to allow the size in this region for the subscription, which can go in the same support case as a GPU quota request, or they choose another region where both are allowed. If `Standard_NC8as_T4_v3` is missing from the output, the region does not offer it: propose another region. Do not pick a size outside the list yourself: that is Polar Sky's decision, so report it with `report_issue`. If the command fails because a resource provider is not registered, go back to step 2.
+
+5. **Quota.** Quota and the size check in step 4 are separate: a size can be blocked while its family has quota, and an allowed size can have no quota. Check the quota of the two families from step 4 and the region's total (read only). Put the `family` of the system size you picked and the `family` of `Standard_NC8as_T4_v3` in place of the placeholders:
+
+   ```bash
+   . ~/polar-sky-install/values.env && az vm list-usage --location "${CLUSTER_REGION}" --subscription "${CLUSTER_SUBSCRIPTION_ID}" --query "[?contains(['<system family>','<GPU family>','cores'], name.value)].{family:name.value,used:currentValue,limit:limit}" --output table
+   ```
+
+   Each `family` from step 4 is the `name.value` of its quota line, and `cores` is the regional vCPU limit. AKS adds one extra node to each pool while it upgrades the pool, so the recipe needs 40 free vCPUs in the GPU family for four GPU nodes and that extra node (56 for the pool's maximum of six), 16 to 28 in the system size's family for the system pool, and the total in the regional vCPU limit. If one of these limits is too low, stop: the person requests more on the subscription's Usage + quotas page in the Azure portal, and you plan once it is granted.
 
 Check that nothing the recipe creates already exists (read only). A plan on a new cluster cannot see a clash, so the apply would fail part way. On GKE the recipe creates the cluster `gke-polar-sky`, the network `vpc-gke-polar-sky` and the service account `gke-polar-sky-node`. Run the three lists one by one. If one fails because its API is not enabled, it cannot tell you what exists: turn that API on, then list again. It costs nothing, the recipe turns it on during the apply anyway, and the install plan names it with the other free APIs:
 
@@ -133,6 +143,14 @@ grep -l 'variable "gpu_zones"' <recipe folder>/variables.tf
 
 If it prints nothing, leave `-var="gpu_zones=${CLUSTER_GPU_ZONES}"` out of the GKE plan. That recipe keeps the GPU pool in `CLUSTER_ZONE` only, so that zone must offer L4, and one zone running out of GPUs stops the models.
 
+On AKS, `CLUSTER_SYSTEM_VM_SIZE` must be in `values.env`. Check the same way that the recipe folder takes it (read only; it prints nothing for an older recipe):
+
+```bash
+grep -l 'variable "system_node_vm_size"' <recipe folder>/variables.tf
+```
+
+If it prints nothing, do not plan with that folder and do not edit it: it has no size choice, and its GPU pool sets a label AKS refuses, so the apply fails. If `$IAC state list` in it says there is no state file, or lists no resource, nothing was built with it: tell the person, and after their yes, rename it to `on-prem-infrastructure-aks-old` and download the recipe again as above. Otherwise stop and report it with `report_issue`.
+
 GKE:
 
 ```bash
@@ -168,10 +186,10 @@ cd <recipe folder> && $IAC init && $IAC plan -var="region=${CLUSTER_REGION}" -va
 AKS:
 
 ```bash
-cd <recipe folder> && $IAC init && $IAC plan -var="subscription_id=${CLUSTER_SUBSCRIPTION_ID}" -var="location=${CLUSTER_REGION}" -var="kubernetes_version=${CLUSTER_KUBERNETES_VERSION}" -out=polar-sky.plan
+cd <recipe folder> && $IAC init && $IAC plan -var="subscription_id=${CLUSTER_SUBSCRIPTION_ID}" -var="location=${CLUSTER_REGION}" -var="kubernetes_version=${CLUSTER_KUBERNETES_VERSION}" -var="system_node_vm_size=${CLUSTER_SYSTEM_VM_SIZE}" -out=polar-sky.plan
 ```
 
-`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer. The AKS recipe uses the minor version you picked: show it. It stays on that minor and takes only its patch releases while AKS supports it. Tell the person that when AKS retires the minor, AKS moves the cluster to the next minor by itself.
+`init` downloads providers and may set up state; it creates no cloud resource. Show the person the plan's summary line (`Plan: N to add, 0 to change, 0 to destroy`) and the main resources. If the plan changes or destroys anything that already exists, stop and ask the person why before going on. The GKE recipe follows GKE's `REGULAR` channel: show the planned Kubernetes version. Polar Sky needs Kubernetes 1.33 or newer. The AKS recipe uses the minor version you picked: show it. It stays on that minor and takes only its patch releases while AKS supports it. Tell the person that when AKS retires the minor, AKS moves the cluster to the next minor by itself. Also show the system pool's machine size you picked. If it is not `Standard_D4s_v5`, the recipe's default, say why: the default is not available to the subscription in this region. If it is `Standard_DC4ads_v5`, also say that it is a confidential-computing size.
 
 ### Apply
 
@@ -213,7 +231,7 @@ AKS:
 az aks nodepool show --subscription "${CLUSTER_SUBSCRIPTION_ID}" --resource-group rg-polar-sky --cluster-name aks-polar-sky --name gpu --query '{vmSize:vmSize,minCount:minCount,maxCount:maxCount,labels:nodeLabels,taints:nodeTaints}' --output yaml
 ```
 
-The pool must have the platform's GPU type, label and taint (table below), and a maximum of at least 4 nodes. On GKE the maximum is for the whole pool across its zones (`totalMaxNodeCount`), the pool takes whichever zone has capacity (`locationPolicy: ANY`), and `locations` lists the GPU zones.
+The pool must have the platform's GPU type and taint (table below), and a maximum of at least 4 nodes. On EKS it must also have the label. On AKS the pool's `labels` is empty by design: AKS puts `accelerator=nvidia` on the GPU nodes when they start. The AKS pool must still have the GPU size, the `sku=gpu` `NoSchedule` taint and a maximum of at least 4. On GKE the maximum is for the whole pool across its zones (`totalMaxNodeCount`), the pool takes whichever zone has capacity (`locationPolicy: ANY`), and `locations` lists the GPU zones.
 
 On GKE, also check that the GPU pool's instance groups exist (read only). When a zone has no L4 GPUs while the pool is created, GKE can still show the pool as running but leave it without instance groups, and then no GPU node ever starts:
 
@@ -245,7 +263,7 @@ Check that the context is the cluster the person named in the install plan; ask 
 | --- | --- | --- | --- |
 | GKE (`gke`) | `cloud.google.com/gke-accelerator=nvidia-l4` | `nvidia.com/gpu`, `NoSchedule` | None needed |
 | EKS (`eks`) | `workload-type=gpu` and `gpu-type=t4` | `nvidia.com/gpu`, `NoSchedule` | `efs-polarsky-retain` (ReadWriteMany) |
-| AKS (`aks`) | `accelerator=nvidia` | `sku=gpu`, `NoSchedule` | `premium-azurefile-retain` (ReadWriteMany) |
+| AKS (`aks`) | `accelerator=nvidia`, which AKS sets on NVIDIA GPU nodes | `sku=gpu`, `NoSchedule` | `premium-azurefile-retain` (ReadWriteMany) |
 
 The standard model fleet needs four schedulable NVIDIA GPUs. All Polar Sky nodes must be Linux `amd64`.
 
