@@ -42,7 +42,13 @@ If it found answers, use those for the framework the person asked for, or else `
 3. "Anything to change?" Use the earlier answers only once the person has confirmed them or given new ones; a logo is shown with its full path so the person sees which file the cover will carry.
 4. The answers that are new for this report: the review period (if the person has not given it), the report ID, and the management acknowledgment date. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
 5. Any answer from the list below that the earlier report did not have, except the optional ones.
-6. For columns: if the answers hold `columns`, ask "Same columns as last time?" and show only the tables the person changed then; otherwise show the columns as below.
+6. The columns, from the `columns` printed next to those answers. Never list every column here:
+   - When `last_time` is `defaults`, the earlier report kept the default columns. Ask "Same columns as last time (the default columns)?"
+   - When `last_time` is `chosen`, ask "Same columns as last time?" and show only the tables in `changed_tables`, each headed by its `title` from `references/columns.json`, with its saved columns from `answers.columns`, one `header` per line.
+   - When `no_longer_offered` has ids, add one line: "These columns from last time are no longer in the report: <ids>."
+   - When `defaults_not_in_last` has ids, add one line with their headers: "These default columns were not in your last report: <headers>. Add them?"
+
+   Show the full column lists, as below, only if the person wants to change the columns.
 
 If it found nothing, or the person asks for a different framework with only organization answers found, ask for everything below as usual, filling in the answers it found.
 
@@ -59,7 +65,7 @@ Ask in one message, with short examples. Read `references/frameworks.json` for t
 
 Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the person's answer, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
 
-Then show the columns from `references/columns.json`: one short list per table, headed by the table's `title`, one column `header` per line, each default column prefixed with `✓ ` and each optional column with no mark. Ask which columns to drop or add. Keep the defaults for any table they do not change.
+Then, unless item 6 above already asked about the columns, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`, one column `header` per line, each default column prefixed with `✓ ` and each optional column with no mark. Ask which columns to drop or add. Keep the defaults for any table they do not change.
 
 ### 3. Make the data folder and start the extract
 
@@ -105,7 +111,7 @@ The render uses the extract named last in `responses/`, and refuses one still ru
 
 ### 7. Write the inputs file
 
-Write `inputs.json` in the data folder as described in `references/data-schema.md`. Put the review interval number in `review_interval_months` or `review_interval_days`, and its wording in `review_interval`. Put the number of days of the removal deadline in `removal_deadline_days` as a number, and the deadline in words in `removal_deadline`. Leave out `generated_at`: the render stamps it from the clock. For a logo, write the path the person gave in `logo`.
+Write `inputs.json` in the data folder as described in `references/data-schema.md`. Put the review interval number in `review_interval_months` or `review_interval_days`, and its wording in `review_interval`. Put the number of days of the removal deadline in `removal_deadline_days` as a number, and the deadline in words in `removal_deadline`. Leave out `generated_at`: the render stamps it from the clock. For a logo, write the path the person gave in `logo`. Always write `columns` with every table in `references/columns.json`, in that order, each with the ids of the columns used, in the order shown, defaults included, so a later report knows exactly which columns this one used.
 
 ### 8. Check, then render
 

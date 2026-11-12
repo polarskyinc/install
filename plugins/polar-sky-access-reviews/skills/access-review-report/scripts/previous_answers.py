@@ -29,6 +29,7 @@ TEXT_ANSWERS = (
     "data_source", "exclusions", "prepared_for", "running_footer",
 )
 ACKNOWLEDGMENT_ANSWERS = ("name", "title", "statement")
+COLUMN_ID = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
 def sessions_folder():
@@ -83,6 +84,47 @@ def _text(value):
     return None
 
 
+def _table_ids(columns, table, defaults_only=False):
+    """The column ids of a table in columns.json order, or only its default ones."""
+    definitions = (columns.get(table) or {}).get("columns", []) if isinstance(table, str) else []
+    return [column["id"] for column in definitions if column.get("default") or not defaults_only]
+
+
+def _known_columns(chosen, columns):
+    """Split the saved columns into the ids columns.json still has, per table in the saved order, and the ids it no longer has."""
+    kept, unknown = {}, {}
+    if not isinstance(chosen, dict):
+        return kept, unknown
+    for table, ids in chosen.items():
+        known = set(_table_ids(columns, table))
+        if not known or not isinstance(ids, list):
+            continue
+        names = [item for item in ids if isinstance(item, str)]
+        kept_ids = list(dict.fromkeys(item for item in names if item in known))
+        dropped = [item for item in dict.fromkeys(names) if item not in known and COLUMN_ID.match(item)]
+        if kept_ids:
+            kept[table] = kept_ids
+        if dropped:
+            unknown[table] = dropped
+    return kept, unknown
+
+
+def columns_last_time(inputs, columns):
+    """Describe the columns of an earlier report: defaults when it saved none, the tables that differ from today's defaults, the saved ids columns.json no longer has, and today's default ids the saved tables leave out."""
+    kept, unknown = _known_columns(inputs.get("columns"), columns)
+    if not kept:
+        return {"last_time": "defaults", "changed_tables": [], "no_longer_offered": unknown,
+                "defaults_not_in_last": {}}
+    changed = [table for table in columns if table in kept and kept[table] != _table_ids(columns, table, True)]
+    missing = {}
+    for table, ids in kept.items():
+        left_out = [item for item in _table_ids(columns, table, True) if item not in ids]
+        if left_out:
+            missing[table] = left_out
+    return {"last_time": "chosen", "changed_tables": changed, "no_longer_offered": unknown,
+            "defaults_not_in_last": missing}
+
+
 def clean_answers(inputs, frameworks, columns):
     """Keep only the answers the renderer accepts that hold from one report to the next, each of the type it expects."""
     if not isinstance(inputs, dict) or not isinstance(inputs.get("framework"), str) or inputs["framework"] not in frameworks:
@@ -103,15 +145,9 @@ def clean_answers(inputs, frameworks, columns):
         kept = {key: acknowledgment[key] for key in ACKNOWLEDGMENT_ANSWERS if _text(acknowledgment.get(key))}
         if kept:
             answers["acknowledgment"] = kept
-    chosen = inputs.get("columns")
-    if isinstance(chosen, dict):
-        kept_columns = {}
-        for table, ids in chosen.items():
-            known = {column["id"] for column in (columns.get(table) or {}).get("columns", [])} if isinstance(table, str) else set()
-            if known and isinstance(ids, list) and ids and all(isinstance(item, str) and item in known for item in ids):
-                kept_columns[table] = ids
-        if kept_columns:
-            answers["columns"] = kept_columns
+    kept_columns = _known_columns(inputs.get("columns"), columns)[0]
+    if kept_columns:
+        answers["columns"] = kept_columns
     logo = _text(inputs.get("logo"))
     if logo and os.path.isfile(os.path.expanduser(logo)):
         answers["logo"] = logo
@@ -217,12 +253,15 @@ def find_previous_answers(folder=None, organization=None):
                         when = _record_time(timestamp, file_time)
                         known = newest.get(answers["framework"]) if answers else None
                         if answers and (known is None or when > known[0]):
-                            newest[answers["framework"]] = (when, answers, _last_report(inputs))
+                            newest[answers["framework"]] = (
+                                when, answers, _last_report(inputs), columns_last_time(inputs, columns)
+                            )
             except OSError:
                 continue
     by_framework = {
-        framework: {"date": when.strftime("%Y-%m-%d"), "answers": answers, "last_report": last_report}
-        for framework, (when, answers, last_report) in newest.items()
+        framework: {"date": when.strftime("%Y-%m-%d"), "answers": answers, "last_report": last_report,
+                    "columns": columns_note}
+        for framework, (when, answers, last_report, columns_note) in newest.items()
     }
     latest = max(newest, key=lambda framework: newest[framework][0], default=None)
     return {"by_framework": by_framework, "latest": by_framework[latest] if latest else None}

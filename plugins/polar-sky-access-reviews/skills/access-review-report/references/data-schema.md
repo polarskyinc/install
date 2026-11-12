@@ -77,7 +77,7 @@ Reason: the member's `basis` if present, in words for the tags the import uses (
 | `running_footer` | | Defaults to `Confidential.` |
 | `acknowledgment` | | `{"name": "…", "title": "…", "date": "2026-11-03", "statement": "…"}` |
 | `session` | | `{"id": "…", "source": "CLAUDE_CODE_SESSION_ID"}`; the report shows the id only |
-| `columns` | | `{"members": ["folder_set", "person_name", …]}`; ids from `columns.json`, in the order to show; a table left out keeps its defaults |
+| `columns` | | `{"members": ["folder_set", "person_name", …], "groups": […], …}`; ids from `columns.json`, in the order to show; a table left out keeps its defaults. The skill writes every table, defaults included |
 | `logo` | | `/Users/laura/Documents/northwind-logo.png`; the full path of a PNG, JPEG or SVG file for the cover. `~` is expanded; a relative path is read from the folder the render runs in |
 
 The skill asks for `requested_by`, `procedure`, `removal_deadline`, `retention` and `acknowledgment` (and `review_interval` for SOC 2 and SOX); when one is missing the report shows TBD and the summary block lists it. `review_interval_months`, `review_interval_days` and `removal_deadline_days` never show TBD: without it, Section 6.2 "Within the deadline" says "Not available in this version". The fields step 2 of the skill marks optional (`control_owner`, `previous_review`, `data_source`, `exclusions`, `prepared_for`, `logo`) never show TBD: with no `control_owner`, `previous_review` or `exclusions` the report leaves its row out, `data_source` and `prepared_for` take their defaults, and with no logo the cover shows none.
@@ -88,7 +88,9 @@ The logo: the render refuses a file that does not exist, is larger than 2 MB, do
 
 ## Earlier answers
 
-`scripts/previous_answers.py` keeps these fields from an earlier `inputs.json` the skill wrote: the text fields `organization`, `requested_by`, `procedure`, `removal_deadline`, `retention`, `review_interval`, `control_owner`, `data_source`, `exclusions`, `prepared_for` and `running_footer` (non-empty, up to 2,000 characters), `framework` (one of `frameworks.json`), `removal_deadline_days`, `review_interval_months` and `review_interval_days` (as the renderer reads them), `acknowledgment` `name`, `title` and `statement`, `columns` (only tables whose every id is in `columns.json`), and `logo` while its file exists. Every other field, and any value of the wrong type, is dropped.
+`scripts/previous_answers.py` keeps these fields from an earlier `inputs.json` the skill wrote: the text fields `organization`, `requested_by`, `procedure`, `removal_deadline`, `retention`, `review_interval`, `control_owner`, `data_source`, `exclusions`, `prepared_for` and `running_footer` (non-empty, up to 2,000 characters), `framework` (one of `frameworks.json`), `removal_deadline_days`, `review_interval_months` and `review_interval_days` (as the renderer reads them), `acknowledgment` `name`, `title` and `statement`, `columns` (the ids still in `columns.json`, per table; a table with none left is dropped), and `logo` while its file exists. Every other field, and any value of the wrong type, is dropped.
+
+Next to the answers it prints `columns`, which says how the earlier report chose its columns: `last_time` is `defaults` when that report saved no columns (it kept the default columns) and `chosen` when it did; `changed_tables` lists the tables whose saved columns differ from today's defaults, in `columns.json` order; `no_longer_offered` holds, per table, the saved ids that `columns.json` no longer has; `defaults_not_in_last` holds, per saved table, today's default ids that the saved columns leave out (a column that became a default since, or one the person dropped).
 
 ## Output
 
