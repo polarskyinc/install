@@ -73,6 +73,8 @@ An On-Prem install usually takes one to two hours, most of it waiting for the cl
 4. It works step by step. Before each step it shows you that step's plan, such as the cluster plan in an On-Prem install, and asks once. It shows every command it runs. It asks again before it deletes or replaces anything, before a cost the plan did not cover, before it grants admin consent, and before it uploads the cloud service account key or the Microsoft 365 certificate bundle.
 5. In an On-Prem install, slow steps run side by side: while the cluster builds, the agent creates the Google service accounts and prepares the request for your super admin, or with Microsoft 365 creates the app registrations and the consent request for your administrator.
 
+Optionally, after the install is done and only when you ask for it, the agent can put the accounts of Polar Sky's AI helpers in a Google Cloud project you own (Google Workspace only). Google Workspace then counts them as part of your organization. It needs someone who can change an organization policy, and the agent says which steps need which rights.
+
 ## Install
 
 Run two commands in a terminal. If your agent was already running and `/mcp` does not list the server, restart it. Restart Codex in any case.
