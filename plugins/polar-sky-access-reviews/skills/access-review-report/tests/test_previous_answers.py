@@ -247,7 +247,7 @@ class PreviousAnswersTest(unittest.TestCase):
         self.assertIsNone(previous_answers.find_previous_answers(organization="Fabrikam")["latest"])
 
     def test_an_unknown_framework_is_dropped(self):
-        self.session("a.jsonl", self.inputs_call(dict(SOC2_INPUTS, framework="iso27001")))
+        self.session("a.jsonl", self.inputs_call(dict(SOC2_INPUTS, framework="nist_800_53")))
         self.assertIsNone(previous_answers.find_previous_answers()["latest"])
 
     def test_a_logo_is_kept_only_while_its_file_exists(self):
@@ -328,6 +328,53 @@ class PreviousAnswersTest(unittest.TestCase):
         self.assertNotIn(secret, printed.stdout)
         self.assertEqual(printed.stderr, "")
         self.assertEqual(json.loads(printed.stdout)["latest"]["answers"]["organization"], "Northwind Traders")
+
+
+    def test_an_answer_set_for_several_frameworks_is_listed_under_each_of_them(self):
+        several = {key: value for key, value in SOC2_INPUTS.items() if key != "framework"}
+        several["frameworks"] = ["soc2", "iso27001"]
+        self.session("a.jsonl", self.inputs_call(several, "2026-08-01T10:00:00Z"))
+        result = previous_answers.find_previous_answers()
+        self.assertEqual(sorted(result["by_framework"]), ["iso27001", "soc2"])
+        for key in ("soc2", "iso27001"):
+            self.assertEqual(result["by_framework"][key]["answers"]["frameworks"], ["soc2", "iso27001"])
+            self.assertNotIn("framework", result["by_framework"][key]["answers"])
+        self.assertEqual(result["latest"]["answers"]["frameworks"], ["soc2", "iso27001"])
+
+    def test_an_earlier_single_framework_answer_set_is_still_found_next_to_a_newer_several_framework_one(self):
+        several = {key: value for key, value in SOC2_INPUTS.items() if key != "framework"}
+        several.update(frameworks=["pci_dss", "iso27001"], retention="5 years")
+        self.session("a.jsonl",
+                     self.inputs_call(SOC2_INPUTS, "2026-07-02T10:00:00Z"),
+                     self.inputs_call(several, "2026-09-01T10:00:00Z"))
+        result = previous_answers.find_previous_answers()
+        self.assertEqual(result["by_framework"]["soc2"]["answers"]["framework"], "soc2")
+        self.assertEqual(result["by_framework"]["soc2"]["date"], "2026-07-02")
+        self.assertEqual(result["by_framework"]["pci_dss"]["answers"]["retention"], "5 years")
+        self.assertEqual(result["latest"]["date"], "2026-09-01")
+
+    def test_a_newer_single_framework_answer_set_wins_for_its_framework_only(self):
+        several = {key: value for key, value in SOC2_INPUTS.items() if key != "framework"}
+        several.update(frameworks=["soc2", "iso27001"], retention="5 years")
+        self.session("a.jsonl",
+                     self.inputs_call(several, "2026-07-02T10:00:00Z"),
+                     self.inputs_call(SOC2_INPUTS, "2026-09-01T10:00:00Z"))
+        result = previous_answers.find_previous_answers()
+        self.assertEqual(result["by_framework"]["soc2"]["answers"]["retention"], "Report and attachments kept for 3 years")
+        self.assertEqual(result["by_framework"]["iso27001"]["answers"]["retention"], "5 years")
+
+    def test_a_frameworks_list_the_renderer_would_refuse_skips_the_record(self):
+        several = {key: value for key, value in SOC2_INPUTS.items() if key != "framework"}
+        refused = [
+            dict(several, frameworks=["soc2", "nist_800_53"]),
+            dict(several, frameworks=["soc2", "soc2"]),
+            dict(several, frameworks=[]),
+            dict(several, frameworks="soc2"),
+            dict(several, frameworks=[["soc2"]]),
+            dict(SOC2_INPUTS, frameworks=["soc2"]),
+        ]
+        self.session("a.jsonl", *(self.inputs_call(inputs, f"2026-07-0{index + 2}T10:00:00Z") for index, inputs in enumerate(refused)))
+        self.assertEqual(previous_answers.find_previous_answers(), {"by_framework": {}, "latest": None})
 
 
 if __name__ == "__main__":

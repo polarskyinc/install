@@ -3,6 +3,7 @@
 Usage: python3 previous_answers.py [--organization NAME]
 
 Prints one JSON object: the most recent answers for each framework, and the most recent answers of any framework.
+A report mapped to several frameworks counts for each of them.
 Only answers the renderer accepts are printed; nothing else from the session files is.
 """
 
@@ -125,11 +126,29 @@ def columns_last_time(inputs, columns):
             "defaults_not_in_last": missing}
 
 
+def framework_keys(inputs, frameworks):
+    """The frameworks of an earlier report, from its one framework or its list of frameworks, or None when they are not ones the renderer accepts."""
+    single, several = inputs.get("framework"), inputs.get("frameworks")
+    if several is None:
+        return [single] if isinstance(single, str) and single in frameworks else None
+    if single is not None or not isinstance(several, list) or not several:
+        return None
+    if not all(isinstance(key, str) and key in frameworks for key in several) or len(set(several)) != len(several):
+        return None
+    return list(several)
+
+
+def answer_frameworks(answers):
+    """The frameworks a cleaned answer set counts for."""
+    return answers.get("frameworks") or [answers["framework"]]
+
+
 def clean_answers(inputs, frameworks, columns):
     """Keep only the answers the renderer accepts that hold from one report to the next, each of the type it expects."""
-    if not isinstance(inputs, dict) or not isinstance(inputs.get("framework"), str) or inputs["framework"] not in frameworks:
+    keys = framework_keys(inputs, frameworks) if isinstance(inputs, dict) else None
+    if keys is None:
         return None
-    answers = {"framework": inputs["framework"]}
+    answers = {"frameworks": keys} if "frameworks" in inputs else {"framework": keys[0]}
     for key in TEXT_ANSWERS:
         if _text(inputs.get(key)):
             answers[key] = inputs[key]
@@ -250,12 +269,15 @@ def find_previous_answers(folder=None, organization=None):
                         answers = clean_answers(inputs, frameworks, columns)
                         if answers and organization and (answers.get("organization") or "").casefold() != organization.casefold():
                             answers = None
+                        if not answers:
+                            continue
                         when = _record_time(timestamp, file_time)
-                        known = newest.get(answers["framework"]) if answers else None
-                        if answers and (known is None or when > known[0]):
-                            newest[answers["framework"]] = (
-                                when, answers, _last_report(inputs), columns_last_time(inputs, columns)
-                            )
+                        for framework in answer_frameworks(answers):
+                            known = newest.get(framework)
+                            if known is None or when > known[0]:
+                                newest[framework] = (
+                                    when, answers, _last_report(inputs), columns_last_time(inputs, columns)
+                                )
             except OSError:
                 continue
     by_framework = {

@@ -43,6 +43,14 @@ CHANGES_COUNTED = (
 
 OTHER_SYSTEMS = "Other systems in scope for the requirement are reviewed separately."
 
+SEVERAL_TITLE = "Access Review Report"
+SEVERAL_SCOPE_NOUN = "in-scope data"
+SEVERAL_OTHER_SYSTEMS = "Other systems in scope for these frameworks are reviewed separately."
+EVIDENCE_ORDER = (
+    "sites", "approvals", "interval", "decisions", "who_decided", "owner_approvals", "account_types", "removals",
+    "acknowledgment",
+)
+
 SITES_INCOMPLETE = (
     "The list may be incomplete: Polar Sky lists the first 25 folders of a folder set, and a folder set has more."
 )
@@ -194,7 +202,7 @@ def interval_findings(model):
 
 
 def checks_before_rendering(model):
-    """The points to raise with the person before the report is rendered: folder sets no person approved, the review interval, and a missing acknowledgment title or date."""
+    """The points to raise with the person before the report is rendered: folder sets no person approved, folder sets their data owner did not approve, the review interval, and a missing acknowledgment title or date."""
     totals = model["totals"]
     points = []
     if totals["controls_without_person"]:
@@ -202,6 +210,15 @@ def checks_before_rendering(model):
             f"{counted(len(totals['controls_without_person']), 'folder set has', 'folder sets have')} no approval by a "
             "person in force at the end of the period: "
             + "; ".join(control["name"] for control in totals["controls_without_person"]) + "."
+        )
+    if totals["owner_not_signed_off"]:
+        points.append(
+            f"{counted(len(totals['owner_not_signed_off']), 'folder set was', 'folder sets were')} not approved by "
+            "their data owner in the period: "
+            + "; ".join(
+                f"{control['name']} ({lower_first(control['owner_signoff']['note'])})"
+                for control in totals["owner_not_signed_off"]
+            ) + "."
         )
     points += [finding for finding in interval_findings(model) if not finding.startswith("Every folder set")]
     acknowledgment = model["acknowledgment"]
@@ -323,6 +340,58 @@ def section_heading(index, title, first_on_page=True):
     return f'<section{attributes}>\n  <p class="eyebrow" id="s{index}">Section {index}</p>\n  <h2>{escape(title)}</h2>\n'
 
 
+def chosen(model):
+    """The frameworks the report maps its evidence to, in the order the person chose them."""
+    return model.get("frameworks") or [model["framework"]]
+
+
+def several_frameworks(model):
+    """Say whether the report maps its evidence to more than one framework."""
+    return len(chosen(model)) > 1
+
+
+def framework_names(model, key="short_name"):
+    """Join one text of every chosen framework, such as "PCI DSS, SOC 2 and ISO 27001"."""
+    return report_data.join_names(framework[key] for framework in chosen(model))
+
+
+def cover_texts(model):
+    """The cover and running title texts: the framework's own for one framework, or texts that name every chosen framework."""
+    framework = model["framework"]
+    values = fill_values(model)
+    if not several_frameworks(model):
+        return {key: fill(framework[key], values) for key in ("eyebrow", "title", "subtitle", "prepared_for", "confidentiality")}
+    organization = model["inputs"]["organization"]
+    return {
+        "eyebrow": f"Access review evidence for {framework_names(model)}",
+        "title": SEVERAL_TITLE,
+        "subtitle": (
+            f"Review of access to {SEVERAL_SCOPE_NOUN} in {organization}'s {model['provider_scope']}, with the evidence "
+            f"mapped to {framework_names(model, 'name')}"
+        ),
+        "prepared_for": f"{organization}'s auditors and assessors for {framework_names(model)}",
+        "confidentiality": (
+            f"This report contains confidential information about {organization}'s systems and personnel. Distribute "
+            f"only to people involved in {organization}'s {framework_names(model, 'assessment')}."
+        ),
+    }
+
+
+def scope_noun(model):
+    """What the report calls the data in scope: the framework's word for one framework, or a word for any."""
+    return SEVERAL_SCOPE_NOUN if several_frameworks(model) else model["framework"]["scope_noun"]
+
+
+def purpose(model):
+    """The sentence that says what the report was prepared for."""
+    if not several_frameworks(model):
+        return fill(model["framework"]["purpose"], fill_values(model))
+    return (
+        f"It was prepared as evidence for {model['inputs']['organization']}'s {framework_names(model, 'assessment')}, "
+        f"for the period ending {model['period']['to']}."
+    )
+
+
 def fill_values(model):
     """The values framework texts may refer to."""
     return {
@@ -334,9 +403,8 @@ def fill_values(model):
 
 
 def render_cover(model):
-    framework = model["framework"]
+    texts = cover_texts(model)
     inputs = model["inputs"]
-    values = fill_values(model)
     with open(os.path.join(ASSETS_DIRECTORY, "wordmark.svg"), encoding="utf-8") as handle:
         wordmark = handle.read().strip()
     meta = [
@@ -344,7 +412,7 @@ def render_cover(model):
         ("Report ID", escape(inputs["report_id"])),
         ("Review period", escape(f"{model['period']['from']} to {model['period']['to']}")),
         ("Issued", escape(report_data.format_date(model["issued_at"]))),
-        ("Prepared for", escape(inputs.get("prepared_for") or fill(framework["prepared_for"], values))),
+        ("Prepared for", escape(inputs.get("prepared_for") or texts["prepared_for"])),
         ("Requested by", value_or_tbd(inputs.get("requested_by"))),
     ]
     meta_html = "".join(f"<dt>{escape(key)}</dt><dd>{value}</dd>" for key, value in meta)
@@ -358,13 +426,13 @@ def render_cover(model):
         f"    {wordmark}\n"
         "  </div>\n"
         '  <div class="cover-title">\n'
-        f'    <p class="eyebrow">{escape(framework["eyebrow"])}</p>\n'
-        f'    <h1>{escape(framework["title"])}</h1>\n'
-        f'    <p class="sub">{escape(fill(framework["subtitle"], values))}</p>\n'
+        f'    <p class="eyebrow">{escape(texts["eyebrow"])}</p>\n'
+        f'    <h1>{escape(texts["title"])}</h1>\n'
+        f'    <p class="sub">{escape(texts["subtitle"])}</p>\n'
         f'    <dl class="cover-meta">{meta_html}</dl>\n'
         "  </div>\n"
         '  <div class="cover-foot">\n'
-        f'    <p>{escape(fill(framework["confidentiality"], values))}</p>\n'
+        f'    <p>{escape(texts["confidentiality"])}</p>\n'
         '    <span class="conf">Confidential</span>\n'
         "  </div>\n"
         "</section>\n"
@@ -385,14 +453,15 @@ def render_contents(model):
             f"{report_data.format_date(acknowledgment.get('date')) or 'Date TBD'} by {acknowledgment['name']}"
             + (f", {acknowledgment['title']}" if acknowledgment.get("title") else "")
         )
-    rows = [("Requirement", escape(model["framework"]["control"]))]
+    rows = [("Requirements" if several_frameworks(model) else "Requirement",
+             "<br>".join(escape(framework["control"]) for framework in chosen(model)))]
     rows += optional_row("Review owner", inputs.get("control_owner"))
     rows += [
         ("Review procedure", value_or_tbd(inputs.get("procedure"))),
         ("Removal deadline", value_or_tbd(inputs.get("removal_deadline"))),
         ("Retention", value_or_tbd(inputs.get("retention"))),
     ]
-    if inputs.get("review_interval") or model["framework_key"] in ("soc2", "sox"):
+    if inputs.get("review_interval") or model["needs_interval"]:
         rows.append(("Review interval", value_or_tbd(inputs.get("review_interval"))))
     rows += optional_row("Previous review", inputs.get("previous_review"))
     rows += [
@@ -431,8 +500,7 @@ def checklist_evidence(model, key):
     if totals["controls_carried"]:
         approved += f" {number(totals['controls_carried'])} approved before the period, still in force."
     if key == "approvals":
-        previous = inputs.get("previous_review")
-        return (f"Previous review: {previous}. " if previous else "Previous review not recorded. ") + approved
+        return previous_review_text(inputs) + approved
     if key == "interval":
         interval = inputs.get("review_interval") or "TBD"
         text = f"Interval set by the company: {interval}. Review period {model['period']['from']} to {model['period']['to']}. " + approved
@@ -464,6 +532,8 @@ def checklist_evidence(model, key):
         return text
     if key == "account_types":
         return account_types_evidence(model)
+    if key == "owner_approvals":
+        return owner_approvals_evidence(model)
     if key == "removals":
         if not totals["removals"]:
             return "No removals."
@@ -487,6 +557,33 @@ def checklist_evidence(model, key):
             return "No folders."
         return f"{number(totals['folders'])} folders, listed in Attachment A."
     raise report_data.ReportDataError(f"Unknown checklist evidence {key!r}.")
+
+
+def previous_review_text(inputs):
+    """Say when the previous review was, as the person gave it, or that it is not recorded."""
+    previous = inputs.get("previous_review")
+    return f"Previous review: {previous}. " if previous else "Previous review not recorded. "
+
+
+def lower_first(text):
+    """Lower the first letter of a sentence, to use it inside another one."""
+    return text[:1].lower() + text[1:]
+
+
+def owner_approvals_evidence(model):
+    """Say how many folder sets their data owner approved in the period, and name the ones the data owner did not."""
+    totals = model["totals"]
+    if not totals["controls"]:
+        return "No folder sets."
+    text = (
+        f"{number(totals['owner_signed_off'])} of {counted(totals['controls'], 'folder set', 'folder sets')} approved by "
+        "their data owner in the period. Section 8 lists each folder set with its data owner's approval, when and through what."
+    )
+    if totals["owner_not_signed_off"]:
+        text += " Not approved by their data owner in the period: " + "; ".join(
+            f"{control['name']} ({lower_first(control['owner_signoff']['note'])})" for control in totals["owner_not_signed_off"]
+        ) + "."
+    return text
 
 
 def account_type_counts(totals):
@@ -599,7 +696,7 @@ def summary_paragraph(model):
     if no_folder_sets(model):
         return no_access_to_review(model) + " A folder set is one folder, or a group of folders, with a data owner."
     text = (
-        f"{model['inputs']['organization']} reviewed access to {model['framework']['scope_noun']} in "
+        f"{model['inputs']['organization']} reviewed access to {scope_noun(model)} in "
         f"{model['provider_label']} from {model['period']['from']} to {model['period']['to']} for "
         f"{counted(totals['controls'], 'folder set', 'folder sets')}. Each folder set is one folder, or a group of folders, "
         "with a data owner. For each folder set, Polar Sky proposed who should keep access and why, and the data owner "
@@ -632,42 +729,87 @@ def summary_stats(model):
     return f'  <div class="stats">{cards}</div>\n'
 
 
-def render_summary(model):
+def mapped_checklist(model):
+    """One row per piece of evidence, with the requirement of every chosen framework it answers; the review timing rows of all frameworks share one row."""
+    keys = {item["evidence"] for framework in chosen(model) for item in framework["checklist"]}
+    rows = {}
+    for framework in chosen(model):
+        for item in framework["checklist"]:
+            key = "interval" if item["evidence"] == "approvals" and "interval" in keys else item["evidence"]
+            entry = rows.setdefault(key, {"requirements": [], "sections": []})
+            entry["requirements"].append((f"{framework['short_name']} {framework['checklist_heading']}", item["requirement"]))
+            entry["sections"] += [section for section in item["sections"] if section not in entry["sections"]]
+    order = {key: index for index, key in enumerate(EVIDENCE_ORDER)}
+    return [
+        (key, rows[key]["requirements"], sorted(rows[key]["sections"], key=int))
+        for key in sorted(rows, key=lambda key: order.get(key, len(order)))
+    ]
+
+
+def mapped_evidence(model, key):
+    """The evidence of one row of the mapped table; the shared review timing row also gives the previous review when a framework asks for it."""
+    text = checklist_evidence(model, key)
+    asks_previous = any(item["evidence"] == "approvals" for framework in chosen(model) for item in framework["checklist"])
+    if key == "interval" and asks_previous:
+        return previous_review_text(model["inputs"]) + text
+    return text
+
+
+def checklist_table(model):
+    """The Section 1 table: for one framework, its requirements with their evidence; for several, each piece of evidence once with every requirement it answers."""
     framework = model["framework"]
+    if not several_frameworks(model):
+        rows = "".join(
+            f"<tr><td>{escape(item['requirement'])}</td><td>{escape(checklist_evidence(model, item['evidence']))}</td>"
+            f"<td>{section_links(item['sections'])}</td></tr>"
+            for item in framework["checklist"]
+        )
+        return (
+            f'<table class="ps-table checklist"><thead><tr><th>{escape(framework["checklist_heading"])}</th>'
+            f"<th>Evidence</th><th>Section</th></tr></thead><tbody>{rows}</tbody></table>"
+        )
     rows = "".join(
-        f"<tr><td>{escape(item['requirement'])}</td><td>{escape(checklist_evidence(model, item['evidence']))}</td>"
-        f"<td>{section_links(item['sections'])}</td></tr>"
-        for item in framework["checklist"]
+        "<tr><td>"
+        + "".join(
+            f'<span class="requirement"><span class="cell-note">{escape(label)}</span><br>{escape(requirement)}</span>'
+            for label, requirement in requirements
+        )
+        + f"</td><td>{escape(mapped_evidence(model, key))}</td><td>{section_links(sections)}</td></tr>"
+        for key, requirements, sections in mapped_checklist(model)
     )
+    return (
+        '<table class="ps-table checklist mapped"><thead><tr><th>Requirement</th><th>Evidence</th><th>Section</th></tr>'
+        f"</thead><tbody>{rows}</tbody></table>"
+    )
+
+
+def render_summary(model):
     bar = outcome_bar(model["totals"])
     return (
         section_heading(1, SECTIONS[0])
         + f"  <p>{escape(summary_paragraph(model))}</p>\n"
         + summary_stats(model)
-        + f'  <table class="ps-table checklist"><thead><tr><th>{escape(framework["checklist_heading"])}</th><th>Evidence</th><th>Section</th></tr></thead><tbody>{rows}</tbody></table>\n'
+        + f"  {checklist_table(model)}\n"
         + (f"  {bar}\n" if bar else "")
         + "</section>\n"
     )
 
 
 def render_scope(model):
-    framework = model["framework"]
     inputs = model["inputs"]
-    values = fill_values(model)
     totals = model["totals"]
     provider = model["provider_label"]
     period = f"from {model['period']['from']} to {model['period']['to']}"
     if no_folder_sets(model):
         paragraphs = [
-            f"This report documents what Polar Sky recorded about access to {framework['scope_noun']} in {provider} {period}. "
-            f"{fill(framework['purpose'], values)}",
+            f"This report documents what Polar Sky recorded about access to {scope_noun(model)} in {provider} {period}. "
+            f"{purpose(model)}",
             f"<b>Scope.</b> No folder sets. {other_systems(model)}",
-            f"<b>Requirement.</b> {framework['requirement']}",
         ]
     else:
         paragraphs = [
-            f"This report documents {inputs['organization']}'s review of access to {framework['scope_noun']} in "
-            f"{provider} {period}. {fill(framework['purpose'], values)}",
+            f"This report documents {inputs['organization']}'s review of access to {scope_noun(model)} in "
+            f"{provider} {period}. {purpose(model)}",
             f"<b>Scope.</b> The {counted(totals['controls'], 'folder set', 'folder sets')} whose access approval was in "
             "force during the period, and the access Polar Sky records for them: every member, every group kept or "
             f"dropped, and every direct share kept. This report covers only these folder sets in {provider}. "
@@ -680,14 +822,27 @@ def render_scope(model):
             "that included them; Attachment A shows anyone proposed after an approval was withdrawn. "
             "A person who added someone or changed their access is named, with the date. Each approval is recorded with "
             "who approved it and when.",
-            f"<b>Requirement.</b> {framework['requirement']}",
         ]
+    paragraphs += requirement_paragraphs(model)
     body = f"  <p>{escape(paragraphs[0])}</p>\n" + "".join(f"  <p>{_bold_lead(paragraph)}</p>\n" for paragraph in paragraphs[1:])
     return section_heading(2, SECTIONS[1]) + body + "</section>\n"
 
 
+def requirement_paragraphs(model):
+    """The Section 2 paragraphs that give what each chosen framework requires."""
+    if not several_frameworks(model):
+        return [f"<b>Requirement.</b> {model['framework']['requirement']}"]
+    lead = (
+        f"<b>Requirements.</b> This report maps one set of evidence to {counted(len(chosen(model)), 'framework', 'frameworks')}. "
+        "Section 1 shows which evidence answers each requirement; the other sections are shared."
+    )
+    return [lead] + [f"<b>{framework['short_name']}.</b> {framework['requirement']}" for framework in chosen(model)]
+
+
 def other_systems(model):
     """Say that systems outside these folder sets are reviewed separately, in the framework's words or generic ones."""
+    if several_frameworks(model):
+        return SEVERAL_OTHER_SYSTEMS
     return fill(model["framework"].get("other_systems") or OTHER_SYSTEMS, fill_values(model))
 
 
@@ -1269,11 +1424,68 @@ def render_signoff(model):
     )
     return (
         section_heading(8, SECTIONS[7])
-        + "  <p><b>Approvers.</b> Each approval of a folder set's access is the approver's sign-off, recorded in "
-        "Polar Sky with the date (Section 5.2). Approvers do not sign this report.</p>\n"
+        + owner_signoff_section(model)
+        + "  <h3>8.2 Management acknowledgment</h3>\n"
         + '  <div class="attest"><span class="label">Management acknowledgment</span>\n'
         + f"    <p>{escape(statement)}</p>\n"
         + f"    <dl>{details}</dl>\n  </div>\n</section>\n"
+    )
+
+
+OWNER_SIGNOFF_MEANING = (
+    "Each data owner's approval of a folder set is their sign-off for it, recorded in Polar Sky with the time and how "
+    "they approved: in the Polar Sky console, or through an AI assistant connected to Polar Sky. Data owners do not "
+    "sign this report. The table shows, for each folder set, whether its data owner approved it during the review "
+    "period. An approval by another person, or by Polar Sky itself, is not the data owner's sign-off; Section 5.2 "
+    "lists every approver. Polar Sky records approvers by name, so an approval counts as the data owner's when the "
+    "approver's name matches the data owner's."
+)
+
+
+def owner_label(owners):
+    """Name a folder set's data owners with their job titles, or say none is recorded."""
+    names = "; ".join(f"{owner['name']}, {owner['title']}" if owner["title"] else owner["name"] for owner in owners)
+    return names or report_data.NOT_RECORDED
+
+
+def owner_signoff_rows(model):
+    """One row per folder set: its data owner, whether the data owner approved it in the period, when, through what, and why not."""
+    return [
+        {
+            "folder_set": control["name"],
+            "owner": owner_label(control["owners"]),
+            "signed_off": "Yes" if control["owner_signoff"]["signed_off"] else "No",
+            "approved_at": control["owner_signoff"]["approved_at"],
+            "through": control["owner_signoff"]["through"],
+            "note": control["owner_signoff"]["note"],
+        }
+        for control in model["controls"]
+    ]
+
+
+def owner_signoff_section(model):
+    """Section 8.1: each folder set's data owner sign-off, as the approvals show it."""
+    heading = "  <h3>8.1 Data owner sign-off</h3>\n"
+    if no_folder_sets(model):
+        return heading + "  <p>No folder sets, so no data owner sign-off.</p>\n"
+    totals = model["totals"]
+    columns = [
+        {"id": "folder_set", "header": "Folder set"},
+        {"id": "owner", "header": "Data owner"},
+        {"id": "signed_off", "header": "Approved by the data owner in the period"},
+        {"id": "approved_at", "header": "Data owner's approval"},
+        {"id": "through", "header": "Through"},
+        {"id": "note", "header": "Notes"},
+    ]
+    count = (
+        f"{number(totals['owner_signed_off'])} of {counted(totals['controls'], 'folder set was', 'folder sets were')} "
+        "approved by their data owner in the period."
+    )
+    return (
+        heading
+        + f"  <p>{escape(OWNER_SIGNOFF_MEANING)}</p>\n"
+        + f"  <p>{escape(count)}</p>\n"
+        + f"  {data_table(columns, owner_signoff_rows(model), css_class='owners')}\n"
     )
 
 
@@ -1334,12 +1546,12 @@ def css_string(value):
 
 def render_html(model, hashes):
     """Lay out the whole report as one HTML document."""
-    framework = model["framework"]
+    title = cover_texts(model)["title"]
     inputs = model["inputs"]
     with open(os.path.join(ASSETS_DIRECTORY, "report.css"), encoding="utf-8") as handle:
         css = handle.read()
     css = (
-        css.replace("{{running_title}}", css_string(framework["title"].replace('"', "'")))
+        css.replace("{{running_title}}", css_string(title.replace('"', "'")))
         .replace("{{report_id}}", css_string(inputs["report_id"].replace('"', "'")))
         .replace("{{running_footer}}", css_string((inputs.get("running_footer") or "Confidential.").replace('"', "'")))
     )
@@ -1351,7 +1563,7 @@ def render_html(model, hashes):
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{escape(framework['title'])}, {escape(inputs['organization'])}, {escape(inputs['report_id'])}</title>\n"
+        f"<title>{escape(title)}, {escape(inputs['organization'])}, {escape(inputs['report_id'])}</title>\n"
         f"<style>\n{css}</style>\n</head>\n<body>\n<div class=\"sheet\">\n\n"
         + "\n".join(sections)
         + "\n</div>\n</body>\n</html>\n"
@@ -1375,7 +1587,7 @@ def tbd_fields(model):
     """Name the report fields that show TBD because the person did not give them."""
     inputs = model["inputs"]
     fields = [label for key, label in TBD_FIELDS if inputs.get(key) in (None, "")]
-    if model["framework_key"] in ("soc2", "sox") and not inputs.get("review_interval"):
+    if model["needs_interval"] and not inputs.get("review_interval"):
         fields.append("Review interval")
     acknowledgment = model["acknowledgment"]
     if not acknowledgment.get("name"):
@@ -1455,6 +1667,7 @@ def summary_lines(model):
         f"Kept direct shares: {shares_text(model)}.",
         f"People who approved access or added or changed it: {people}.",
         *([f"Approval by a person: {approved_by_polar_sky_only(totals)}"] if totals["controls_without_person"] else []),
+        f"Data owner sign-off: {owner_approvals_evidence(model)}",
         f"Extract: {extract_summary(model['extract'])}",
         *([f"Access not in the members list: {unlisted_text(model['unlisted'])}."] if model["unlisted"] is not None else []),
         f"Generated: {report_data.format_time(model['inputs']['generated_at'])}.",

@@ -1048,17 +1048,101 @@ def interval_check(length, period, controls):
     }
 
 
+def chosen_frameworks(inputs, frameworks):
+    """Return the keys of the frameworks the report maps its evidence to, from inputs.frameworks (a list) or inputs.framework (one key)."""
+    single = inputs.get("framework")
+    several = inputs.get("frameworks")
+    if single not in (None, "") and several not in (None, []):
+        raise ReportDataError("Give inputs.framework or inputs.frameworks, not both.")
+    if several in (None, []):
+        if single in (None, ""):
+            raise ReportDataError("inputs.framework or inputs.frameworks is required.")
+        several = [single]
+    if not isinstance(several, list):
+        raise ReportDataError("inputs.frameworks must be a list of framework keys, such as [\"soc2\", \"iso27001\"].")
+    unknown = [key for key in several if not isinstance(key, str) or key not in frameworks]
+    if unknown:
+        raise ReportDataError(
+            f"inputs.framework must be one of {', '.join(sorted(frameworks))}, not {', '.join(repr(key) for key in unknown)}."
+        )
+    if len(set(several)) != len(several):
+        raise ReportDataError("inputs.frameworks names a framework more than once.")
+    return list(several)
+
+
+def _through(row):
+    """Say how an approval was made: in the Polar Sky console, or through an AI assistant and which one."""
+    surface = row["surface"]
+    assistant = row["assistant_client"]
+    if surface and assistant:
+        return f"{surface} ({assistant})"
+    return surface or assistant or NOT_RECORDED
+
+
+def join_names(values):
+    """Join names as "A", "A and B" or "A, B and C"."""
+    values = list(values)
+    if len(values) < 3:
+        return " and ".join(values)
+    return ", ".join(values[:-1]) + " and " + values[-1]
+
+
+def _later_approvals(rows):
+    """Say who approved a folder set after the data owner's approval, and when last."""
+    return f"approved again later by {join_names(dict.fromkeys(row['approved_by'] for row in rows))}, last {rows[-1]['approved_at']}"
+
+
+def owner_signoff(owners, approvals):
+    """Say whether a folder set's data owner approved it in the period, with when and through what, or why not; an approver is the data owner when the names match, as approvals carry no email."""
+    names = {name.strip().casefold() for name in owners if name and name.strip()}
+    in_period = [row for row in approvals if not row["_carried"]]
+    result = {"signed_off": False, "approved_by": "", "approved_at": "", "through": "", "note": ""}
+    if not names:
+        result["note"] = "No data owner recorded"
+        return result
+
+    def by_owner(row):
+        return row["_by_person"] and row["approved_by"].strip().casefold() in names
+
+    owner_rows = [row for row in in_period if by_owner(row)]
+    if owner_rows:
+        last = owner_rows[-1]
+        later = in_period[in_period.index(last) + 1:]
+        result.update(approved_by=last["approved_by"], approved_at=last["approved_at"], through=_through(last))
+        notes = []
+        if last["_ended_on"]:
+            notes.append(f"The data owner's approval was {last['_ended_how']} {last['_ended_on']}")
+        else:
+            result["signed_off"] = True
+        if later:
+            notes.append(_later_approvals(later))
+        note = "; ".join(notes)
+        result["note"] = note[:1].upper() + note[1:]
+        return result
+    others = sorted({row["approved_by"] for row in in_period if row["_by_person"]}, key=str.lower)
+    if others:
+        result["note"] = f"Approved in the period by {join_names(others)}, not by the data owner"
+    elif in_period:
+        result["note"] = "Approved in the period by Polar Sky only, not by a person"
+    elif approvals:
+        last = approvals[-1]
+        who = f"the data owner, {last['approved_by']}" if by_owner(last) else last["approved_by"]
+        result["note"] = f"No approval in the period; last approved before it, {format_date(last['_at'])}, by {who}"
+        if last["_ended_on"]:
+            result["note"] += f", and that approval was {last['_ended_how']} {last['_ended_on']}"
+    else:
+        result["note"] = "No approval recorded"
+    return result
+
+
 def build_model(data):
     """Turn the data file into the rows, counts and texts the renderer lays out."""
     inputs = data.get("inputs") or {}
-    for key in ("organization", "report_id", "framework", "period", "generated_at"):
+    for key in ("organization", "report_id", "period", "generated_at"):
         if not inputs.get(key):
             raise ReportDataError(f"inputs.{key} is required.")
     frameworks = load_reference("frameworks.json")
-    if inputs["framework"] not in frameworks:
-        raise ReportDataError(
-            f"inputs.framework must be one of {', '.join(sorted(frameworks))}, not {inputs['framework']!r}."
-        )
+    framework_keys = chosen_frameworks(inputs, frameworks)
     deadline_days = removal_deadline_days(inputs.get("removal_deadline_days"))
     interval_length = review_interval_length(inputs)
     if interval_length is not None and not inputs.get("review_interval"):
@@ -1124,8 +1208,10 @@ def build_model(data):
             (_member_row(entry, member, members_as_of) for member in records["members"].get(control_id, {}).values()),
             key=lambda row: (row["person_name"].lower(), row["email"].lower()),
         )
-        owners = [row["person_name"] for row in members if row["is_owner"] == "Yes"]
-        entry["owner"] = owners[0] if owners else ""
+        owners = [row for row in members if row["is_owner"] == "Yes"]
+        entry["owner"] = owners[0]["person_name"] if owners else ""
+        entry["owners"] = [{"name": row["person_name"], "title": row["title"]} for row in owners]
+        entry["owner_signoff"] = owner_signoff([row["person_name"] for row in owners], approvals)
         groups = _group_rows(entry, detail)
         shares = _share_rows(entry, evidence, evidence.get("shares_read_at") or records["shares_read_at"])
         removals = _removal_rows(entry, evidence, deadline_days, open_until)
@@ -1166,8 +1252,11 @@ def build_model(data):
         extract["providers"] = extract_providers(extract, records["controls"], providers)
     return {
         "inputs": inputs,
-        "framework_key": inputs["framework"],
-        "framework": frameworks[inputs["framework"]],
+        "framework_key": framework_keys[0],
+        "framework": frameworks[framework_keys[0]],
+        "framework_keys": framework_keys,
+        "frameworks": [frameworks[key] for key in framework_keys],
+        "needs_interval": any(frameworks[key].get("needs_interval") for key in framework_keys),
         "period": period,
         "provider_label": provider_label,
         "provider_scope": provider_scope,
@@ -1289,6 +1378,8 @@ def _totals(controls, tables):
     totals["controls_without_person"] = [control for control in controls if control["last_person_approval"] is None]
     totals["controls_approved_in_period"] = sum(1 for control in controls if control["state"] == CONTROL_APPROVED)
     totals["controls_carried"] = sum(1 for control in controls if control["state"] == CONTROL_CARRIED)
+    totals["owner_signed_off"] = sum(1 for control in controls if control["owner_signoff"]["signed_off"])
+    totals["owner_not_signed_off"] = [control for control in controls if not control["owner_signoff"]["signed_off"]]
     ended = {}
     for control in controls:
         if control["state"] == CONTROL_ENDED:

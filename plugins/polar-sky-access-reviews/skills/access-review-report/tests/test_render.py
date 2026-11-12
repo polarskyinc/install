@@ -60,7 +60,7 @@ class GoldenTest(unittest.TestCase):
 class FrameworkTest(unittest.TestCase):
     def test_every_framework_renders_its_cover_page(self):
         frameworks = report_data.load_reference("frameworks.json")
-        self.assertEqual(sorted(frameworks), ["hipaa", "pci_dss", "soc2", "sox"])
+        self.assertEqual(sorted(frameworks), ["hipaa", "iso27001", "pci_dss", "soc2", "sox"])
         for key, framework in frameworks.items():
             with self.subTest(framework=key):
                 data = fixture()
@@ -76,7 +76,7 @@ class FrameworkTest(unittest.TestCase):
 
     def test_unknown_framework_is_refused(self):
         data = fixture()
-        data["inputs"]["framework"] = "iso27001"
+        data["inputs"]["framework"] = "nist_800_53"
         with self.assertRaises(report_data.ReportDataError):
             render_report.render(data)
 
@@ -2023,6 +2023,18 @@ def in_force():
     return with_ending(fixture(), "member_added")
 
 
+def owners_approved(data):
+    """The fixture with every folder set approved in the period by its data owner."""
+    evidence = data["responses"][0]["response"]["controls"]
+    for control in evidence:
+        if control["name"] == "Customer Records":
+            for approval in control["approvals"]:
+                approval["actor"]["name"] = "Tess Quinn"
+        if control["name"] == "Model Eval Results":
+            control["approvals"][0].update(at="2026-06-02T09:15:00Z", carried_into_range=False)
+    return data
+
+
 def with_system_approval(data=None):
     """The fixture with Catalog-Client-Viewers approved by Polar Sky itself, not by a person."""
     data = data or fixture()
@@ -2156,7 +2168,7 @@ class CheckBeforeRenderingTest(unittest.TestCase):
         self.assertTrue(any(line.startswith("1 folder set has no approval by a person from 2026-08-02") for line in lines))
 
     def test_a_missing_acknowledgment_title_or_date_is_listed(self):
-        data = in_force()
+        data = owners_approved(in_force())
         del data["inputs"]["acknowledgment"]["title"]
         del data["inputs"]["acknowledgment"]["date"]
         self.assertEqual(check_lines(data), ["The management acknowledgment has no title and no date; the report will show TBD."])
@@ -2165,7 +2177,7 @@ class CheckBeforeRenderingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "data.json")
             with open(path, "w", encoding="utf-8") as handle:
-                json.dump(in_force(), handle)
+                json.dump(owners_approved(in_force()), handle)
             output = io.StringIO()
             with mock.patch("sys.stdout", output):
                 self.assertEqual(render_report.main(["--data", path, "--check"]), 0)
@@ -2378,3 +2390,264 @@ class SameNamedLiveGroupTest(unittest.TestCase):
         member = dict(HIDDEN_MEMBER, principal_email="mia.novak@northwind-demo.com", via_group_name="Catalog-Client-Viewers")
         rows = rows_of(render_report.render(with_extract_rows(twin, member))["members.csv"])
         self.assertFalse([row for row in rows if "(live read)" in row["through_groups"]])
+
+
+def with_frameworks(data, *keys, **inputs):
+    """The data mapped to the given frameworks, in that order."""
+    data["inputs"].pop("framework", None)
+    data["inputs"].update(frameworks=list(keys), **inputs)
+    return data
+
+
+FOUR = ("pci_dss", "soc2", "iso27001", "hipaa")
+
+
+def mapped_rows(page):
+    """The rows of the Section 1 table of a report mapped to several frameworks, as (requirements, evidence, sections) text."""
+    table = page.split('<table class="ps-table checklist mapped">', 1)[1].split("</table>", 1)[0]
+    rows = []
+    for row in re.findall(r"<tr><td>(.*?)</td><td>(.*?)</td><td>(.*?)</td></tr>", table.split("<tbody>", 1)[1]):
+        requirements = [html.unescape(re.sub(r"<[^>]+>", " ", item)).split() for item in row[0].split('<span class="requirement">')[1:]]
+        rows.append(([" ".join(words) for words in requirements], html.unescape(row[1]), html.unescape(re.sub(r"<[^>]+>", "", row[2]))))
+    return rows
+
+
+class SeveralFrameworksTest(unittest.TestCase):
+    def test_iso27001_is_a_framework_that_needs_the_review_interval(self):
+        frameworks = report_data.load_reference("frameworks.json")
+        self.assertEqual(
+            {key: framework["needs_interval"] for key, framework in frameworks.items()},
+            {"pci_dss": False, "soc2": True, "iso27001": True, "hipaa": False, "sox": True},
+        )
+        iso = frameworks["iso27001"]
+        self.assertEqual(iso["name"], "ISO/IEC 27001:2022 Annex A 5.18")
+        self.assertEqual(
+            [item["evidence"] for item in iso["checklist"]],
+            ["interval", "decisions", "who_decided", "owner_approvals", "removals"],
+        )
+        for framework in frameworks.values():
+            for text in (framework["requirement"], *[item["requirement"] for item in framework["checklist"]]):
+                self.assertNotRegex(text, r"(?i)\b(met|passed|compliant|satisf)")
+
+    def test_one_framework_in_a_list_renders_as_the_one_framework(self):
+        single = fixture()
+        listed = with_frameworks(fixture(), "pci_dss")
+        self.assertEqual(render_report.render(listed, "2026-11-03T09:00:00Z"), render_report.render(single, "2026-11-03T09:00:00Z"))
+
+    def test_the_frameworks_input_is_checked(self):
+        cases = {
+            "both": lambda data: data["inputs"].update(frameworks=["soc2"]),
+            "neither": lambda data: data["inputs"].pop("framework"),
+            "not a list": lambda data: with_frameworks(data, "x").update(frameworks="soc2"),
+            "unknown": lambda data: with_frameworks(data, "soc2", "nist_800_53"),
+            "twice": lambda data: with_frameworks(data, "soc2", "soc2"),
+        }
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                data = fixture()
+                change(data)
+                with self.assertRaises(report_data.ReportDataError):
+                    render_report.render(data)
+
+    def test_the_cover_and_report_details_name_every_framework(self):
+        page = render_report.render(with_frameworks(fixture(), *FOUR, review_interval="Every 6 months"))["report.html"]
+        cover = html.unescape(cover_of(page))
+        self.assertIn("Access review evidence for PCI DSS, SOC 2, ISO 27001 and HIPAA", cover)
+        self.assertIn("<h1>Access Review Report</h1>", cover)
+        self.assertIn(
+            "Review of access to in-scope data in Northwind Traders's Microsoft 365 tenant, with the evidence mapped to "
+            "PCI DSS 4.0.1 Requirement 7.2.4, SOC 2 CC6.2 and CC6.3, ISO/IEC 27001:2022 Annex A 5.18 and HIPAA 164.308(a)(4)",
+            cover,
+        )
+        self.assertIn("Northwind Traders's auditors and assessors for PCI DSS, SOC 2, ISO 27001 and HIPAA", cover)
+        self.assertIn(
+            "Distribute only to people involved in Northwind Traders's PCI DSS assessment, SOC 2 examination, ISO 27001 "
+            "certification audit and HIPAA compliance review.",
+            cover,
+        )
+        details = html.unescape(page.split("Report details", 1)[1].split("</table>", 1)[0])
+        frameworks = report_data.load_reference("frameworks.json")
+        self.assertIn("<td>Requirements</td><td>" + "<br>".join(frameworks[key]["control"] for key in FOUR) + "</td>", details)
+        self.assertIn("<td>Review interval</td><td>Every 6 months</td>", details)
+        self.assertIn("<title>Access Review Report, Northwind Traders, AR-2026-H2-0001</title>", page)
+
+    def test_a_given_prepared_for_is_kept(self):
+        page = render_report.render(with_frameworks(fixture(), "soc2", "iso27001", review_interval="Quarterly",
+                                                    prepared_for="Northwind Traders's SOC 2 and ISO 27001 auditor"))["report.html"]
+        self.assertIn("<dd>Northwind Traders&#x27;s SOC 2 and ISO 27001 auditor</dd>", cover_of(page))
+
+    def test_the_scope_gives_every_requirement_and_the_generic_other_systems(self):
+        data = with_frameworks(fixture(), "soc2", "iso27001", review_interval="Quarterly")
+        page = html.unescape(render_report.render(data)["report.html"])
+        scope = page.split('id="s2"', 1)[1].split("</section>", 1)[0]
+        frameworks = report_data.load_reference("frameworks.json")
+        self.assertIn("<b>Requirements.</b> This report maps one set of evidence to 2 frameworks.", scope)
+        self.assertIn(f"<b>SOC 2.</b> {frameworks['soc2']['requirement']}", scope)
+        self.assertIn(f"<b>ISO 27001.</b> {frameworks['iso27001']['requirement']}", scope)
+        self.assertIn("Other systems in scope for these frameworks are reviewed separately.", scope)
+        self.assertIn("It was prepared as evidence for Northwind Traders's SOC 2 examination and ISO 27001 certification audit, for the period ending 2026-10-31.", scope)
+
+    def test_each_piece_of_evidence_is_shown_once_with_every_requirement_it_answers(self):
+        data = with_frameworks(fixture(), *FOUR, review_interval="Every 6 months")
+        rows = mapped_rows(render_report.render(data)["report.html"])
+        frameworks = report_data.load_reference("frameworks.json")
+        expected = sum(len(frameworks[key]["checklist"]) for key in FOUR)
+        self.assertEqual(sum(len(requirements) for requirements, _, _ in rows), expected)
+        evidence = [text for _, text, _ in rows]
+        self.assertEqual(len(evidence), len(set(evidence)))
+        self.assertEqual(len(rows), 8)
+        timing = rows[1]
+        self.assertEqual(timing[0], [
+            "PCI DSS Requirement 7.2.4 Reviewed at least every six months",
+            "SOC 2 CC6.2 and CC6.3 Reviewed at the interval the company set",
+            "ISO 27001 Annex A 5.18 Reviewed at the interval the organization set",
+        ])
+        self.assertTrue(timing[1].startswith("Previous review: Completed 2026-04-30"))
+        self.assertIn("Interval set by the company: Every 6 months.", timing[1])
+        self.assertEqual(rows[0][0], ["HIPAA 164.308(a)(4) Sites that hold patient data named"])
+        owner_row = [row for row in rows if row[0] == ["ISO 27001 Annex A 5.18 Reviewed by the owner of the information"]][0]
+        self.assertEqual(owner_row[2], "8")
+        self.assertTrue(owner_row[1].startswith("1 of 3 folder sets approved by their data owner in the period."))
+        self.assertEqual(rows[-1][0][0], "PCI DSS Requirement 7.2.4 Management acknowledgment")
+        self.assertEqual(rows[2][2], "3, 5")
+
+    def test_without_pci_dss_the_timing_row_does_not_give_the_previous_review(self):
+        rows = mapped_rows(render_report.render(with_frameworks(fixture(), "soc2", "iso27001", review_interval="Quarterly"))["report.html"])
+        self.assertTrue(rows[0][1].startswith("Interval set by the company: Quarterly."))
+
+    def test_the_review_interval_is_asked_when_any_framework_needs_it(self):
+        data = with_frameworks(fixture(), "pci_dss", "iso27001")
+        files, model = render_report.render_with_model(data)
+        self.assertIn("Review interval", render_report.tbd_fields(model))
+        self.assertIn("<td>Review interval</td><td><span class=\"tbd\">TBD</span></td>", files["report.html"])
+        model = render_report.render_with_model(with_frameworks(fixture(), "pci_dss", "hipaa"))[1]
+        self.assertNotIn("Review interval", render_report.tbd_fields(model))
+
+    def test_no_framework_wording_says_a_requirement_is_met_and_no_report_word_is_jargon(self):
+        data = every_column(with_frameworks(fixture(), *FOUR, "sox", review_interval="Quarterly"))
+        files, model = render_report.render_with_model(data)
+        text = visible_text(files) + "\n" + render_report.render_summary_text(model)
+        for framework in model["frameworks"]:
+            for framework_text in sorted(framework_texts(framework), key=len, reverse=True):
+                text = text.replace(render_report.fill(framework_text, render_report.fill_values(model)), "")
+        self.assertEqual([line for line in text.splitlines() if JARGON.search(line)], [])
+        self.assertNotIn("TBD", visible_text(files).replace("TBD: nothing", ""))
+
+
+def signoff_of(data):
+    """Each folder set's data owner sign-off, by folder set name."""
+    model = render_report.render_with_model(data)[1]
+    return {control["name"]: control["owner_signoff"] for control in model["controls"]}
+
+
+def evidence_control(data, name):
+    return [control for control in data["responses"][0]["response"]["controls"] if control["name"] == name][0]
+
+
+class DataOwnerSignoffTest(unittest.TestCase):
+    def test_each_folder_set_says_whether_its_data_owner_approved_it_when_and_through_what(self):
+        signoff = signoff_of(fixture())
+        self.assertEqual(signoff["Catalog-Client-Viewers"], {
+            "signed_off": True, "approved_by": "Dana Whitfield", "approved_at": "2026-09-15 16:20 UTC",
+            "through": "Polar Sky console", "note": "",
+        })
+        self.assertFalse(signoff["Customer Records"]["signed_off"])
+        self.assertEqual(signoff["Customer Records"]["note"], "Approved in the period by Dana Whitfield, not by the data owner")
+        self.assertEqual(signoff["Customer Records"]["approved_at"], "")
+        self.assertFalse(signoff["Model Eval Results"]["signed_off"])
+        self.assertEqual(
+            signoff["Model Eval Results"]["note"],
+            "No approval in the period; last approved before it, 2026-03-02, by the data owner, Omar Haddad, "
+            "and that approval was withdrawn 2026-10-19",
+        )
+
+    def test_an_approval_through_an_ai_assistant_names_it_and_the_name_match_ignores_case(self):
+        data = fixture()
+        for approval in evidence_control(data, "Customer Records")["approvals"]:
+            approval["actor"]["name"] = "  tess quinn "
+        signoff = signoff_of(data)["Customer Records"]
+        self.assertTrue(signoff["signed_off"])
+        self.assertEqual(signoff["through"], "AI assistant (Claude)")
+        self.assertEqual(signoff["approved_at"], "2026-08-04 12:30 UTC")
+
+    def test_an_approval_by_polar_sky_is_not_the_data_owners(self):
+        signoff = signoff_of(with_system_approval())["Catalog-Client-Viewers"]
+        self.assertFalse(signoff["signed_off"])
+        self.assertEqual(signoff["note"], "Approved in the period by Polar Sky only, not by a person")
+
+    def test_a_withdrawn_data_owner_approval_is_not_a_signoff_and_a_later_approval_is_named(self):
+        data = owners_approved(fixture())
+        evidence_control(data, "Model Eval Results")["approvals"].append({
+            "at": "2026-10-25T08:00:00Z", "carried_into_range": False,
+            "actor": {"type": "user", "name": "Dana Whitfield", "surface": "connector", "assistant_client": "Claude Code"},
+        })
+        signoff = signoff_of(data)["Model Eval Results"]
+        self.assertFalse(signoff["signed_off"])
+        self.assertEqual(signoff["approved_at"], "2026-06-02 09:15 UTC")
+        self.assertEqual(
+            signoff["note"],
+            "The data owner's approval was withdrawn 2026-10-19; approved again later by Dana Whitfield, last 2026-10-25 08:00 UTC",
+        )
+
+    def test_a_later_approval_by_someone_else_is_named_next_to_the_data_owners(self):
+        data = owners_approved(in_force())
+        evidence_control(data, "Catalog-Client-Viewers")["approvals"].append({
+            "at": "2026-10-01T08:00:00Z", "carried_into_range": False,
+            "actor": {"type": "user", "name": "Laura Kim", "surface": "console", "assistant_client": None},
+        })
+        signoff = signoff_of(data)["Catalog-Client-Viewers"]
+        self.assertTrue(signoff["signed_off"])
+        self.assertEqual(signoff["note"], "Approved again later by Laura Kim, last 2026-10-01 08:00 UTC")
+
+    def test_no_data_owner_and_no_approval_are_said(self):
+        data = fixture()
+        for item in data["responses"]:
+            if item["tool"] == "list_control_members":
+                for member in item["response"]["members"]:
+                    member["is_owner"] = False
+        self.assertEqual({entry["note"] for entry in signoff_of(data).values()}, {"No data owner recorded"})
+        data = fixture()
+        evidence_control(data, "Customer Records")["approvals"] = []
+        self.assertEqual(signoff_of(data)["Customer Records"]["note"], "No approval recorded")
+
+    def test_section_8_shows_the_signoff_table_before_the_acknowledgment(self):
+        page = render_report.render(fixture())["report.html"]
+        section = html.unescape(page.split('id="s8"', 1)[1].split("</section>", 1)[0])
+        self.assertLess(section.index("<h3>8.1 Data owner sign-off</h3>"), section.index("<h3>8.2 Management acknowledgment</h3>"))
+        self.assertIn("Data owners do not sign this report.", section)
+        self.assertIn("Polar Sky records approvers by name", section)
+        self.assertIn("<p>1 of 3 folder sets were approved by their data owner in the period.</p>", section)
+        self.assertIn(
+            "<tr><td>Customer Records</td><td>Tess Quinn, Escalations Manager</td><td>No</td><td class=\"d\"></td><td></td>"
+            "<td>Approved in the period by Dana Whitfield, not by the data owner</td></tr>",
+            section,
+        )
+        self.assertNotIn("TBD", section)
+
+    def test_with_no_folder_sets_section_8_says_there_is_no_signoff(self):
+        page = render_report.render(empty_review(fixture()))["report.html"]
+        self.assertIn("<p>No folder sets, so no data owner sign-off.</p>", page)
+
+    def test_the_summary_and_the_check_name_the_folder_sets_their_data_owner_did_not_approve(self):
+        lines = render_report.summary_lines(render_report.render_with_model(fixture())[1])
+        line = [line for line in lines if line.startswith("Data owner sign-off: ")][0]
+        self.assertIn("1 of 3 folder sets approved by their data owner in the period.", line)
+        self.assertIn("Customer Records (approved in the period by Dana Whitfield, not by the data owner)", line)
+        checks = check_lines(fixture())
+        self.assertIn(
+            "2 folder sets were not approved by their data owner in the period: Customer Records (approved in the period "
+            "by Dana Whitfield, not by the data owner); Model Eval Results (no approval in the period; last approved "
+            "before it, 2026-03-02, by the data owner, Omar Haddad, and that approval was withdrawn 2026-10-19).",
+            checks,
+        )
+        self.assertFalse([line for line in check_lines(owners_approved(in_force())) if "data owner" in line])
+
+
+class SeveralFrameworksSkillTest(unittest.TestCase):
+    def test_the_skill_offers_every_framework_and_asks_the_interval_when_one_needs_it(self):
+        with open(os.path.join(SKILL_DIRECTORY, "SKILL.md"), encoding="utf-8") as handle:
+            skill = handle.read()
+        self.assertIn("ISO 27001:2022 Annex A 5.18", skill)
+        self.assertIn("If any chosen framework has `needs_interval` set (SOC 2, ISO 27001 and SOX), also ask the review interval", skill)
+        self.assertIn("Put one framework in `framework`, or several in `frameworks`", skill)
+        self.assertIn("folder sets their data owner did not approve in the period", skill)

@@ -1,6 +1,6 @@
 ---
 name: access-review-report
-description: Build a Polar Sky access review report (HTML, PDF and CSV files) for an auditor from the folder access that data owners approved in a date range, with a PCI DSS 7.2.4, SOC 2 CC6.2/CC6.3, HIPAA 164.308(a)(4) or SOX ITGC cover page, using the polar-sky-controls MCP server. Use when the person asks for an access review report, user access review evidence, a compliance report or access review evidence for an auditor, QSA or tool such as Vanta.
+description: Build a Polar Sky access review report (HTML, PDF and CSV files) for an auditor from the folder access that data owners approved in a date range, with the evidence mapped to one or more of PCI DSS 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC, and the data owners' sign-off, using the polar-sky-controls MCP server. Use when the person asks for an access review report, user access review evidence, a compliance report or access review evidence for an auditor, QSA or tool such as Vanta.
 ---
 
 # Polar Sky access review report
@@ -33,12 +33,12 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/previous_answers.py" --organization "<organ
 
 Pass `--organization` with the organization's name when the person has already named it, so only that organization's earlier answers are shown; leave it out when they have not. If the answers found are for another organization than the one the person names, do not show them.
 
-It prints the answers this skill wrote for earlier reports in the person's Claude Code sessions on this computer: `by_framework` holds the latest answers for each framework, and `latest` the latest of any framework, each with its `date` and the `last_report` (report ID and period). It never prints anything else from the sessions.
+It prints the answers this skill wrote for earlier reports in the person's Claude Code sessions on this computer: `by_framework` holds the latest answers for each framework (an answer set for several frameworks is listed under each of them; it has `frameworks` instead of `framework`), and `latest` the latest of any framework, each with its `date` and the `last_report` (report ID and period). It never prints anything else from the sessions.
 
-If it found answers, use those for the framework the person asked for, or else `latest`. Ask in one message:
+If it found answers, use the newest of those for the frameworks the person asked for, or else `latest`. Ask in one message:
 
 1. One line: "I found your answers from an earlier report in your Claude Code sessions on this computer."
-2. The answers as one short list, headed "From your last <framework name> report on <date>:", one answer per line with its label from the list below. Leave out the period, report ID and acknowledgment date, which are new each time.
+2. The answers as one short list, headed "From your last <framework names> report on <date>:", one answer per line with its label from the list below. Leave out the period, report ID and acknowledgment date, which are new each time.
 3. "Anything to change?" Use the earlier answers only once the person has confirmed them or given new ones; a logo is shown with its full path so the person sees which file the cover will carry.
 4. The answers that are new for this report: the review period (if the person has not given it), the report ID, and the management acknowledgment date. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
 5. Any answer from the list below that the earlier report did not have, except the optional ones.
@@ -50,12 +50,12 @@ If it found answers, use those for the framework the person asked for, or else `
 
    Show the full column lists, as below, only if the person wants to change the columns.
 
-If it found nothing, or the person asks for a different framework with only organization answers found, ask for everything below as usual, filling in the answers it found.
+If it found nothing, or the person asks for a different framework with only organization answers found, ask for everything below as usual, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still ask the review interval if a framework asked for now needs it.
 
-Ask in one message, with short examples. Read `references/frameworks.json` for the four frameworks and their names.
+Ask in one message, with short examples. Read `references/frameworks.json` for the five frameworks and their names.
 
 - Review period: first and last day (YYYY-MM-DD, UTC).
-- Framework: PCI DSS 4.0.1 7.2.4, SOC 2 CC6.2/CC6.3, HIPAA 164.308(a)(4) or SOX ITGC. For SOC 2 and SOX also ask the review interval the company set, as a number of months or days (for example 6 months), and its wording if it is not just that (for example "Every 6 months, per the review procedure").
+- Frameworks: one or more of PCI DSS 4.0.1 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC. One report can map its evidence to several frameworks, for example SOC 2 and ISO 27001; one framework is the usual case. If any chosen framework has `needs_interval` set (SOC 2, ISO 27001 and SOX), also ask the review interval the company set, once for the report, as a number of months or days (for example 6 months), and its wording if it is not just that (for example "Every 6 months, per the review procedure").
 - Organization name, report ID, and who requested the report (name and title).
 - Review procedure (name and version), retention period.
 - Removal deadline: the number of days after the decision by which access must be removed (for example 30), and, optionally, where it is set (for example "per the review procedure"). With the number, the report checks each removal against it; without it, Section 6.2 says the check is not available.
@@ -111,7 +111,7 @@ The render uses the extract named last in `responses/`, and refuses one still ru
 
 ### 7. Write the inputs file
 
-Write `inputs.json` in the data folder as described in `references/data-schema.md`. Put the review interval number in `review_interval_months` or `review_interval_days`, and its wording in `review_interval`. Put the number of days of the removal deadline in `removal_deadline_days` as a number, and the deadline in words in `removal_deadline`. Leave out `generated_at`: the render stamps it from the clock. For a logo, write the path the person gave in `logo`. Always write `columns` with every table in `references/columns.json`, in that order, each with the ids of the columns used, in the order shown, defaults included, so a later report knows exactly which columns this one used.
+Write `inputs.json` in the data folder as described in `references/data-schema.md`. Put one framework in `framework`, or several in `frameworks` as a list in the order the person gave them, never both. Put the review interval number in `review_interval_months` or `review_interval_days`, and its wording in `review_interval`. Put the number of days of the removal deadline in `removal_deadline_days` as a number, and the deadline in words in `removal_deadline`. Leave out `generated_at`: the render stamps it from the clock. For a logo, write the path the person gave in `logo`. Always write `columns` with every table in `references/columns.json`, in that order, each with the ids of the columns used, in the order shown, defaults included, so a later report knows exactly which columns this one used.
 
 ### 8. Check, then render
 
@@ -121,7 +121,7 @@ First run:
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_report.py" --data access-review-<report id> --check
 ```
 
-It writes no file. If it prints "Check before you render:", show the person its lines word for word: folder sets that no person approved in the period (only Polar Sky did), a review period longer than the review interval, folder sets a person last approved too long ago, and a missing acknowledgment name, title or date. Ask whether to fix anything first (for example, give the missing title or date, which you then put in `inputs.json`) or to render as it is. If it prints "Nothing to check before you render.", go straight on.
+It writes no file. If it prints "Check before you render:", show the person its lines word for word: folder sets that no person approved in the period (only Polar Sky did), folder sets their data owner did not approve in the period, a review period longer than the review interval, folder sets a person last approved too long ago, and a missing acknowledgment name, title or date. Ask whether to fix anything first (for example, give the missing title or date, which you then put in `inputs.json`) or to render as it is. If it prints "Nothing to check before you render.", go straight on.
 
 
 ```sh

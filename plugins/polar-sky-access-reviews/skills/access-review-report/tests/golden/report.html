@@ -90,6 +90,9 @@ code { font-family: var(--font-mono); font-size: 8pt; background: var(--ground);
 
 .half { width: 36%; margin: 8pt 0 2pt; }
 .checklist td:first-child { width: 2.4in; }
+.mapped .requirement { display: block; }
+.mapped .requirement + .requirement { margin-top: 5pt; }
+.mapped tr { break-inside: avoid; }
 .checklist td.met { white-space: nowrap; font-weight: 600; }
 .checklist td.met::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #0BFFA1; margin-right: 5px; vertical-align: 0; }
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 22pt; margin: 6pt 0 10pt; }
@@ -258,7 +261,11 @@ a.xref { color: var(--violet); text-decoration: none; }
 <section class="page">
   <p class="eyebrow" id="s8">Section 8</p>
   <h2>Sign-off and management acknowledgment</h2>
-  <p><b>Approvers.</b> Each approval of a folder set's access is the approver's sign-off, recorded in Polar Sky with the date (Section 5.2). Approvers do not sign this report.</p>
+  <h3>8.1 Data owner sign-off</h3>
+  <p>Each data owner&#x27;s approval of a folder set is their sign-off for it, recorded in Polar Sky with the time and how they approved: in the Polar Sky console, or through an AI assistant connected to Polar Sky. Data owners do not sign this report. The table shows, for each folder set, whether its data owner approved it during the review period. An approval by another person, or by Polar Sky itself, is not the data owner&#x27;s sign-off; Section 5.2 lists every approver. Polar Sky records approvers by name, so an approval counts as the data owner&#x27;s when the approver&#x27;s name matches the data owner&#x27;s.</p>
+  <p>1 of 3 folder sets were approved by their data owner in the period.</p>
+  <table class="ps-table owners"><thead><tr><th>Folder set</th><th>Data owner</th><th>Approved by the data owner in the period</th><th>Data owner&#x27;s approval</th><th>Through</th><th>Notes</th></tr></thead><tbody><tr><td>Catalog-Client-Viewers</td><td>Dana Whitfield, Product Manager</td><td>Yes</td><td class="d">2026-09-15 16:20 UTC</td><td>Polar Sky console</td><td></td></tr><tr><td>Customer Records</td><td>Tess Quinn, Escalations Manager</td><td>No</td><td class="d"></td><td></td><td>Approved in the period by Dana Whitfield, not by the data owner</td></tr><tr><td>Model Eval Results</td><td>Omar Haddad, Engineering Manager</td><td>No</td><td class="d"></td><td></td><td>No approval in the period; last approved before it, 2026-03-02, by the data owner, Omar Haddad, and that approval was withdrawn 2026-10-19</td></tr></tbody></table>
+  <h3>8.2 Management acknowledgment</h3>
   <div class="attest"><span class="label">Management acknowledgment</span>
     <p>I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate.</p>
     <dl><dt>Name</dt><dd>Ravi Menon, Vice President, Information Security</dd><dt>Recorded</dt><dd>2026-11-03, typed into the Polar Sky compliance report skill in Claude Code</dd><dt>Claude Code session</dt><dd><code>72fad66e-0000-4000-8000-000000000001</code></dd></dl>

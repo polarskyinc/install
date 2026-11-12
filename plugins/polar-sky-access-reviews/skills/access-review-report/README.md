@@ -7,7 +7,7 @@ Builds the Polar Sky access review report from the controls MCP. `SKILL.md` is w
 | Path | What it holds |
 |---|---|
 | `SKILL.md` | The steps Claude follows |
-| `references/frameworks.json` | Cover page, requirement, scope (`other_systems`) and checklist text for each framework |
+| `references/frameworks.json` | Cover page, requirement, scope (`other_systems`) and checklist text for each framework, its short name and assessment for a report mapped to several frameworks, and whether the company sets the review interval (`needs_interval`) |
 | `references/columns.json` | The columns of each table, with defaults |
 | `references/data-schema.md` | The data folder the renderer reads |
 | `scripts/report_data.py` | Reads the data and derives rows and counts |
@@ -56,7 +56,7 @@ Step 2 of the skill runs `scripts/previous_answers.py`, so a person who made a r
 
 ## Check before rendering
 
-`render_report.py --data <folder> --check` writes no file and prints what the skill must raise with the person before it renders: folder sets with no approval by a person in force for the period (only Polar Sky's own), a review period longer than the review interval, folder sets whose last approval by a person is older than the interval at the period end, and a missing acknowledgment name, title or date.
+`render_report.py --data <folder> --check` writes no file and prints what the skill must raise with the person before it renders: folder sets with no approval by a person in force for the period (only Polar Sky's own), folder sets their data owner did not approve in the period, a review period longer than the review interval, folder sets whose last approval by a person is older than the interval at the period end, and a missing acknowledgment name, title or date.
 
 ## Removal deadline
 
