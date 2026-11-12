@@ -98,3 +98,7 @@ Ask the person before deleting anything. Suggest:
 - Cloud: the key file is already deleted after the upload, so `values.env` is the only file to keep. With Microsoft 365, also keep `microsoft-cloud-app.crt`, the public certificate on the app. `microsoft-permissions.json` and `microsoft-cloud-app-access.json` are public and can go.
 
 On-Prem only: remind them that Kubernetes secrets are only base64-encoded. Their cluster should encrypt secrets at rest, and only a few people should be able to read the Polar Sky namespace.
+
+## What is left
+
+After the summary, call `get_install_checklist` with `check_live` true, as [Say what is left to set up](../SKILL.md#say-what-is-left-to-set-up) says, and add one line for each optional item it reports as missing, with its next step. Do not let it change whether the install is done: that stays with the checks above.
