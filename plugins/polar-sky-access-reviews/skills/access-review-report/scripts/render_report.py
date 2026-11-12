@@ -963,7 +963,8 @@ def provider_name(model):
 EXTRACT_METHODS = {
     "microsoft365": (
         "Polar Sky read each folder's permissions live from Microsoft 365, and listed the members of every Entra group "
-        "and SharePoint group they grant, with Microsoft 365's own count of each Entra group"
+        "and SharePoint group they grant and the owners of every Microsoft 365 group whose owners they grant, with "
+        "Microsoft 365's own count of each Entra group's members and of each group's owners"
     ),
     "google_workspace": (
         "Polar Sky read each folder's permissions live from Google Drive, and listed the members of every Google group "
@@ -1141,6 +1142,10 @@ def _group_difference(group):
         f"{group['provider_label']} reports {number(group['provider_member_count'])})"
     )
 
+
+SYSTEM_ACCOUNT_NOTE = (
+    "System Account is SharePoint's built-in service account, not a person: SharePoint adds it to a site's groups itself."
+)
 
 UNLISTED_MEANING = (
     "The live read found this access to the folders, but the members list in Attachment A does not show it: the person "
@@ -1335,6 +1340,7 @@ def render_results(model):
         "  <h3>5.3 Groups</h3>\n",
         f"  {data_table(group_columns, model['tables']['groups'], numeric=('people_count',))}\n" if model["tables"]["groups"]
         else "  <p>No groups.</p>\n",
+        system_account_groups_note(model["tables"]["groups"]),
         "  <h3>5.4 Kept direct shares</h3>\n",
         "  <p>Direct shares are read as they are now, not as at approval. Polar Sky does not record who decided to keep "
         "them or when.</p>\n",
@@ -1354,6 +1360,17 @@ def approver_label(name, kind, owners):
     if not owners:
         return "Polar Sky; no data owner recorded"
     return f"Polar Sky; data {'owner' if len(owners) == 1 else 'owners'} {', '.join(sorted(owners))}"
+
+
+def system_account_groups_note(groups):
+    """The sentence under 5.3 naming the groups whose people count includes SharePoint's System Account, or nothing."""
+    names = []
+    for row in groups:
+        if row.get("_system_account") and row["group_name"] not in names:
+            names.append(row["group_name"])
+    if not names:
+        return ""
+    return f"  <p>{escape(f'The people count of {report_data.join_names(names)} includes System Account. {SYSTEM_ACCOUNT_NOTE}')}</p>\n"
 
 
 def render_removals(model):
@@ -1530,7 +1547,8 @@ def extract_attachment(extract, definition, hashes):
         f"<td class=\"p\"><code>{escape(file.get('reference') or '')}</code></td></tr>"
         f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{escape(file.get("sha256") or "")}</code></td></tr>'
         f"<tr class=\"has-hash\"><td></td><td>{escape(definition['title'])}</td>"
-        f"<td>{escape(definition['description'])} {number(extract['rows_read'])} rows.</td>"
+        f"<td>{escape(definition['description'])} {number(extract['rows_read'])} rows."
+        f"{' ' + escape(SYSTEM_ACCOUNT_NOTE) if extract.get('system_account') else ''}</td>"
         f"<td><code>{escape(definition['file'])}</code></td></tr>"
         f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{hashes[definition["file"]]}</code></td></tr></tbody>'
     )

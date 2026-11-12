@@ -2392,6 +2392,220 @@ class SameNamedLiveGroupTest(unittest.TestCase):
         self.assertFalse([row for row in rows if "(live read)" in row["through_groups"]])
 
 
+FINANCE_ID = "f1f1f1f1-0000-4000-8000-000000000001"
+OWNERS_CLAIM = f"c:0o.c|federateddirectoryclaimprovider|{FINANCE_ID}_o"
+OWNERS_GRANT = {"row_kind": "grant", "grantee_type": "group", "principal_id": FINANCE_ID, "login_name": OWNERS_CLAIM,
+                "roles": ["owner"], "inherited": True, "group_owners_only": True, "permission_id": "perm-owners"}
+SITE_OWNERS_GRANT = {"row_kind": "grant", "grantee_type": "site_group", "principal_id": "3", "login_name": "Catalog Site Owners",
+                     "roles": ["owner"], "permission_id": "perm-site-owners"}
+SITE_OWNERS_CLAIM = {"row_kind": "sharepoint_group_member", "grantee_type": "entra_group_owners", "principal_id": FINANCE_ID,
+                     "principal_name": "Finance Owners", "login_name": OWNERS_CLAIM, "roles": ["owner"],
+                     "permission_id": "perm-site-owners", "via_sharepoint_group_id": 3, "via_sharepoint_group_name": "Catalog Site Owners"}
+SYSTEM_ACCOUNT = {"row_kind": "sharepoint_group_member", "grantee_type": "user", "principal_name": "System Account",
+                  "login_name": "SHAREPOINT\\system", "roles": ["owner"], "permission_id": "perm-site-owners",
+                  "via_sharepoint_group_id": 3, "via_sharepoint_group_name": "Catalog Site Owners"}
+OWNER_OUTSIDER = {"principal_id": "u-quinn", "principal_name": "Quinn Harper", "principal_email": "quinn.harper@northwind-demo.com"}
+OWNER_MEMBER = {"principal_id": "u-sam", "principal_name": "Sam Ortiz", "principal_email": "sam.ortiz@northwind-demo.com"}
+
+
+def owner_row(person, permission_id, **extra):
+    return dict({"row_kind": "group_owner", "grantee_type": "user", "roles": ["owner"], "permission_id": permission_id,
+                 "via_group_id": FINANCE_ID, "via_group_name": "Finance"}, **person, **extra)
+
+
+def with_extract_groups(data, *groups):
+    """The data with more counted groups on the completed extract's first summary page."""
+    for item in data["responses"]:
+        if item["tool"] == "get_access_review_extract" and item["response"].get("status") == "completed" and not item["arguments"].get("offset"):
+            item["response"]["groups"] += list(groups)
+    return data
+
+
+OWNERS_COUNT = {"group_id": FINANCE_ID, "name": "Finance", "kind": "entra_group_owners", "counted_members": 2, "provider_member_count": 2}
+SITE_OWNERS_COUNT = {"group_id": "3", "name": "Catalog Site Owners", "kind": "sharepoint_group", "counted_members": 2, "provider_member_count": None}
+
+
+class GrantNameTest(unittest.TestCase):
+    def test_a_grant_to_a_groups_owners_is_named_by_the_group_id_and_never_by_its_claim(self):
+        files = render_report.render(with_extract_rows(OWNERS_GRANT))
+        names = [row["principal_name"] for row in rows_of(files["extract.csv"]) if row["permission_id"] == "perm-owners"]
+        self.assertEqual(names, [f"Owners of Microsoft 365 group {FINANCE_ID}"])
+        self.assertNotIn(OWNERS_CLAIM, files["extract.csv"].replace(f",{OWNERS_CLAIM},", ","))
+        groups = [(row["group_name"], row["people_count"]) for row in rows_of(files["groups.csv"]) if row["role"] == "Owner"]
+        self.assertEqual(groups, [(f"Owners of Microsoft 365 group {FINANCE_ID}", "Not recorded")])
+
+    def test_a_grant_to_a_groups_owners_is_named_by_the_group_once_its_name_is_known(self):
+        files = render_report.render(with_extract_rows(dict(OWNERS_GRANT, principal_name="Finance")))
+        names = [row["principal_name"] for row in rows_of(files["extract.csv"]) if row["permission_id"] == "perm-owners"]
+        self.assertEqual(names, ["Owners of Microsoft 365 group Finance"])
+
+    def test_a_sharepoint_group_grant_without_a_display_name_is_named_by_its_login_name(self):
+        files = render_report.render(with_extract_rows(SITE_OWNERS_GRANT))
+        names = [row["principal_name"] for row in rows_of(files["extract.csv"]) if row["permission_id"] == "perm-site-owners"]
+        self.assertEqual(names, ["Catalog Site Owners"])
+        self.assertIn("Catalog Site Owners", [row["group_name"] for row in rows_of(files["groups.csv"])])
+
+    def test_two_nameless_grants_on_one_folder_set_are_two_groups(self):
+        files = render_report.render(with_extract_rows(OWNERS_GRANT, SITE_OWNERS_GRANT))
+        names = sorted(row["group_name"] for row in rows_of(files["groups.csv"]) if row["role"] == "Owner")
+        self.assertEqual(names, ["Catalog Site Owners", f"Owners of Microsoft 365 group {FINANCE_ID}"])
+
+
+class GroupOwnerRowsTest(unittest.TestCase):
+    def data(self, *extra_rows, counts=(OWNERS_COUNT, dict(SITE_OWNERS_COUNT, counted_members=1))):
+        grant = dict(OWNERS_GRANT, principal_name="Finance")
+        rows = [
+            grant, owner_row(OWNER_OUTSIDER, "perm-owners", inherited=True), owner_row(OWNER_MEMBER, "perm-owners", inherited=True),
+            SITE_OWNERS_GRANT, SITE_OWNERS_CLAIM,
+            owner_row(OWNER_OUTSIDER, "perm-site-owners", via_sharepoint_group_id=3, via_sharepoint_group_name="Catalog Site Owners"),
+            owner_row(OWNER_MEMBER, "perm-site-owners", via_sharepoint_group_id=3, via_sharepoint_group_name="Catalog Site Owners"),
+            *extra_rows,
+        ]
+        return with_extract_groups(with_extract_rows(*rows), *counts)
+
+    def test_an_owner_row_names_the_group_it_owns(self):
+        files = render_report.render(self.data())
+        owners = [(row["row_kind"], row["principal_name"], row["via_group"]) for row in rows_of(files["extract.csv"])
+                  if row["row_kind"] == "group owner"]
+        self.assertEqual(owners[:2], [
+            ("group owner", "Quinn Harper", "Owners of Microsoft 365 group Finance"),
+            ("group owner", "Sam Ortiz", "Owners of Microsoft 365 group Finance"),
+        ])
+        self.assertEqual(len(owners), 4)
+
+    def test_the_owners_count_gives_the_people_of_the_owners_grant_and_shows_in_3_1(self):
+        files, model = render_report.render_with_model(self.data())
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(files["groups.csv"])}
+        self.assertEqual(groups["Owners of Microsoft 365 group Finance"], "2")
+        counted = [group for group in model["extract"]["groups"] if group["_kind"] == "entra_group_owners"]
+        self.assertEqual([(group["group_name"], group["kind"], group["provider_label"], group["result"]) for group in counted],
+                         [("Finance", "Microsoft 365 group owners", "Microsoft 365", "Matches")])
+
+    def test_a_sharepoint_group_counts_the_owners_inside_it(self):
+        files = render_report.render(self.data())
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(files["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "2")
+
+    def test_a_sharepoint_group_whose_owners_were_not_read_has_no_people_count(self):
+        files = render_report.render(self.data(counts=(dict(SITE_OWNERS_COUNT, counted_members=1),)))
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(files["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "Not recorded")
+        self.assertEqual(groups["Owners of Microsoft 365 group Finance"], "Not recorded")
+
+    def test_an_owner_is_access_section_3_3_lists_once_per_folder(self):
+        rows = [row for row in unlisted_of(self.data()) if row["_control_id"] == CATALOG_ID and row["role"] == "Owner"]
+        self.assertEqual([(row["person_name"], row["why"]) for row in rows], [
+            ("Quinn Harper", "Not a member of this folder set. Access as an owner of Microsoft 365 group Finance"),
+            ("Sam Ortiz", "A member, with Viewer permission in Attachment A. Access as an owner of Microsoft 365 group Finance"),
+        ])
+
+    def test_a_member_who_owns_the_group_shows_its_owners_in_attachment_a(self):
+        files = render_report.render(self.data())
+        sam = [row["through_groups"] for row in rows_of(files["members.csv"]) if row["person_name"] == "Sam Ortiz"
+               and row["folder_set"] == "Catalog-Client-Viewers"]
+        self.assertEqual(len(sam), 1)
+        self.assertIn("Owners of Microsoft 365 group Finance (live read)", sam[0])
+
+    def test_section_3_names_the_group_owner_rows_and_how_they_were_read(self):
+        files = render_report.render(self.data())
+        page = html.unescape(files["report.html"])
+        self.assertIn("group owner 4", page)
+        self.assertIn("the owners of every Microsoft 365 group whose owners they grant", page)
+
+
+class SystemAccountTest(unittest.TestCase):
+    def test_system_account_is_labelled_and_explained_and_its_row_stays(self):
+        data = with_extract_groups(
+            with_extract_rows(SITE_OWNERS_GRANT, SYSTEM_ACCOUNT, SITE_OWNERS_CLAIM,
+                              owner_row(OWNER_OUTSIDER, "perm-site-owners", via_sharepoint_group_id=3,
+                                        via_sharepoint_group_name="Catalog Site Owners")),
+            OWNERS_COUNT, SITE_OWNERS_COUNT)
+        files = render_report.render(data)
+        names = [row["principal_name"] for row in rows_of(files["extract.csv"]) if row["permission_id"] == "perm-site-owners"]
+        self.assertIn("System Account (SharePoint's built-in account)", names)
+        page = html.unescape(files["report.html"])
+        self.assertEqual(page.count(render_report.SYSTEM_ACCOUNT_NOTE), 2)
+        self.assertIn("The people count of Catalog Site Owners includes System Account.", page)
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(files["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "2")
+
+    def test_without_system_account_the_report_does_not_mention_it(self):
+        page = html.unescape(render_report.render(fixture())["report.html"])
+        self.assertNotIn("System Account", page)
+
+
+class SharePointGroupPeopleTest(unittest.TestCase):
+    def test_an_owner_reached_only_through_a_sharepoint_group_shows_that_group_in_attachment_a(self):
+        data = with_extract_groups(with_extract_rows(
+            SITE_OWNERS_GRANT, SITE_OWNERS_CLAIM,
+            owner_row(OWNER_MEMBER, "perm-site-owners", via_sharepoint_group_id=3, via_sharepoint_group_name="Catalog Site Owners"),
+        ), OWNERS_COUNT, SITE_OWNERS_COUNT)
+        sam = [row["through_groups"] for row in rows_of(render_report.render(data)["members.csv"]) if row["person_name"] == "Sam Ortiz"]
+        self.assertEqual(len(sam), 1)
+        self.assertIn("Catalog Site Owners (live read)", sam[0])
+
+    def test_a_nested_group_object_is_not_counted_as_a_person(self):
+        nested_id = "a2a2a2a2-0000-4000-8000-000000000002"
+        entra_member = {"row_kind": "sharepoint_group_member", "grantee_type": "entra_group", "principal_id": nested_id,
+                        "principal_name": "Field team", "roles": ["owner"], "permission_id": "perm-site-owners"}
+        person = {"row_kind": "group_member", "grantee_type": "user", "principal_id": "u-quinn", "principal_name": "Quinn Harper",
+                  "principal_email": "quinn.harper@northwind-demo.com", "roles": ["owner"], "permission_id": "perm-site-owners",
+                  "via_group_id": nested_id, "via_group_name": "Field team"}
+        group = dict(person, grantee_type="group", principal_id="g-inner", principal_name="Inner team", principal_email="")
+        data = with_extract_groups(
+            with_extract_rows(SITE_OWNERS_GRANT, entra_member, person, group),
+            dict(SITE_OWNERS_COUNT, counted_members=1),
+            {"group_id": nested_id, "name": "Field team", "kind": "entra_group", "counted_members": 2, "provider_member_count": 2},
+        )
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(render_report.render(data)["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "1")
+
+    def test_an_unread_sharepoint_group_named_like_a_read_one_has_no_people_count(self):
+        data = with_extract_groups(with_extract_rows(SITE_OWNERS_GRANT), dict(SITE_OWNERS_COUNT, counted_members=4))
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(render_report.render(data)["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "Not recorded")
+
+    def test_two_reads_of_a_sharepoint_group_by_the_same_id_and_name_give_no_people_count(self):
+        data = with_extract_groups(with_extract_rows(SITE_OWNERS_GRANT), dict(SITE_OWNERS_COUNT, counted_members=0),
+                                   dict(SITE_OWNERS_COUNT, counted_members=0, site_id="other-site"))
+        groups = {row["group_name"]: row["people_count"] for row in rows_of(render_report.render(data)["groups.csv"])}
+        self.assertEqual(groups["Catalog Site Owners"], "Not recorded")
+
+    def test_an_owner_on_two_folders_with_the_same_path_is_listed_on_each(self):
+        rows = [
+            dict(OWNERS_GRANT, principal_name="Finance", drive_id="drive-a", folder_item_id="item-a"),
+            owner_row(OWNER_OUTSIDER, "perm-owners", drive_id="drive-a", folder_item_id="item-a"),
+            dict(OWNERS_GRANT, principal_name="Finance", drive_id="drive-b", folder_item_id="item-b"),
+            owner_row(OWNER_OUTSIDER, "perm-owners", drive_id="drive-b", folder_item_id="item-b"),
+        ]
+        listed = [row for row in unlisted_of(with_extract_groups(with_extract_rows(*rows), OWNERS_COUNT))
+                  if row["person_name"] == "Quinn Harper"]
+        self.assertEqual(len(listed), 2)
+
+    def test_an_owner_reached_with_two_roles_on_one_folder_is_one_row_with_both(self):
+        rows = [
+            dict(OWNERS_GRANT, principal_name="Finance"), owner_row(OWNER_OUTSIDER, "perm-owners"),
+            dict(SITE_OWNERS_GRANT, roles=["write"]), dict(SITE_OWNERS_CLAIM, roles=["write"]),
+            owner_row(OWNER_OUTSIDER, "perm-site-owners", roles=["write"], via_sharepoint_group_id=3,
+                      via_sharepoint_group_name="Catalog Site Owners"),
+        ]
+        listed = [row for row in unlisted_of(with_extract_groups(with_extract_rows(*rows), OWNERS_COUNT))
+                  if row["person_name"] == "Quinn Harper"]
+        self.assertEqual([row["role"] for row in listed], ["Owner; Edit"])
+
+    def test_an_owner_of_two_groups_on_one_folder_has_both_groups_named(self):
+        legal_id = "b3b3b3b3-0000-4000-8000-000000000003"
+        rows = [
+            dict(OWNERS_GRANT, principal_name="Finance"), owner_row(OWNER_OUTSIDER, "perm-owners"),
+            dict(OWNERS_GRANT, principal_id=legal_id, principal_name="Legal", permission_id="perm-legal"),
+            owner_row(OWNER_OUTSIDER, "perm-legal", via_group_id=legal_id, via_group_name="Legal"),
+        ]
+        listed = [row for row in unlisted_of(with_extract_rows(*rows)) if row["person_name"] == "Quinn Harper"]
+        self.assertEqual([row["why"] for row in listed], [
+            "Not a member of this folder set. Access as an owner of Microsoft 365 groups Finance and Legal",
+        ])
+
+
 def with_frameworks(data, *keys, **inputs):
     """The data mapped to the given frameworks, in that order."""
     data["inputs"].pop("framework", None)

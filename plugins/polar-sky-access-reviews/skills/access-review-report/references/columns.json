@@ -98,7 +98,7 @@
   "extract": {
     "title": "Extract rows",
     "file": "extract.csv",
-    "description": "One row per grant, link or group member on each covered folder, as Polar Sky read it live at the extract's as-of time, in the stored file's order. The CSV is a rendering of the stored file, so its SHA-256 differs from the stored file's.",
+    "description": "One row per grant, link, group member or group owner on each covered folder, as Polar Sky read it live at the extract's as-of time, in the stored file's order. The CSV is a rendering of the stored file, so its SHA-256 differs from the stored file's.",
     "columns": [
       {"id": "folder_set", "header": "Folder set", "default": true},
       {"id": "folder", "header": "Folder", "default": true},

@@ -28,15 +28,33 @@ ROW_KIND_LABELS = {
     "link": "link",
     "group_member": "group member",
     "sharepoint_group_member": "SharePoint group member",
+    "group_owner": "group owner",
 }
 
-GROUP_KIND_LABELS = {"entra_group": "Entra group", "sharepoint_group": "SharePoint group", "google_group": "Google group"}
+ENTRA_GROUP_OWNERS = "entra_group_owners"
+
+GROUP_KIND_LABELS = {
+    "entra_group": "Entra group", "sharepoint_group": "SharePoint group", "google_group": "Google group",
+    ENTRA_GROUP_OWNERS: "Microsoft 365 group owners",
+}
 
 GOOGLE_GROUP = "google_group"
 
-GROUP_KIND_PROVIDERS = {"entra_group": "microsoft365", "sharepoint_group": "microsoft365", GOOGLE_GROUP: "google_workspace"}
+GROUP_KIND_PROVIDERS = {
+    "entra_group": "microsoft365", "sharepoint_group": "microsoft365", GOOGLE_GROUP: "google_workspace",
+    ENTRA_GROUP_OWNERS: "microsoft365",
+}
 
-ROW_KIND_PROVIDERS = {"sharepoint_group_member": "microsoft365"}
+ROW_KIND_PROVIDERS = {"sharepoint_group_member": "microsoft365", "group_owner": "microsoft365"}
+
+GROUP_OWNER_ROW = "group_owner"
+OWNERS_OF = "Owners of Microsoft 365 group "
+
+SHAREPOINT_SYSTEM_LOGIN = "sharepoint\\system"
+SYSTEM_ACCOUNT_MARK = "(SharePoint's built-in account)"
+
+SITE_GROUP_MEMBERS_TO_EXPAND = {"entra_group": "entra_group", "entra_group_owners": ENTRA_GROUP_OWNERS}
+SITE_GROUP_ACCOUNTS = frozenset({"user", "application"})
 
 UNKNOWN_PROVIDER_LABEL = "the provider"
 
@@ -93,7 +111,7 @@ SAME_PERMISSION = {
 
 LIVE_READ_GROUP = "Found in the live read, not decided in Polar Sky"
 GROUP_GRANTEE_TYPES = frozenset({"group", "site_group", "sharepoint_group"})
-GROUP_MEMBER_KINDS = frozenset({"group_member", "sharepoint_group_member"})
+GROUP_MEMBER_KINDS = frozenset({"group_member", "sharepoint_group_member", GROUP_OWNER_ROW})
 LIVE_READ_MARK = "(live read)"
 
 TARGET_KIND_LABELS = {
@@ -553,18 +571,48 @@ def _chain(pages, start, next_key):
     return ordered
 
 
+def is_system_account(row):
+    """Say whether an extract row is SharePoint's built-in System Account, which SharePoint adds to a site's groups itself."""
+    return (row.get("login_name") or "").strip().lower() == SHAREPOINT_SYSTEM_LOGIN
+
+
+def extract_name(row):
+    """Name the person or group of an extract row: its display name, else its email, else a SharePoint group's login name; a grant to a Microsoft 365 group's owners is "Owners of Microsoft 365 group" and the group's name or id. A claim string is never a name."""
+    name = row.get("principal_name") or ""
+    grantee_type = row.get("grantee_type") or ""
+    if row.get("group_owners_only"):
+        return OWNERS_OF + (name or row.get("principal_id") or "")
+    if is_system_account(row):
+        return f"{name or 'System Account'} {SYSTEM_ACCOUNT_MARK}"
+    if name or row.get("principal_email"):
+        return name or row.get("principal_email")
+    if grantee_type == "site_group":
+        return row.get("login_name") or row.get("principal_id") or ""
+    if grantee_type in GROUP_GRANTEE_TYPES:
+        return row.get("principal_id") or ""
+    return ""
+
+
+def _via_group(row):
+    """Name the group a member or owner row reaches its folder through; an owner reaches it through the group's owners."""
+    if row.get("row_kind") == GROUP_OWNER_ROW:
+        return OWNERS_OF + (row.get("via_group_name") or row.get("via_group_id") or "")
+    return row.get("via_group_name") or row.get("via_sharepoint_group_name") or ""
+
+
 def _extract_row(row):
+    via_group = _via_group(row)
     return {
         "folder_set": row.get("control_name") or "",
         "folder": row.get("folder") or "",
         "row_kind": ROW_KIND_LABELS.get(row.get("row_kind") or "", row.get("row_kind") or ""),
         "grantee_type": (row.get("grantee_type") or "").replace("_", " "),
-        "principal_name": row.get("principal_name") or row.get("principal_email") or "",
+        "principal_name": extract_name(row),
         "principal_email": row.get("principal_email") or "",
         "login_name": row.get("login_name") or "",
         "roles": _join(row.get("roles") or []),
         "inherited": _yes_no(row.get("inherited")),
-        "via_group": row.get("via_group_name") or row.get("via_sharepoint_group_name") or "",
+        "via_group": via_group,
         "link_scope": row.get("link_scope") or "",
         "link_type": row.get("link_type") or "",
         "link_expires_at": format_time(row.get("link_expires_at")),
@@ -582,8 +630,15 @@ def _extract_row(row):
         "_grantee_type": row.get("grantee_type") or "",
         "_roles": [role for role in row.get("roles") or [] if isinstance(role, str)],
         "_inherited": bool(row.get("inherited")),
-        "_via_group": row.get("via_group_name") or row.get("via_sharepoint_group_name") or "",
-        "_name": row.get("principal_name") or "",
+        "_via_group": via_group,
+        "_name": extract_name(row),
+        "_principal_id": row.get("principal_id") or "",
+        "_owners_only": bool(row.get("group_owners_only")),
+        "_system_account": is_system_account(row),
+        "_owner_of": (row.get("via_group_name") or row.get("via_group_id") or "") if row.get("row_kind") == GROUP_OWNER_ROW else "",
+        "_via_sharepoint_group": row.get("via_sharepoint_group_name") or "",
+        "_grant": (row.get("control_id") or "", row.get("drive_id") or "", row.get("folder_item_id") or "",
+                   row.get("folder") or "", row.get("permission_id") or ""),
     }
 
 
@@ -609,6 +664,7 @@ def _group_count_row(group):
         "provider_member_count": provider_count,
         "result": result,
         "_group_id": (group.get("group_id") or "").lower(),
+        "_kind": group.get("kind") or "",
     }
 
 
@@ -668,6 +724,7 @@ def build_extract(extract, control_names):
         "groups": groups,
         "groups_differ": [group for group in groups if group["result"] in ("Differs", NESTED_GROUP_DIFFERS)],
         "groups_without_provider_count": sum(1 for group in groups if group["provider_member_count"] is None),
+        "system_account": any(row["_system_account"] for row in rows),
         "exclusions": exclusions,
         "exclusion_control_ids": [
             item["control_id"] for page in summaries for item in page.get("exclusions") or [] if item.get("control_id")
@@ -1294,8 +1351,95 @@ def _is_decided_group(email, name, control):
     return False
 
 
+def _group_counts(extract):
+    """Index the extract's counted groups: members by group id, email or unique name, and owners by group id."""
+    members = {}
+    owners = {}
+    names = [group["group_name"].lower() for group in extract["groups"] if group["_kind"] != ENTRA_GROUP_OWNERS]
+    for group in extract["groups"]:
+        if group["_kind"] == ENTRA_GROUP_OWNERS:
+            owners[group["_group_id"]] = group["counted_members"]
+            continue
+        if group["_group_id"]:
+            members.setdefault(group["_group_id"], group["counted_members"])
+        if names.count(group["group_name"].lower()) == 1:
+            members.setdefault(group["group_name"].lower(), group["counted_members"])
+    return members, owners
+
+
+def _person_key(row):
+    return (row["principal_id"] or row["principal_email"] or row["_name"]).lower()
+
+
+def _grant_people(extract, member_counts, owner_counts):
+    """For each grant, by folder set, folder and permission, the accounts the extract lists behind it, or None where it does not list them all."""
+    people = {}
+    for row in extract["table"]:
+        key = row["_grant"]
+        if row["_kind"] == "grant":
+            people.setdefault(key, set())
+            continue
+        if row["_kind"] not in GROUP_MEMBER_KINDS or people.get(key, set()) is None:
+            continue
+        accounts = people.setdefault(key, set())
+        if row["_kind"] != "sharepoint_group_member":
+            if row["_grantee_type"] != "group":
+                accounts.add(_person_key(row))
+            continue
+        if row["_grantee_type"] in SITE_GROUP_ACCOUNTS:
+            accounts.add(_person_key(row))
+            continue
+        expanded = SITE_GROUP_MEMBERS_TO_EXPAND.get(row["_grantee_type"])
+        listed = owner_counts if expanded == ENTRA_GROUP_OWNERS else member_counts
+        if expanded is None or row["_principal_id"].lower() not in listed:
+            people[key] = None
+    return people
+
+
+def _live_group_count(row, member_counts, owner_counts, people, site_groups):
+    """The people count of a group grant found in the live read, or None when the extract does not list its people; a SharePoint group counts only when exactly one read of it, by id and name, holds as many members as the rows behind the grant."""
+    group_id = row["_principal_id"].lower()
+    if row["_owners_only"]:
+        return owner_counts.get(group_id)
+    if row["_grantee_type"] in ("site_group", "sharepoint_group"):
+        reads = site_groups.get((group_id, row["_name"].lower()), [])
+        if len(reads) != 1 or reads[0] != site_groups["_member_rows"].get(row["_grant"], 0):
+            return None
+        accounts = people.get(row["_grant"])
+        return None if accounts is None else accounts
+    for key in (row["principal_email"].lower(), group_id, row["_name"].lower()):
+        if key and key in member_counts:
+            return member_counts[key]
+    return None
+
+
+def _unlisted_row(control, row, members, owner_of):
+    """The 3.3 row for a person's grant or group ownership the members list does not show, or None when it shows it."""
+    email = row["principal_email"].lower()
+    member = members.get((control["id"], email)) if email else None
+    if not email:
+        why = "Not matched: the live read gave no email for this person"
+        extra = row["_roles"]
+    elif member is None:
+        why = "Not a member of this folder set"
+        extra = row["_roles"]
+    else:
+        why = f"A member, with {member['role'] or 'no recorded'} permission in Attachment A"
+        extra = [role for role in row["_roles"] if _permission(role) != _permission(member["role"])]
+        if not extra:
+            return None
+    if owner_of:
+        groups = "group" if len(owner_of) == 1 else "groups"
+        why += f". Access as an owner of Microsoft 365 {groups} {join_names(owner_of)}"
+    return {
+        "folder_set": control["name"], "folder": row["folder"], "person_name": row["_name"] or row["principal_email"],
+        "email": row["principal_email"], "role": _join(role_label(role) for role in extra),
+        "inherited": _yes_no(row["_inherited"]), "why": why, "_control_id": control["id"],
+    }
+
+
 def reconcile_extract(extract, controls, tables, details):
-    """Compare a completed extract with the members and groups Polar Sky records: return the person grants the members list does not show, and add the groups found only in the live read to the groups table and to members' groups."""
+    """Compare a completed extract with the members and groups Polar Sky records: return the person grants and group ownerships the members list does not show, and add the groups found only in the live read to the groups table and to members' groups."""
     if not extract or extract["status"] != EXTRACT_COMPLETED or not extract["folders_read"]:
         return None
     by_id = {control["id"]: control for control in controls}
@@ -1303,12 +1447,17 @@ def reconcile_extract(extract, controls, tables, details):
     for row in tables["members"]:
         if row["email"]:
             members.setdefault((row["_control_id"], row["email"].lower()), row)
-    counts = {group["_group_id"]: group["counted_members"] for group in extract["groups"] if group["_group_id"]}
-    names = [group["group_name"].lower() for group in extract["groups"]]
+    member_counts, owner_counts = _group_counts(extract)
+    people = _grant_people(extract, member_counts, owner_counts)
+    site_groups = {"_member_rows": {}}
     for group in extract["groups"]:
-        if names.count(group["group_name"].lower()) == 1:
-            counts.setdefault(group["group_name"].lower(), group["counted_members"])
+        if group["_kind"] == "sharepoint_group":
+            site_groups.setdefault((group["_group_id"], group["group_name"].lower()), []).append(group["counted_members"])
+    for row in extract["table"]:
+        if row["_kind"] == "sharepoint_group_member":
+            site_groups["_member_rows"][row["_grant"]] = site_groups["_member_rows"].get(row["_grant"], 0) + 1
     unlisted = []
+    owner_access = {}
     live_groups = {}
     through = {}
     for row in extract["table"]:
@@ -1317,46 +1466,59 @@ def reconcile_extract(extract, controls, tables, details):
             continue
         email = row["principal_email"].lower()
         if row["_kind"] == "grant" and row["_grantee_type"] == "user":
-            member = members.get((control["id"], email)) if email else None
-            if not email:
-                why = "Not matched: the live read gave no email for this person"
-                extra = row["_roles"]
-            elif member is None:
-                why = "Not a member of this folder set"
-                extra = row["_roles"]
-            else:
-                why = f"A member, with {member['role'] or 'no recorded'} permission in Attachment A"
-                extra = [role for role in row["_roles"] if _permission(role) != _permission(member["role"])]
-                if not extra:
-                    continue
-            unlisted.append({
-                "folder_set": control["name"], "folder": row["folder"], "person_name": row["_name"] or row["principal_email"],
-                "email": row["principal_email"], "role": _join(role_label(role) for role in extra),
-                "inherited": _yes_no(row["_inherited"]), "why": why, "_control_id": control["id"],
-            })
-        elif row["_kind"] == "grant" and row["_grantee_type"] in GROUP_GRANTEE_TYPES:
+            entry = _unlisted_row(control, row, members, [])
+            if entry:
+                unlisted.append(entry)
+        elif row["_kind"] == GROUP_OWNER_ROW and row["_grantee_type"] == "user":
+            access = owner_access.setdefault(
+                (*row["_grant"][:4], _person_key(row)), (control, dict(row, _roles=[], _owner_of=[]))
+            )[1]
+            access["_roles"] += [role for role in row["_roles"] if role not in access["_roles"]]
+            access["_owner_of"] += [row["_owner_of"]] if row["_owner_of"] not in access["_owner_of"] else []
+        if row["_kind"] == "grant" and row["_grantee_type"] in GROUP_GRANTEE_TYPES:
             name = row["_name"] or row["principal_email"]
             if _is_decided_group(email, name.lower(), details.get(control["id"]) or {}):
                 continue
             entry = live_groups.setdefault((control["id"], email or name.lower()), {
                 "control": control, "name": name, "email": row["principal_email"], "folders": [], "roles": [],
+                "accounts": set(), "count": None, "unknown": False, "system_account": False,
             })
             entry["folders"] += [row["folder"]] if row["folder"] not in entry["folders"] else []
             entry["roles"] += [role_label(role) for role in row["_roles"] if role_label(role) not in entry["roles"]]
-        elif row["_kind"] in GROUP_MEMBER_KINDS and email and row["_via_group"]:
-            through.setdefault((control["id"], email), []).append(row["_via_group"])
+            count = _live_group_count(row, member_counts, owner_counts, people, site_groups)
+            if count is None:
+                entry["unknown"] = True
+            elif isinstance(count, set):
+                entry["accounts"] |= count
+            else:
+                entry["count"] = count
+        elif row["_kind"] in GROUP_MEMBER_KINDS and email:
+            groups = [name for name in (row["_via_group"], row["_via_sharepoint_group"]) if name]
+            through.setdefault((control["id"], email), []).extend(groups)
+    for control, row in owner_access.values():
+        entry = _unlisted_row(control, row, members, row["_owner_of"])
+        if entry:
+            unlisted.append(entry)
+    system_accounts = {
+        row["_grant"] for row in extract["table"] if row["_system_account"]
+    }
+    for row in extract["table"]:
+        entry = live_groups.get((row["folder_set_id"], row["principal_email"].lower() or row["_name"].lower()))
+        if row["_kind"] == "grant" and entry and row["_grant"] in system_accounts:
+            entry["system_account"] = True
     live_names = {
         (entry["control"]["id"], entry["name"].lower()) for entry in live_groups.values()
         if not _is_decided_group("", entry["name"].lower(), details.get(entry["control"]["id"]) or {})
     }
     for entry in live_groups.values():
-        count = counts.get(entry["email"].lower(), counts.get(entry["name"].lower()))
+        count = None if entry["unknown"] else (entry["count"] if entry["count"] is not None else len(entry["accounts"]))
         entry["control"]["counts"]["groups_live"] += 1
         tables["groups"].append({
             "folder_set": entry["control"]["name"], "folders": _join(entry["folders"]), "group_name": entry["name"],
             "group_email": entry["email"], "outcome": LIVE_READ_GROUP, "role": _join(entry["roles"]),
             "people_count": "Not recorded" if count is None else str(count), "membership_complete": "",
             "external_recipients": "", "reviewed_by": "", "reviewed_on": "",
+            "_system_account": entry["system_account"] and count is not None,
         })
     for row in tables["members"]:
         listed = [name for name in row["through_groups"].split("; ") if name]
