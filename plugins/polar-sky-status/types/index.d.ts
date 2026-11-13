@@ -3,7 +3,7 @@ export type PolarSkyStatus = {
   controls: { active: number; recommended: number; critical_recommended: number }
 }
 
-export type Band = { status: PolarSkyStatus; tip: string }
+export type Band = { status: PolarSkyStatus | null; tip: string }
 
 declare module 'claude-code' {
   interface PluginState {

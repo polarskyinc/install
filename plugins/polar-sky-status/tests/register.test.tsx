@@ -2,7 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import {
   findControlsServer,
+  findInstallServer,
   formatCount,
+  INSTALL_TIPS,
   isPolarSkyServer,
   nextTip,
   parseMcpTool,
@@ -36,6 +38,12 @@ const ID_TOOLS = [
   { name: `mcp__${CONNECTOR_ID}__get_control`, description: '', mcp: true },
   { name: `mcp__${CONNECTOR_ID}__get_status`, description: '', mcp: true },
   { name: 'mcp__claude_ai_Gmail__create_draft', description: '', mcp: true },
+]
+
+const INSTALL_TOOLS = [
+  { name: 'mcp__polar-sky-install__get_install_values', description: '', mcp: true },
+  { name: 'mcp__polar-sky-install__start_key_upload', description: '', mcp: true },
+  ...TOOLS,
 ]
 
 const BAND = {
@@ -184,6 +192,99 @@ test('a Controls connector without get_status shows no band and calls nothing', 
   await ui.unmount()
 })
 
+test('an install call shows an install tip with no counts and calls nothing', async ($, on) => {
+  const calls: string[] = []
+
+  on('mcp.call', (_, e) => {
+    calls.push(e.tool)
+
+    return { value: { content: [{ type: 'text', text: JSON.stringify(STATUS) }], isError: false } }
+  })
+  on('tool.list', () => ({ value: INSTALL_TOOLS }))
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => ({ value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  on('tool.call', () => ({ result: {} }))
+
+  await $.tool.call({ tool: 'mcp__polar-sky-install__get_install_values' })
+  await settle()
+
+  const ui = await $.ui.mount(BAND)
+  expect((await ui.find({ type: 'Text', text: /^Tip:/ }))?.text).toBe(`Tip: ${INSTALL_TIPS[0]?.text}`)
+  expect(await ui.find({ type: 'Text', text: /sensitive/ })).toBe(undefined)
+  expect(calls).toEqual([])
+  await ui.unmount()
+})
+
+const mountInstallTurn = (on: Parameters<Parameters<typeof test>[1]>[1], calls: string[]) => {
+  on('mcp.call', (_, e) => {
+    calls.push(e.tool)
+
+    return { value: { content: [{ type: 'text', text: JSON.stringify(STATUS) }], isError: false } }
+  })
+  on('tool.list', () => ({ value: INSTALL_TOOLS }))
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => ({ value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+}
+
+test('a Controls call after an install call in the same turn shows the counts', async ($, on) => {
+  const calls: string[] = []
+
+  mountInstallTurn(on, calls)
+  on('tool.call', () => ({ result: {} }))
+
+  await $.tool.call({ tool: 'mcp__polar-sky-install__get_install_values' })
+  await settle()
+  await $.tool.call({ tool: 'mcp__claude_ai_Polar_Sky_Controls__list_controls' })
+  await settle()
+
+  const ui = await $.ui.mount(BAND)
+  expect((await ui.find({ type: 'Text', text: /sensitive/ }))?.text).toContain('200 sensitive')
+  expect(calls).toEqual(['get_status'])
+  await ui.unmount()
+})
+
+test('an install call after a Controls call in the same turn keeps the counts', async ($, on) => {
+  const calls: string[] = []
+
+  mountInstallTurn(on, calls)
+  on('tool.call', () => ({ result: {} }))
+
+  await $.tool.call({ tool: 'mcp__claude_ai_Polar_Sky_Controls__list_controls' })
+  await settle()
+  await $.tool.call({ tool: 'mcp__polar-sky-install__get_install_values' })
+  await settle()
+
+  const ui = await $.ui.mount(BAND)
+  expect((await ui.find({ type: 'Text', text: /sensitive/ }))?.text).toContain('200 sensitive')
+  expect((await ui.find({ type: 'Text', text: /^Tip:/ }))?.text).toBe(`Tip: ${TIPS[0]?.text}`)
+  await ui.unmount()
+})
+
+test('a refused install call shows no band', async ($, on) => {
+  const calls: string[] = []
+
+  mountInstallTurn(on, calls)
+  on('tool.call', () => ({ deny: 'insufficient_scope' }))
+
+  await $.tool.call({ tool: 'mcp__polar-sky-install__get_install_values' })
+  await settle()
+
+  const ui = await $.ui.mount(BAND)
+  expect(await ui.find({ type: 'Text', text: /^Tip:/ })).toBe(undefined)
+  expect(calls).toEqual([])
+  await ui.unmount()
+})
+
 test('helpers', () => {
   expect(parseMcpTool('mcp__claude_ai_Polar_Sky_Google_Drive__search_files')).toEqual({
     server: 'claude_ai_Polar_Sky_Google_Drive',
@@ -196,6 +297,9 @@ test('helpers', () => {
   expect(findControlsServer(ID_TOOLS)).toBe(CONNECTOR_ID)
   expect(findControlsServer(ID_TOOLS.filter(tool => !tool.name.endsWith('get_status')))).toBe(null)
   expect(findControlsServer([{ name: 'mcp__claude_ai_Gmail__create_draft' }])).toBe(null)
+
+  expect(findInstallServer(INSTALL_TOOLS)).toBe('polar-sky-install')
+  expect(findInstallServer(TOOLS)).toBe(null)
 
   expect(isPolarSkyServer(CONNECTOR_ID, CONNECTOR_ID)).toBe(true)
   expect(isPolarSkyServer('claude_ai_Polar_Sky_Google_Drive', null)).toBe(true)
@@ -210,4 +314,8 @@ test('helpers', () => {
   const all = TIPS.map(tip => tip.id)
   expect(nextTip([]).shown).toEqual([all[0]])
   expect(nextTip(all).shown).toEqual([all[0]])
+
+  const install = INSTALL_TIPS.map(tip => tip.id)
+  expect(nextTip([], INSTALL_TIPS).shown).toEqual([install[0]])
+  expect(nextTip(install, INSTALL_TIPS).tip).toBe(INSTALL_TIPS[0]?.text)
 })

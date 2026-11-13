@@ -10,7 +10,10 @@ const POLAR_SKY_NAME = /polar[-_ ]?sky/i
 const STATUS_TOOL = 'get_status'
 /** Tools only the Controls connector serves, so it is found whatever name it was added under. */
 const CONTROLS_SIGNATURE = ['list_controls', 'get_control'] as const
+/** Tools only the Install server serves, so it is found whatever name it was added under. */
+const INSTALL_SIGNATURE = ['get_install_values', 'start_key_upload'] as const
 const SHOWN_TIPS_KEY = 'shownTips'
+const SHOWN_INSTALL_TIPS_KEY = 'shownInstallTips'
 const BAR_CELLS = 16
 // Polar Sky brand colors. Raw colors do not follow the person's theme, so each one reads on light and dark alike:
 // the bar and the triangle are marks, labeled by the text beside them.
@@ -37,6 +40,20 @@ export const TIPS: readonly { id: string; text: string }[] = [
   { id: 'members', text: 'Ask "who keeps access to the folders this control covers?"' },
   { id: 'activity', text: 'Ask "what has changed on this control recently?"' },
   { id: 'reviewers', text: 'Ask "who could review this control with me?"' },
+  { id: 'recent-use', text: 'Ask "is anyone losing access to files they opened in the last 90 days?"' },
+  { id: 'carried', text: 'Ask "which controls need me to confirm an earlier decision?"' },
+  { id: 'plan', text: 'Ask "how will Polar Sky apply this control if I approve it?"' },
+  { id: 'remind', text: 'Ask "remind owners to review the controls assigned to them"' },
+]
+
+/** Tips the band rotates through during an install, each naming a question the install answers in both Cloud and On-Prem. */
+export const INSTALL_TIPS: readonly { id: string; text: string }[] = [
+  { id: 'remaining', text: 'Ask "what\'s left in my install?"' },
+  { id: 'people', text: 'Ask "who else do I need to finish this install?"' },
+  { id: 'permissions', text: 'Ask "which Google Workspace permissions does Polar Sky need, and why?"' },
+  { id: 'keys', text: 'Ask "do my private keys ever leave this machine?"' },
+  { id: 'drives', text: 'Ask "can I choose which shared drives Polar Sky monitors?"' },
+  { id: 'failures', text: 'Ask "what does Polar Sky learn when a step fails?"' },
 ]
 
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
@@ -53,11 +70,7 @@ export const parseMcpTool = (name: string): { server: string; tool: string } | n
   return server === undefined || tool === undefined ? null : { server, tool }
 }
 
-/**
- * The Controls connector among the tools the model can call: the first server that serves its tools and get_status,
- * or null when none does.
- */
-export const findControlsServer = (tools: readonly { name: string }[]): string | null => {
+const findServer = (tools: readonly { name: string }[], signature: readonly string[]): string | null => {
   const byServer = new Map<string, Set<string>>()
 
   for (const { name } of tools) {
@@ -67,10 +80,20 @@ export const findControlsServer = (tools: readonly { name: string }[]): string |
     }
   }
 
-  const found = [...byServer].find(([, served]) => [...CONTROLS_SIGNATURE, STATUS_TOOL].every(tool => served.has(tool)))
+  const found = [...byServer].find(([, served]) => signature.every(tool => served.has(tool)))
 
   return found?.[0] ?? null
 }
+
+/**
+ * The Controls connector among the tools the model can call: the first server that serves its tools and get_status,
+ * or null when none does.
+ */
+export const findControlsServer = (tools: readonly { name: string }[]): string | null =>
+  findServer(tools, [...CONTROLS_SIGNATURE, STATUS_TOOL])
+
+/** The Install server among the tools the model can call, or null when none serves its tools. */
+export const findInstallServer = (tools: readonly { name: string }[]): string | null => findServer(tools, INSTALL_SIGNATURE)
 
 /** Whether a call goes to a Polar Sky connector: the Controls connector, or any server named for Polar Sky. */
 export const isPolarSkyServer = (server: string, controlsServer: string | null): boolean =>
@@ -108,13 +131,16 @@ const isStatus = (value: unknown): value is PolarSkyStatus =>
   isCounts((value as PolarSkyStatus).controls, ['active', 'recommended', 'critical_recommended'])
 
 /** Picks the first tip not yet shown, starting over once every tip has been shown. */
-export const nextTip = (shown: readonly string[]): { tip: string; shown: string[] } => {
-  const unseen = TIPS.find(tip => !shown.includes(tip.id))
+export const nextTip = (
+  shown: readonly string[],
+  tips: readonly { id: string; text: string }[] = TIPS,
+): { tip: string; shown: string[] } => {
+  const unseen = tips.find(tip => !shown.includes(tip.id))
   if (unseen !== undefined) {
     return { tip: unseen.text, shown: [...shown, unseen.id] }
   }
 
-  const [first] = TIPS
+  const [first] = tips
 
   return first === undefined ? { tip: '', shown: [] } : { tip: first.text, shown: [first.id] }
 }
@@ -129,18 +155,26 @@ export const progressBar = (protectedFolders: number, sensitiveFolders: number):
 
 type TipStore = { store: { get: (key: string) => Promise<unknown>; set: (key: string, value: unknown) => Promise<void> } }
 
-async function takeTip($: TipStore): Promise<string> {
-  const stored = await $.store.get(SHOWN_TIPS_KEY)
+async function takeTip($: TipStore, key: string, tips: readonly { id: string; text: string }[]): Promise<string> {
+  const stored = await $.store.get(key)
   const shown = Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : []
-  const { tip, shown: updated } = nextTip(shown)
-  await $.store.set(SHOWN_TIPS_KEY, updated)
+  const { tip, shown: updated } = nextTip(shown, tips)
+  await $.store.set(key, updated)
 
   return tip
 }
 
+async function showBand($: Parameters<typeof update>[0], shown: Band, keep: (current: Band) => boolean): Promise<void> {
+  await update($, band, current => (current !== null && keep(current) ? current : shown))
+}
+
+const succeeded = (result: { deny?: unknown; isError?: boolean }): boolean =>
+  result.deny === undefined && result.isError !== true
+
 export const register: Register = on => {
   let turn = 0
-  let fetchedTurn = -1
+  let statusTurn = -1
+  let installTurn = -1
 
   on('prompt.submit', async ($, e, next) => {
     turn += 1
@@ -152,36 +186,47 @@ export const register: Register = on => {
   on('tool.call', { tool: MCP_TOOL }, async ($, e, next) => {
     const parsed = parseMcpTool(e.tool)
 
-    if (parsed === null || parsed.tool === STATUS_TOOL || fetchedTurn === turn) {
+    if (parsed === null || parsed.tool === STATUS_TOOL || (statusTurn === turn && installTurn === turn)) {
       return next(e)
     }
 
-    const fetchedFor = turn
+    const shownFor = turn
+    const servers = $.tool.list().then(tools => ({ install: findInstallServer(tools), controls: findControlsServer(tools) }))
 
     // Runs beside the call, so a call to any other MCP server waits only for the tool list.
     const showing = (async () => {
-      const controlsServer = findControlsServer(await $.tool.list())
+      const { install, controls } = await servers
 
-      if (controlsServer === null || !isPolarSkyServer(parsed.server, controlsServer) || fetchedTurn === fetchedFor) {
+      if (controls === null || parsed.server === install || !isPolarSkyServer(parsed.server, controls) || statusTurn === shownFor) {
         return
       }
 
-      fetchedTurn = fetchedFor
+      statusTurn = shownFor
 
-      const status = parseStatus(await $.mcp.call(controlsServer, STATUS_TOOL))
+      const status = parseStatus(await $.mcp.call(controls, STATUS_TOOL))
 
       if (status === null) {
         return
       }
 
-      const shown: Band = { status, tip: await takeTip($) }
+      const tip = await takeTip($, SHOWN_TIPS_KEY, TIPS)
 
-      if (fetchedFor === turn) {
-        await update($, band, () => shown)
+      if (shownFor === turn) {
+        await showBand($, { status, tip }, () => false)
       }
     })().catch(() => undefined)
 
     const [result] = await Promise.all([next(e), showing])
+
+    if (succeeded(result) && installTurn !== shownFor && parsed.server === (await servers.catch(() => null))?.install) {
+      installTurn = shownFor
+
+      const tip = await takeTip($, SHOWN_INSTALL_TIPS_KEY, INSTALL_TIPS).catch(() => '')
+
+      if (tip !== '' && shownFor === turn) {
+        await showBand($, { status: null, tip }, current => current.status !== null)
+      }
+    }
 
     return result
   })
@@ -196,8 +241,8 @@ export const register: Register = on => {
     const elements = $.ui.resolve(e)
     const { Box, Text } = elements
     const Svg = 'Svg' in elements ? elements.Svg : null
-    const { folders, controls } = shown.status
-    const bar = progressBar(folders.protected, folders.sensitive)
+    const { status } = shown
+    const bar = progressBar(status?.folders.protected ?? 0, status?.folders.sensitive ?? 0)
 
     return (
       <Box flexDirection="row">
@@ -211,32 +256,37 @@ export const register: Register = on => {
           </Box>
         )}
         <Box flexDirection="column">
-          <Box flexDirection="row">
-            <Box width={10}>
-              <Text bold>Folders</Text>
+          {status === null ? null : (
+            <Box flexDirection="column">
+              <Box flexDirection="row">
+                <Box width={10}>
+                  <Text bold>Folders</Text>
+                </Box>
+                <Text dimColor>{formatCount(status.folders.scanned)} scanned, </Text>
+                <Text>
+                  {formatCount(status.folders.sensitive)} sensitive, {formatCount(status.folders.protected)} protected
+                  {'  '}
+                </Text>
+                <Text color={CUSTOMER_COLOR}>{bar.filled}</Text>
+                <Text dimColor>{bar.empty}</Text>
+                <Text> {bar.percent}%</Text>
+              </Box>
+              <Box flexDirection="row">
+                <Box width={10}>
+                  <Text bold>Controls</Text>
+                </Box>
+                <Text>
+                  {formatCount(status.controls.active)} active, {formatCount(status.controls.recommended)} recommended
+                </Text>
+                {status.controls.critical_recommended > 0 ? (
+                  <Text>
+                    {'  '}
+                    <Text color={BLOCKED_COLOR}>▲</Text> {formatCount(status.controls.critical_recommended)} critical
+                  </Text>
+                ) : null}
+              </Box>
             </Box>
-            <Text dimColor>{formatCount(folders.scanned)} scanned, </Text>
-            <Text>
-              {formatCount(folders.sensitive)} sensitive, {formatCount(folders.protected)} protected{'  '}
-            </Text>
-            <Text color={CUSTOMER_COLOR}>{bar.filled}</Text>
-            <Text dimColor>{bar.empty}</Text>
-            <Text> {bar.percent}%</Text>
-          </Box>
-          <Box flexDirection="row">
-            <Box width={10}>
-              <Text bold>Controls</Text>
-            </Box>
-            <Text>
-              {formatCount(controls.active)} active, {formatCount(controls.recommended)} recommended
-            </Text>
-            {controls.critical_recommended > 0 ? (
-              <Text>
-                {'  '}
-                <Text color={BLOCKED_COLOR}>▲</Text> {formatCount(controls.critical_recommended)} critical
-              </Text>
-            ) : null}
-          </Box>
+          )}
           {shown.tip === '' ? null : <Text dimColor>Tip: {shown.tip}</Text>}
         </Box>
       </Box>
