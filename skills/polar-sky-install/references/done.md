@@ -103,7 +103,7 @@ If the command says `polar-sky-controls` already exists, keep it: do not remove 
 
 Then tell the person how they sign in. They sign in with their Polar Sky console account, in the browser:
 
-- In Claude Code: Claude Code opens the browser the first time they use Polar Sky controls, or they type `/mcp`, choose `polar-sky-controls`, or the claude.ai connector by the name `claude mcp list` showed when you did not add the server, and **Authenticate**.
+- In Claude Code: Claude Code opens the browser the first time they use Polar Sky controls, or they type `/mcp`, choose `polar-sky-controls`, or the claude.ai connector by the name `claude mcp list` showed when you did not add the server, and **Authenticate**. `/mcp` hides a claude.ai connector that is not signed in: tell them to choose **Show unused connectors** at the bottom of the list to find it.
 - In Codex: they run `codex mcp login polar-sky-controls` in their own terminal, and Codex opens the browser.
 
 On the Polar Sky page they sign in and choose **Approve**. The page says that Polar Sky cannot verify which program on their computer is asking: they choose **Approve** only if they started the sign-in themselves. Only administrators, named reviewers and delegates see controls; a delegate sees only the controls delegated to them.
