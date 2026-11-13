@@ -8,7 +8,7 @@ When this stage is done, call `get_install_values` again, with the same `deploym
 
 ## When Okta is already connected
 
-If `get_install_values` answers `okta_connected` true, Okta is already connected (`okta_org_url`). Tell the person, with its group settings in plain words (see [Choose how groups reach Google Workspace](#choose-how-groups-reach-google-workspace)), and ask whether to keep it as it is. Run this stage again only if they want another Okta org, a new app key, or other group settings. Running it again for the same Okta org replaces the app's key; for another Okta org, it replaces the connection.
+If `get_install_values` answers `okta_connected` true, Okta is already connected (`okta_org_url`). Tell the person, with its group settings in plain words (see [Choose how groups reach Google Workspace](#choose-how-groups-reach-google-workspace)), and ask whether to keep it as it is. Run this stage again only if they want another Okta org, a new app key, or other group settings. For a quick look at whether the Okta app still works, call `check_integration_setup` with kind `okta` (read only) and say what each setup step reports. Running it again for the same Okta org replaces the app's key; for another Okta org, it replaces the connection. Whether they keep Okta as it is or not, run [Record the groups Polar Sky created before](#record-the-groups-polar-sky-created-before) once for this connection: it needs only the connection, not the Okta API token or the rest of this stage.
 
 ## What this stage needs
 
@@ -25,7 +25,8 @@ Show the plan in one message and ask "Does this look right?" One yes covers ever
 3. Polar Sky makes the app's key. Polar Sky keeps the private key; only the public key comes back.
 4. You create the app `Polar Sky Group Provisioning` in Okta with that public key, let it manage groups and read users, and give it the Organization Administrator role.
 5. Polar Sky signs in to Okta as the app, reads its groups, and saves the connection with the group settings.
-6. The person revokes the Okta API token.
+6. If Polar Sky created groups in this Okta org earlier, you list them and, after their own yes, record that Okta keeps them.
+7. The person revokes the Okta API token.
 
 ## Save the Okta API token
 
@@ -168,7 +169,7 @@ Polar Sky signs in to Okta as the app with the key it kept, reads the org's grou
 
 | Answer | What it means | Fix |
 | --- | --- | --- |
-| `connected` is true | Okta is connected | Go to [Tell the person what the app can do](#tell-the-person-what-the-app-can-do) |
+| `connected` is true | Okta is connected | Go to [Record the groups Polar Sky created before](#record-the-groups-polar-sky-created-before), then [Tell the person what the app can do](#tell-the-person-what-the-app-can-do) |
 | `admin_role_missing` | The app has no admin role, so it cannot read or create groups | Give it the role as above, then call again |
 | `credentials_rejected` | Okta refused the app's sign-in. `detail` has Okta's reason | Check the client ID, that the app has the key `OKTA_KEY_ID`, that DPoP is off, and that both grants are there. Then call again |
 | `scopes_not_granted` | Okta has not granted the app every scope; `missing_scopes` names the ones missing | Grant them as above, then call again |
@@ -178,6 +179,10 @@ Polar Sky signs in to Okta as the app with the key it kept, reads the org's grou
 | `invalid_arguments` | A value does not fit | Fix the value it names, then call again |
 
 The answer also has `provisioning_mode`. If it is not `okta`, the message says that Polar Sky does not use Okta for this organization yet. Tell the person in one line that Polar Sky will turn it on with them; do not change anything.
+
+## Record the groups Polar Sky created before
+
+Only when `connected` is true, and only once per Okta connection. Groups Polar Sky created in this Okta org before Okta moved onto Polar Sky's integration engine have no recorded route, so Polar Sky does not reconcile their members through Okta yet. Call `adopt_okta_created_groups` without `confirm`: it records nothing and lists those groups, with their count and a `confirmation`. If it says no group is missing a route, say that nothing is left and go on. Otherwise show the person the groups in plain words ("Polar Sky created these groups in your Okta earlier; from now on it keeps their members right through Okta") and ask for a yes. Only after the yes, call it again with `confirm` true and the `confirmation` it gave. If it refuses because the groups changed meanwhile, call it again without `confirm`, show the new list and ask again. When the list is longer than the page it shows (`remaining_count`), repeat until it says no group is missing a route. Then go on to [Tell the person what the app can do](#tell-the-person-what-the-app-can-do); for an Okta that was already connected and kept, this step ends the stage.
 
 ## Tell the person what the app can do
 
