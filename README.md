@@ -105,9 +105,24 @@ Ask your agent: "Install Polar Sky". The skill starts by signing you in to Polar
 
 The skill never prints your private keys, service account keys or Kubernetes secrets, and never puts them in the chat. It sends Polar Sky public things: the certificate signing request, service account emails, client IDs, the Microsoft 365 tenant ID and the Workspace admin email. The one secret Polar Sky receives is the cloud service account key for Google Workspace, or the cloud app's certificate bundle for Microsoft 365, which the skill uploads once with `curl`, straight from the file, with a one-time upload token; Polar Sky stores it encrypted, and the skill then deletes the file.
 
-## Polar Sky skills in Claude Code
+## Polar Sky controls and skills in your agent
 
-At the end of the install, in Claude Code, the agent adds Polar Sky's skills with the `polar-sky-access-reviews` plugin. With it, you can ask Claude for an access review report for your auditor, or for the audit trail of what changed in a date range. To add it yourself, run:
+At the end of the install, the agent connects itself to Polar Sky controls, so you can review controls from it. To add the connection yourself, in Claude Code run:
+
+```bash
+claude mcp add --scope user --transport http polar-sky-controls https://mcp.polarsky.ai/controls
+```
+
+In Codex run:
+
+```bash
+codex mcp add polar-sky-controls --url https://mcp.polarsky.ai/controls
+codex mcp login polar-sky-controls
+```
+
+You sign in with your Polar Sky console account in the browser; in Claude Code, on first use or with `/mcp`. Only administrators, named reviewers and delegates see controls.
+
+In Claude Code, the agent then adds Polar Sky's skills with the `polar-sky-access-reviews` plugin. With it, you can ask Claude for an access review report for your auditor, or for the audit trail of what changed in a date range. To add it yourself, run:
 
 ```bash
 claude plugin marketplace add polarskyinc/install

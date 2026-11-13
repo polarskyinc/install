@@ -1,6 +1,6 @@
 # Phase 10: Done
 
-**Tell the person:** Polar Sky now works on what it monitors, the locations the person chose or, for Microsoft 365, everything: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. Reviewing from their AI assistant works once Polar Sky turns it on for their organization.
+**Tell the person:** Polar Sky now works on what it monitors, the locations the person chose or, for Microsoft 365, everything: it finds overexposed files and proposes controls, and their team reviews and approves them in the Polar Sky console. They can also review controls from their AI assistant: the last step of the install connects it.
 
 ## On-Prem
 
@@ -75,9 +75,36 @@ Polar Sky's team checks the install on its own side, later and without the perso
 
 Tell the person in one line that Polar Sky checks the install on its side and contacts them only if something needs their help. The person has nothing to arrange.
 
+## Connect your AI assistant to Polar Sky controls
+
+In Claude Code and in Codex. With this connection, the person reviews Polar Sky's controls from their AI assistant: they ask why a control was proposed and who would lose access, change who keeps access, and approve or reject it. Every organization can use it. The final plan's yes covers this step, so do not ask again. Show the command for the agent you are, then run it.
+
+In Claude Code (`--scope user`, so it works in any folder, like the install server):
+
+```bash
+claude mcp add --scope user --transport http polar-sky-controls https://mcp.polarsky.ai/controls
+```
+
+In Codex:
+
+```bash
+codex mcp add polar-sky-controls --url https://mcp.polarsky.ai/controls
+```
+
+If the command says `polar-sky-controls` already exists, keep it: do not remove it or add it again. Check its address (read only): `claude mcp get polar-sky-controls` in Claude Code, `codex mcp get polar-sky-controls` in Codex. If it is `https://mcp.polarsky.ai/controls`, the person is already connected, or signs in as below. If it is another address, do not change it: tell the person that their `polar-sky-controls` server points somewhere else, so Polar Sky controls do not work through it, and give them the command above to run after they remove it themselves.
+
+Then tell the person how they sign in. They sign in with their Polar Sky console account, in the browser:
+
+- In Claude Code: Claude Code opens the browser the first time they use Polar Sky controls, or they type `/mcp`, choose `polar-sky-controls` and **Authenticate**.
+- In Codex: they run `codex mcp login polar-sky-controls` in their own terminal, and Codex opens the browser.
+
+On the Polar Sky page they sign in and choose **Approve**. The page says that Polar Sky cannot verify which program on their computer is asking: they choose **Approve** only if they started the sign-in themselves. Only administrators, named reviewers and delegates see controls; a delegate sees only the controls delegated to them.
+
+If the command fails, call `report_issue`, tell the person the install is done without the connection, and give them the command above to run later. Do not try another way.
+
 ## Add Polar Sky's skills to Claude Code
 
-Only in Claude Code; skip this in Codex. These skills let the person's team ask Claude for Polar Sky work, such as an access review report for their auditor. The final plan's yes covers this step, so do not ask again. Show the two commands, then run them:
+Only in Claude Code; skip this in Codex, which has no plugins. Run it after the connection above: the skills read Polar Sky controls through it. These skills let the person's team ask Claude for Polar Sky work, such as an access review report for their auditor. The final plan's yes covers this step, so do not ask again. Show the two commands, then run them:
 
 ```bash
 claude plugin marketplace add polarskyinc/install
@@ -86,7 +113,7 @@ claude plugin install polar-sky-access-reviews@polar-sky --scope user
 
 If the first command says the marketplace is already added, run `claude plugin marketplace update polar-sky` instead, then the second command. If a command fails, call `report_issue`, tell the person the install is done without the skills, and give them the two commands to run later. Do not try another way.
 
-Tell the person in one line: the skills work in a new Claude Code session, once Polar Sky turns on reviewing from their AI assistant.
+Tell the person in one line: Polar Sky controls and the skills work in a new Claude Code session. In Codex, tell them Polar Sky controls work in a new Codex session, after they signed in.
 
 ## Clean up the install folder
 
