@@ -25,7 +25,16 @@ Polar Sky controls reach Claude through one of two MCP servers: one the person a
 
 ### 2. Ask for the inputs
 
-First run:
+Before anything else, check that there is something to report. If the person has not given the review period, ask only for it, in one line, and wait (a period such as "last quarter" is enough: turn it into first and last day, UTC). Then call `get_access_review_evidence` with `from` and `to` set to that period and no `offset`; for a period longer than 366 days, call it once for each part of 366 days or less, as in step 5. Do not save these results; step 5 calls them again. If any call in this check, the `list_controls` calls below included, is refused, handle it as step 5 says for a refused call; never take a refused call as an empty period or as no controls. If any `total` is more than 0, go on below.
+
+If every `total` is 0, there is no approved access to report, and a report would have nothing in it. Call `list_controls` once with no `status` (it returns the controls waiting for review) and once each with `status` `approved`, `dismissed` and `superseded`, then tell the person, in at most four short lines and without asking any other question:
+
+- If none of these calls lists a control: Polar Sky has no access controls for them right now. After an install it first reads their files, which can take a day or more on a large organization, and then suggests controls for their team to review in the Polar Sky console. The report is built from the access their team approves there, so it will have content once the first controls are approved.
+- If any lists controls: none of their controls had an approval in force from <first day> to <last day>. Say how many controls are waiting for review, from the call with no `status`, and that the report shows the access their team approves, in the Polar Sky console or here.
+
+Then ask whether they want another period, or the report anyway, which will state that there was no access to review. Do not ask for the other inputs until they choose one; for another period, check it the same way.
+
+Then run:
 
 ```sh
 python3 "${CLAUDE_SKILL_DIR}/scripts/previous_answers.py" --organization "<organization>"

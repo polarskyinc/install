@@ -1774,6 +1774,16 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertIn("Write nothing else: no other count, date, hash, name, reason or advice", self.skill)
         self.assertNotIn("Remind the person to read the report", self.skill)
 
+    def test_the_skill_checks_for_approved_access_before_asking_the_inputs(self):
+        check = self.skill.index("Before anything else, check that there is something to report.")
+        self.assertLess(check, self.skill.index("scripts/previous_answers.py\" --organization"))
+        self.assertIn("If every `total` is 0, there is no approved access to report", self.skill)
+        self.assertIn("call it once for each part of 366 days or less", self.skill)
+        self.assertIn("`status` `approved`, `dismissed` and `superseded`", self.skill)
+        self.assertIn("Call `list_controls`", self.skill)
+        self.assertIn("never take a refused call as an empty period or as no controls", self.skill)
+        self.assertIn("Do not ask for the other inputs until they choose one", self.skill)
+
     def test_the_skill_shows_one_numbered_list_per_table_with_each_default_checked_and_described(self):
         self.assertIn("one short list per table", self.skill)
         self.assertIn("Number the columns 1, 2, 3 and on across all the tables, without starting again at each table", self.skill)
