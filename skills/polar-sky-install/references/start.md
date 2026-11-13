@@ -134,7 +134,7 @@ Write one message, in this order. Ask nothing in it except the question at the e
 
    In Cloud, the super admin's or administrator's approval is the longest wait. In On-Prem, the service accounts or app registrations and the cluster can be set up at the same time, so the approval does not hold up the rest.
 
-5. **The question, as the last line.** When no provider is connected and `has_engine` is false, end with: "Does your organization use Google Workspace or Microsoft 365, and which deployment does it want: Cloud or On-Prem?" When a provider is connected and `has_engine` is false, end with: "Which deployment does your organization want: Cloud or On-Prem?" If `has_engine` is true, end with: "Shall I go ahead with the On-Prem install?"
+5. **The question, as the last line.** When no provider is connected and `has_engine` is false, end with: "Does your organization use Google Workspace or Microsoft 365, and which deployment does it want: On-Prem in your own cluster, or Cloud?" When a provider is connected and `has_engine` is false, end with: "Which deployment does your organization want: On-Prem in your own cluster, or Cloud?" Keep that order: some assistants suggest a reply from the last option, and pressing Enter on a suggested On-Prem would start the longer install with a cluster by mistake. If `has_engine` is true, end with: "Shall I go ahead with the On-Prem install?"
 
 The preview sets expectations only. It is not the plan and needs no approval.
 

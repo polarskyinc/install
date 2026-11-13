@@ -79,6 +79,14 @@ Tell the person in one line that Polar Sky checks the install on its side and co
 
 In Claude Code and in Codex. With this connection, the person reviews Polar Sky's controls from their AI assistant: they ask why a control was proposed and who would lose access, change who keeps access, and approve or reject it. Every organization can use it. The final plan's yes covers this step, so do not ask again. Show the command for the agent you are, then run it.
 
+In Claude Code, check first, read only, whether a claude.ai connector already points at Polar Sky controls. Claude Team and Enterprise accounts can bring one from their organization, and a second server would show the same tools twice:
+
+```bash
+claude mcp list 2>/dev/null | grep -E '^claude\.ai [^:]+: https://mcp\.polarsky\.ai/controls( |$)'
+```
+
+If it prints a line, do not add `polar-sky-controls`. Tell the person in one line that Claude Code already has Polar Sky controls through their organization's connector, by the name it shows (for example `claude.ai Polar Sky Controls`). If that line says it needs authentication, they sign in as below, choosing that connector in `/mcp`. If it says it failed to connect, tell them to choose that connector in `/mcp` and reconnect it, and to ask their Claude administrator if it still fails; do not add a second server for it. Then go on to the skills. In Codex, which cannot show such connectors, add the server as below.
+
 In Claude Code (`--scope user`, so it works in any folder, like the install server):
 
 ```bash
@@ -95,7 +103,7 @@ If the command says `polar-sky-controls` already exists, keep it: do not remove 
 
 Then tell the person how they sign in. They sign in with their Polar Sky console account, in the browser:
 
-- In Claude Code: Claude Code opens the browser the first time they use Polar Sky controls, or they type `/mcp`, choose `polar-sky-controls` and **Authenticate**.
+- In Claude Code: Claude Code opens the browser the first time they use Polar Sky controls, or they type `/mcp`, choose `polar-sky-controls`, or the claude.ai connector by the name `claude mcp list` showed when you did not add the server, and **Authenticate**.
 - In Codex: they run `codex mcp login polar-sky-controls` in their own terminal, and Codex opens the browser.
 
 On the Polar Sky page they sign in and choose **Approve**. The page says that Polar Sky cannot verify which program on their computer is asking: they choose **Approve** only if they started the sign-in themselves. Only administrators, named reviewers and delegates see controls; a delegate sees only the controls delegated to them.
@@ -128,4 +136,4 @@ On-Prem only: remind them that Kubernetes secrets are only base64-encoded. Their
 
 ## What is left
 
-After the summary, call `get_install_checklist` with `check_live` true, as [Say what is left to set up](../SKILL.md#say-what-is-left-to-set-up) says, and add one line for each optional item it reports as missing, with its next step. Do not let it change whether the install is done: that stays with the checks above.
+After the summary, call `get_install_checklist` with `check_live` true, as [Say what is left to set up](../SKILL.md#say-what-is-left-to-set-up) says, and add one line for each optional item it reports as missing, with its next step. Leave out the `group_provisioning` item when `values.env` has `POLAR_SKY_OKTA_PLANNED='no'` and Okta is not connected: the company does not use Okta, so the group setting is the normal default, as question 8 in [Look up what the model needs](discover.md#ask-the-open-questions) says, and the person changes nothing. Do not let it change whether the install is done: that stays with the checks above.

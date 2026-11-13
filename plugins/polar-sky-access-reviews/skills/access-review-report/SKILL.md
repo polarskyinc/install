@@ -1,6 +1,6 @@
 ---
 name: access-review-report
-description: Build a Polar Sky access review report (HTML, PDF and CSV files) for an auditor from the folder access that data owners approved in a date range, with the evidence mapped to one or more of PCI DSS 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC, and the data owners' sign-off, using the polar-sky-controls MCP server. Use when the person asks for an access review report, user access review evidence, a compliance report or access review evidence for an auditor, QSA or tool such as Vanta.
+description: Build a Polar Sky access review report (HTML, PDF and CSV files) for an auditor from the folder access that data owners approved in a date range, with the evidence mapped to one or more of PCI DSS 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC, and the data owners' sign-off, using the Polar Sky controls MCP server (polar-sky-controls or the claude.ai Polar Sky Controls connector). Use when the person asks for an access review report, user access review evidence, a compliance report or access review evidence for an auditor, QSA or tool such as Vanta.
 ---
 
 # Polar Sky access review report
@@ -21,7 +21,7 @@ Paths below are relative to this skill's folder (`${CLAUDE_SKILL_DIR}`). The per
 
 ### 1. Check the connection and access
 
-Check that the `polar-sky-controls` MCP server is connected and lists `get_access_review_evidence`. If it is not connected, say so and stop. Note whether it also lists `start_access_review_extract`, `get_access_review_extract` and `read_access_review_extract_rows`. If any of the three is missing, skip the extract calls in steps 3 and 6; the report marks the extract "Not available in this version".
+Polar Sky controls reach Claude through one of two MCP servers: one the person added, usually named `polar-sky-controls`, or their organization's claude.ai connector, usually named `claude.ai Polar Sky Controls`. Find the connected server that lists `get_access_review_evidence`, by the tool's name; the name can carry a server prefix, such as `mcp__polar-sky-controls__get_access_review_evidence` or `mcp__claude_ai_Polar_Sky_Controls__get_access_review_evidence`. Use that server for every tool call in this skill. If two servers list it, use the claude.ai connector, and tell the person in one line which one you use. If no connected server lists `get_access_review_evidence`, say that Polar Sky controls are not connected and stop. Note whether that server also lists `start_access_review_extract`, `get_access_review_extract` and `read_access_review_extract_rows`. If any of the three is missing, skip the extract calls in steps 3 and 6; the report marks the extract "Not available in this version".
 
 ### 2. Ask for the inputs
 

@@ -1,6 +1,6 @@
 ---
 name: access-review-audit-trail
-description: Show the Polar Sky audit trail for a date range, for every control or one control, as a table in the chat and an audit-trail.csv file, using the polar-sky-controls MCP server. One row per change Polar Sky recorded - approvals, member, role and group changes, plan actions and removals - with when, who made it, who approved it, the result and when the removal was confirmed. Use when the person asks what changed, for an audit trail, a change log or change history of access controls, or what Polar Sky did to a control in a period, for example for an auditor or QSA.
+description: Show the Polar Sky audit trail for a date range, for every control or one control, as a table in the chat and an audit-trail.csv file, using the Polar Sky controls MCP server (polar-sky-controls or the claude.ai Polar Sky Controls connector). One row per change Polar Sky recorded - approvals, member, role and group changes, plan actions and removals - with when, who made it, who approved it, the result and when the removal was confirmed. Use when the person asks what changed, for an audit trail, a change log or change history of access controls, or what Polar Sky did to a control in a period, for example for an auditor or QSA.
 ---
 
 # Polar Sky audit trail
@@ -19,7 +19,7 @@ Paths below are relative to this skill's folder (`${CLAUDE_SKILL_DIR}`). The per
 
 ### 1. Check the connection
 
-Check that the `polar-sky-controls` MCP server is connected and lists `get_access_review_audit_trail`. If not, say so and stop.
+Polar Sky controls reach Claude through one of two MCP servers: one the person added, usually named `polar-sky-controls`, or their organization's claude.ai connector, usually named `claude.ai Polar Sky Controls`. Find the connected server that lists `get_access_review_audit_trail`, by the tool's name; the name can carry a server prefix, such as `mcp__polar-sky-controls__get_access_review_audit_trail` or `mcp__claude_ai_Polar_Sky_Controls__get_access_review_audit_trail`. Use that server for every tool call in this skill. If two servers list it, use the claude.ai connector, and tell the person in one line which one you use. If no connected server lists `get_access_review_audit_trail`, say that Polar Sky controls are not connected and stop.
 
 ### 2. Ask for the range
 

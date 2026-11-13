@@ -176,7 +176,7 @@ Also say: the Workspace admin Polar Sky acts as (`GOOGLE_WORKSPACE_ADMIN_EMAIL`)
 
 ## What each entry lets Polar Sky do
 
-A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: its `purpose` from the `scopes` list of `get_install_values`. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, Polar Sky may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
+A super admin should know what they approve. In the message, under each entry, give one plain line per scope in that entry: the scope's short name, which is the part after `https://www.googleapis.com/auth/`, then a colon and its `purpose` from the `scopes` list of `get_install_values`, for example `drive.metadata.readonly: <its purpose>`. Every line starts with its scope's name, because some purposes speak of "this scope" and mean nothing without it. Never write your own explanation. For `admin.directory.group`, also give its `needed_now_reason`, as above. For `drive`, also say: before a change in a shared drive, Polar Sky may add the Workspace admin as a manager of that drive, because only managers can change sharing there; that membership stays.
 
 In On-Prem, Polar Sky Cloud's entry has no scope that reaches file content. Only the engine, which runs in the company's own cloud, can read content and change sharing, and it changes sharing only when the team approves a control.
 
@@ -199,7 +199,7 @@ Open the link while signed in as a super admin, check the client ID and scopes, 
 1. <link for GOOGLE_CLOUD_CLIENT_ID>
 
 What the entry lets Polar Sky do (Polar Sky Cloud reads file content and makes the access changes our team approves):
-   - <one line per scope in POLAR_SKY_CLOUD_SCOPES>
+   - <one line per scope in POLAR_SKY_CLOUD_SCOPES: short scope name: purpose>
 
 If the link does not open the dialog, add the entry by hand
 (Security > Access and data control > API controls > Domain-wide delegation > Manage all):
@@ -229,9 +229,9 @@ Open each link while signed in as a super admin, check the client ID and scopes,
 What each entry lets Polar Sky do:
 
 1. Polar Sky Cloud (no access to file content):
-   - <one line per scope in POLAR_SKY_CLOUD_SCOPES>
+   - <one line per scope in POLAR_SKY_CLOUD_SCOPES: short scope name: purpose>
 2. Polar Sky engine, which runs in our own cloud:
-   - <one line per scope in POLAR_SKY_ON_PREM_SCOPES>
+   - <one line per scope in POLAR_SKY_ON_PREM_SCOPES: short scope name: purpose>
 
 If a link does not open the dialog, add the entries by hand
 (Security > Access and data control > API controls > Domain-wide delegation > Manage all):
