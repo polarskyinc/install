@@ -1774,10 +1774,19 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertIn("Write nothing else: no other count, date, hash, name, reason or advice", self.skill)
         self.assertNotIn("Remind the person to read the report", self.skill)
 
-    def test_the_skill_shows_one_list_per_table_with_each_default_checked(self):
+    def test_the_skill_shows_one_numbered_list_per_table_with_each_default_checked_and_described(self):
         self.assertIn("one short list per table", self.skill)
-        self.assertIn("each default column prefixed with `✓ ` and each optional column with no mark", self.skill)
-        self.assertNotIn("with defaults marked", self.skill)
+        self.assertIn("Number the columns 1, 2, 3 and on across all the tables, without starting again at each table", self.skill)
+        self.assertIn("`✓` for a default column or `·` for an optional one, its `header`, then \" - \" and its `description`", self.skill)
+        self.assertIn("Accept numbers, headers or plain words.", self.skill)
+        self.assertNotIn("each optional column with no mark", self.skill)
+
+    def test_every_column_has_a_short_description(self):
+        for table, definition in report_data.load_reference("columns.json").items():
+            for column in definition["columns"]:
+                with self.subTest(table=table, column=column["id"]):
+                    self.assertTrue(column.get("description", "").endswith("."))
+                    self.assertLessEqual(len(column["description"]), 100)
 
 
 def read_no_folder(data):

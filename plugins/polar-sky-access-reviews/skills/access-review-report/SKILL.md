@@ -61,7 +61,7 @@ If it found answers, use the newest of those for the frameworks the person asked
    - When `no_longer_offered` has ids, add one line: "These columns from last time are no longer in the report: <ids>."
    - When `defaults_not_in_last` has ids, add one line with their headers: "These default columns were not in your last report: <headers>. Add them?"
 
-   Show the full column lists, as below, only if the person wants to change the columns.
+   Show the full column lists, numbered and with descriptions as below, only if the person wants to change the columns.
 
 If it found nothing, or the person asks for a different framework with only organization answers found, ask for everything below as usual, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still ask the review interval if a framework asked for now needs it.
 
@@ -78,7 +78,7 @@ Ask in one message, with short examples. Read `references/frameworks.json` for t
 
 Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the person's answer, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
 
-Then, unless item 6 above already asked about the columns, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`, one column `header` per line, each default column prefixed with `✓ ` and each optional column with no mark. Ask which columns to drop or add. Keep the defaults for any table they do not change.
+Then, unless item 6 above already asked about the columns, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`. Number the columns 1, 2, 3 and on across all the tables, without starting again at each table, so every number names one column. Put one column per line: its number, `✓` for a default column or `·` for an optional one, its `header`, then " - " and its `description`, for example "5. ✓ Job title - The person's job title from the directory.". Under the lists, say: "✓ is in the report, · is not. To change this, give the numbers to drop or add, for example "drop 5, add 6", or say it in words." Accept numbers, headers or plain words. Keep the defaults for any table they do not change.
 
 ### 3. Make the data folder and start the extract
 
