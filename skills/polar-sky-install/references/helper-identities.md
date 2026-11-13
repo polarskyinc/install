@@ -61,10 +61,11 @@ Show the whole setup in one message, with the commands of the next three section
 ## Turn on the APIs
 
 ```bash
-gcloud services enable iam.googleapis.com iamcredentials.googleapis.com drive.googleapis.com --project="${HELPER_IDENTITY_PROJECT_ID}"
+gcloud services enable iam.googleapis.com iamcredentials.googleapis.com drive.googleapis.com orgpolicy.googleapis.com --project="${HELPER_IDENTITY_PROJECT_ID}"
 ```
 
 This turns on the Google services Polar Sky uses to create the helper accounts, to act as them, and to read Drive as them. A helper reads Drive with its own token and no separate quota project, so without the Drive API in this project its first read is refused with a 403.
+The Organization Policy API is what the `gcloud org-policies` commands in the next section go through; without it they stop with "API [orgpolicy.googleapis.com] not enabled on project" before any policy is read or set.
 
 ## Organization policies
 
