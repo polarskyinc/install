@@ -1,13 +1,13 @@
 # Optional: helper identities in the customer's own Google Cloud project
 
-**Tell the person:** Polar Sky's AI helpers act through their own Google accounts. By default those accounts live in a Google Cloud project Polar Sky owns, so your Google Workspace sees them as outsiders: they cannot join your groups, and you cannot share a folder with one while external sharing is off. This step puts the accounts in a project you own, where Google Workspace counts them as part of your organization.
+**Tell the person:** Polar Sky's AI helpers act through their own Google accounts. By default those accounts live in a Google Cloud project Polar Sky owns, and this step puts them in a project you own instead, so you see and control them. Google Drive still treats them as outside your Workspace, so a Shared Drive that blocks outside sharing has to allow it before a helper can read there.
 
 Run this step only when the person asks for it, or when the install plan has it. It is not needed for the install to work, and it comes after the install is done. It is for Google Workspace, in both models. It changes nothing for helpers that already exist: they keep the account they have, and only new helpers are created in the new project.
 
 It needs three kinds of rights. Ask who has them before you start:
 
 - **Create a project** (Project Creator, and Billing Account User to link billing). Not needed when the project already exists.
-- **Change an organization policy** (Organization Policy Administrator, `roles/orgpolicy.policyAdmin`). Often held by the Google Cloud organization administrators and not by the person you are talking to.
+- **Change an organization policy** (Organization Policy Administrator, `roles/orgpolicy.policyAdmin`). The role is granted on the Google Cloud organization only, not on a folder or the project (Google refuses it there), and is almost always held by the organization administrators rather than the person you are talking to.
 - **Create roles and grant them in the project** (Owner, or Role Administrator together with Project IAM Admin).
 
 A Google Workspace super admin is needed for one more thing at the end: the ceiling checker's delegation entry.
@@ -184,8 +184,8 @@ When the person lacks the organization policy rights, write a message for them t
 Hello,
 
 We are setting up Polar Sky's AI helpers so they act through Google accounts in a project we own,
-which makes them count as part of our organization. Please set these organization policies on the
-project <HELPER_IDENTITY_PROJECT_ID> (Organization Policy Administrator is needed):
+which we own and control. Please set these organization policies on the
+project <HELPER_IDENTITY_PROJECT_ID> (Organization Policy Administrator on our Google Cloud organization is needed; the role cannot be granted on a folder or the project itself):
 
 1. If iam.allowedPolicyMemberDomains is enforced for the project, add this Google Workspace customer ID
    to its allowed values and keep inheriting from the parent: <POLAR_SKY_WORKSPACE_CUSTOMER_ID>
