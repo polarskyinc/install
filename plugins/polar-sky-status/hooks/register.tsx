@@ -48,7 +48,7 @@ export const TIPS: readonly { id: string; text: string }[] = [
 
 /** Tips the band rotates through during an install, each naming a question the install answers in both Cloud and On-Prem. */
 export const INSTALL_TIPS: readonly { id: string; text: string }[] = [
-  { id: 'remaining', text: 'Ask "what\'s left in my install?"' },
+  { id: 'remaining', text: 'Ask "what else needs to be configured?"' },
   { id: 'people', text: 'Ask "who else do I need to finish this install?"' },
   { id: 'permissions', text: 'Ask "which Google Workspace permissions does Polar Sky need, and why?"' },
   { id: 'keys', text: 'Ask "do my private keys ever leave this machine?"' },

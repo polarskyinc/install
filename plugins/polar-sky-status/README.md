@@ -11,7 +11,7 @@ Once Claude calls a Polar Sky connector, this mod shows a band above the prompt 
 During an install, a call to the Polar Sky Install server shows a tip about the install instead, with no counts:
 
 ```
- Polar Sky  Tip: Ask "what's left in my install?"
+ Polar Sky  Tip: Ask "what else needs to be configured?"
 ```
 
 ## Install
