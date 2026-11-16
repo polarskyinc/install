@@ -141,3 +141,10 @@ a.xref { color: var(--violet); text-decoration: none; }
 .ps-table td.hk { font-family: var(--font-mono); font-size: 6.5pt; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
 .toc a { color: inherit; text-decoration: none; display: flex; gap: 10pt; }
 .na { color: var(--ink-2); font-style: italic; }
+.people { table-layout: fixed; }
+.people th:nth-child(1) { width: 20%; } .people th:nth-child(2) { width: 14%; } .people th:nth-child(3) { width: 9%; }
+.people th:nth-child(4) { width: 9%; } .people th:nth-child(5) { width: 17%; } .people th:nth-child(6) { width: 11%; }
+.people th:nth-child(7) { width: 12%; } .people th:nth-child(8) { width: 8%; }
+.people th, .people td { padding-left: 3pt; padding-right: 3pt; }
+.people td { overflow-wrap: break-word; }
+.people .nw { white-space: nowrap; }

@@ -103,7 +103,7 @@ If step 1 found the extract tools, call `start_access_review_extract` with `from
 
 ### 4. Record the Claude session
 
-Run `printenv CLAUDE_CODE_SESSION_ID`. If it prints an id, record it with source `CLAUDE_CODE_SESSION_ID`. If it is empty, use `${CLAUDE_SESSION_ID}` if that is an id; otherwise ask the person to paste the session id, or record none (the report then says "Not recorded").
+Run `printenv CLAUDE_CODE_SESSION_ID`. If it prints an id, record it with source `CLAUDE_CODE_SESSION_ID`. If it is empty, use `${CLAUDE_SESSION_ID}` if that is an id; otherwise record none. Never ask the person for it: the report does not show it, it stays in the data folder.
 
 ### 5. Collect the data
 

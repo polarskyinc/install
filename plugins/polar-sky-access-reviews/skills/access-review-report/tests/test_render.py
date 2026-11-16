@@ -295,11 +295,6 @@ class ContentTest(unittest.TestCase):
         with self.assertRaises(report_data.ReportDataError):
             render_report.render(data)
 
-    def test_activity_outside_the_period_is_not_counted(self):
-        model = report_data.build_model(fixture())
-        by_name = {control["name"]: control for control in model["controls"]}
-        self.assertEqual(by_name["Catalog-Client-Viewers"]["activity_in_period"], 3)
-
     def test_attachments_carry_the_hash_of_each_csv(self):
         import hashlib
 
@@ -311,7 +306,8 @@ class ContentTest(unittest.TestCase):
         files = render_report.render(without_extract(fixture()))
         page = files["report.html"]
         self.assertNotIn("extract.csv", files)
-        self.assertIn("<td>SHA-256 of extract</td><td><span class=\"na\">Not available in this version</span>", page)
+        self.assertIn("<td>Extract taken</td><td><span class=\"na\">Not available in this version</span>", page)
+        self.assertNotIn("SHA-256 of extract", page)
         self.assertIn(
             "<td>F</td><td>Original extract</td><td colspan=\"2\"><span class=\"na\">Not available in this version</span>", page
         )
@@ -330,16 +326,14 @@ class ContentTest(unittest.TestCase):
         self.assertEqual({row["as_of"] for row in self.members.values()}, {"2026-11-02 13:55 UTC"})
         self.assertIn("Members are read as they are at report time, 2026-11-02 13:55 UTC", self.files["report.html"])
 
-    def test_session_id_is_recorded_next_to_the_acknowledgment(self):
-        page = self.files["report.html"]
-        acknowledgment = page.split("Management acknowledgment</span>", 1)[1]
-        self.assertIn("72fad66e-0000-4000-8000-000000000001", acknowledgment)
+    def test_the_acknowledgment_shows_who_and_when_but_not_the_session(self):
+        acknowledgment = self.files["report.html"].split("Management acknowledgment</span>", 1)[1]
+        self.assertIn("<dt>Date</dt><dd>2026-11-03</dd>", acknowledgment)
+        self.assertNotIn("72fad66e-0000-4000-8000-000000000001", self.files["report.html"])
+        self.assertNotIn("session", acknowledgment.lower())
 
-    def test_missing_session_says_not_recorded(self):
-        data = fixture()
-        del data["inputs"]["session"]
-        page = render_report.render(data)["report.html"]
-        self.assertIn("<dt>Claude Code session</dt><dd><code>Not recorded</code>", page)
+    def test_the_generated_row_gives_only_the_time(self):
+        self.assertIn("<tr><td>Generated</td><td>2026-11-02 14:02 UTC</td></tr>", self.files["report.html"])
 
     def test_customer_data_is_escaped(self):
         data = fixture()
@@ -658,16 +652,21 @@ class ExtractTest(unittest.TestCase):
         self.page = self.files["report.html"]
         self.section = section_three(self.page)
 
-    def test_section_three_shows_the_stored_file(self):
+    def test_section_three_gives_the_source_the_date_and_the_count_match_only(self):
+        rows = re.findall(r"<tr><td>([^<]+)</td>", self.section.split("<h3>", 1)[0])
+        self.assertEqual(rows, [
+            "Source", "Folder sets", "Folders", "Sites", "Groups", "Members at report time", "Kept direct shares",
+            "Access decisions", "Extract taken", "Independent count", "Could not be read", "Not in the members list",
+            "How the list was built", "Link types not listed",
+        ])
         self.assertIn("<td>Extract taken</td><td>2026-11-02 13:55 UTC</td>", self.section)
-        self.assertIn(f"<code>{STORED_SHA256}</code>", self.section)
-        self.assertIn("2,961 bytes", self.section)
-        self.assertIn(
-            "<td>Extract rows</td><td>6: grant 3, group member 2, link 1. From 3 folder sets and 3 folders read</td>",
-            self.section,
-        )
-        self.assertIn("<td>Rows read</td><td>6, all in Attachment F</td>", self.section)
-        self.assertIn("Yes. Polar Sky checked the whole stored file against this SHA-256", self.section)
+        for plumbing in (STORED_SHA256, "bytes", "Hash checked", "Rows read", "Extract rows", "Extract file", "Extract days"):
+            self.assertNotIn(plumbing, self.section)
+
+    def test_attachment_f_keeps_the_stored_file_and_its_hash(self):
+        attachment = attachment_f(self.page)
+        self.assertIn(f"<code>{STORED_SHA256}</code>", attachment)
+        self.assertNotIn("did not confirm", attachment)
 
     def test_section_three_says_how_the_extract_was_built_and_which_links_it_leaves_out(self):
         self.assertIn(
@@ -749,10 +748,19 @@ class ExtractTest(unittest.TestCase):
         pages[-1]["response"]["rows"] = pages[-1]["response"]["rows"][:-1]
         pages[-1]["response"]["sha256"] = "00" * 32
         pages[0]["response"]["sha256_verified"] = False
-        section = section_three(render_report.render(data)["report.html"])
-        self.assertIn("This differs from the extract&#x27;s own row counts above.", section)
-        self.assertIn("The row pages name a different SHA-256 than the stored file.", section)
-        self.assertIn("No. Polar Sky did not confirm the stored file against this SHA-256", section)
+        page = render_report.render(data)["report.html"]
+        attachment = attachment_f(page)
+        self.assertIn("5 rows were read: grant 2, group member 2, link 1. This differs from the extract&#x27;s own count, 6:", attachment)
+        self.assertIn("The row pages name a different SHA-256 than the stored file.", attachment)
+        self.assertIn("Polar Sky did not confirm the stored file against this SHA-256 when its rows were read.", attachment)
+        self.assertNotIn("did not confirm", section_three(page))
+
+    def test_an_unrecorded_hash_check_is_said_next_to_the_file(self):
+        data = fixture()
+        extract_responses(data, "read_access_review_extract_rows")[0]["response"].pop("sha256_verified", None)
+        page = render_report.render(data)["report.html"]
+        self.assertIn("Polar Sky did not record whether it checked the stored file against this SHA-256.", attachment_f(page))
+        self.assertNotIn("did not record whether", section_three(page))
 
     def test_the_last_extract_named_is_the_one_used(self):
         data = fixture()
@@ -915,33 +923,307 @@ def activity_of(data, control_name):
     )
 
 
-def changes_in_period(data, control_name):
-    return {control["name"]: control for control in report_data.build_model(data)["controls"]}[control_name][
-        "activity_in_period"
+def people_list(page):
+    """Section 8.1 of the report: the printed people list."""
+    return page.split("<h3 class=\"page\">8.1 People with access at report time</h3>", 1)[1].split("</section>", 1)[0]
+
+
+def people_rows(page):
+    """The people list as (folder set, person, cells) tuples, in the order printed."""
+    found = []
+    for block in re.findall(r'<tbody class="people">(.*?)</tbody>', people_list(page), flags=re.S):
+        folder_set = html.unescape(re.search(r'<span class="gcode">(.*?)</span>', block).group(1))
+        for row in re.findall(r"<tr>(.*?)</tr>", block, flags=re.S):
+            cells = [html.unescape(re.sub(r"<[^>]+>", " ", cell.replace("<wbr>", ""))).split() for cell in re.findall(r"<td>(.*?)</td>", row, flags=re.S)]
+            found.append((folder_set, [" ".join(cell) for cell in cells]))
+    return found
+
+
+class PeopleListTest(unittest.TestCase):
+    def setUp(self):
+        self.files, self.model = render_report.render_with_model(fixture())
+        self.page = self.files["report.html"]
+        self.rows = people_rows(self.page)
+
+    def test_the_list_holds_every_member_of_attachment_a(self):
+        members = rows_of(self.files["members.csv"])
+        self.assertEqual(len(self.rows), len(members))
+        self.assertEqual(
+            [(folder_set, cells[0].split(" ")[-1]) for folder_set, cells in self.rows],
+            [(row["folder_set"], row["email"].removeprefix("'")) for row in members],
+        )
+
+    def test_people_are_grouped_by_folder_set_and_sorted_by_name(self):
+        folder_sets = list(dict.fromkeys(folder_set for folder_set, _ in self.rows))
+        self.assertEqual(folder_sets, [control["name"] for control in self.model["controls"]])
+        for folder_set in folder_sets:
+            names = [cells[0].lower() for name, cells in self.rows if name == folder_set]
+            self.assertEqual(names, sorted(names))
+
+    def test_each_row_gives_title_account_type_permission_through_decision_and_keeps_access(self):
+        self.assertIn(
+            ("Catalog-Client-Viewers", [
+                "Dana Whitfield dana.whitfield@northwind-demo.com", "Product Manager", "Not recorded", "Editor",
+                "Direct, and groups: Catalog-Client-Viewers", "Polar Sky 2026-05-04", "Yes", "Yes",
+            ]),
+            self.rows,
+        )
+
+    def test_through_says_direct_groups_or_both(self):
+        through = {cells[0].split(" ")[0] + " " + cells[0].split(" ")[1]: cells[4] for _, cells in self.rows}
+        self.assertEqual(through["Sam Ortiz"], "Direct")
+        self.assertEqual(through["Leah Brooks"], "Groups: Catalog-Client-Viewers")
+        self.assertEqual(through["Dana Whitfield"], "Direct, and groups: Catalog-Client-Viewers")
+        self.assertEqual(render_report.through_text({"individual_access": "No", "through_groups": ""}), "Not recorded")
+
+    def test_the_folder_set_row_names_who_approved_its_access_and_when(self):
+        listed = html.unescape(people_list(self.page))
+        self.assertIn("3 people. Access approved by Dana Whitfield on 2026-09-15. Data owner: Dana Whitfield, Product Manager", listed)
+        self.assertIn("Access approved by Omar Haddad on 2026-03-02, withdrawn 2026-10-19.", listed)
+
+    def test_account_types_are_shown_as_the_provider_gives_them_or_not_recorded(self):
+        data = fixture()
+        for entry in data["responses"]:
+            if entry["tool"] == "list_control_members":
+                for member in entry["response"]["members"]:
+                    if member["name"] == "Sam Ortiz":
+                        member["account_type"] = "Guest"
+        rows = people_rows(render_report.render(data)["report.html"])
+        types = {cells[0].split(" ")[0]: cells[2] for _, cells in rows}
+        self.assertEqual(types["Sam"], "Guest")
+        self.assertEqual(types["Leah"], "Not recorded")
+
+    def test_the_list_keeps_its_columns_when_the_members_csv_drops_them(self):
+        data = fixture()
+        data["inputs"]["columns"]["members"] = ["folder_set", "person_name"]
+        rows = people_rows(render_report.render(data)["report.html"])
+        self.assertEqual({len(cells) for _, cells in rows}, {len(render_report.PEOPLE_COLUMNS)})
+
+    def test_live_read_groups_reach_the_through_column(self):
+        through = " ".join(cells[4] for _, cells in self.rows)
+        for row in rows_of(self.files["members.csv"]):
+            for group in filter(None, row["through_groups"].split("; ")):
+                self.assertIn(group, through)
+
+    def test_the_list_points_to_section_3_3_when_the_live_read_found_more(self):
+        self.assertIn("Access the live read found for people this list does not show is in Section 3.3.", self.page)
+        page = render_report.render(without_extract(fixture()))["report.html"]
+        self.assertNotIn("is in Section 3.3.", page)
+
+    def test_a_report_with_no_folder_sets_says_there_are_no_people(self):
+        page = render_report.render(empty_review(fixture()))["report.html"]
+        self.assertIn("<p>No folder sets, so no people.</p>", people_list(page))
+
+    def test_the_list_starts_on_a_new_page_inside_the_attachments(self):
+        attachments = self.page.split('id="s8"', 1)[1]
+        self.assertIn('<h3 class="page">8.1 People with access at report time</h3>', attachments)
+        self.assertIn("printed in Section 8.1", self.page)
+        self.assertIn("7 rows. Printed in Section 8.1.</td><td><code>members.csv</code>", self.page)
+
+
+def approvals_flags(data):
+    """The approver_has_access value of each approvals.csv row, as (folder set, approver, value)."""
+    return [
+        (row["folder_set"], row["approved_by"], row["approver_has_access"])
+        for row in rows_of(render_report.render(data)["approvals.csv"])
     ]
 
 
-class ChangesInPeriodTest(unittest.TestCase):
-    def test_every_audit_trail_event_type_is_counted(self):
-        data = fixture()
-        entries = activity_of(data, "Customer Records")
-        entries.clear()
-        for index, event_type in enumerate(sorted(report_data.AUDIT_TRAIL_EVENT_TYPES)):
-            entries.append({"at": f"2026-07-{index + 1:02d}T10:00:00Z", "type": event_type, "actor": {"type": "system"}})
-        self.assertEqual(changes_in_period(data, "Customer Records"), 11)
+def members_named(data, name):
+    return [
+        member for entry in data["responses"] if entry["tool"] == "list_control_members"
+        for member in entry["response"]["members"] if member["name"] == name
+    ]
 
-    def test_proposals_releases_and_other_entries_are_not_counted(self):
-        data = fixture()
-        entries = activity_of(data, "Customer Records")
-        entries.clear()
-        for event_type in ("proposal_proposed", "proposal_released", "proposal_dismissed", "delegated", None):
-            entries.append({"at": "2026-07-01T10:00:00Z", "type": event_type, "actor": {"type": "system"}})
-        self.assertEqual(changes_in_period(data, "Customer Records"), 0)
 
-    def test_the_method_text_names_the_events_counted(self):
+class ApproverHasAccessTest(unittest.TestCase):
+    def test_approvals_csv_marks_approvers_who_have_access_to_the_folder_set(self):
+        self.assertEqual(approvals_flags(fixture()), [
+            ("Catalog-Client-Viewers", "Dana Whitfield", "Yes"),
+            ("Customer Records", "Dana Whitfield", "Yes"),
+            ("Customer Records", "Dana Whitfield", "Yes"),
+            ("Model Eval Results", "Omar Haddad", "Yes"),
+        ])
+
+    def test_access_only_the_live_read_found_counts(self):
+        self.assertEqual(approvals_flags(without_extract(fixture()))[1], ("Customer Records", "Dana Whitfield", "No"))
+
+    def test_a_kept_direct_share_counts(self):
+        data = without_extract(fixture())
+        evidence_control(data, "Customer Records")["kept_direct_shares"].append(
+            {"person": "Dana Whitfield", "email": "dana.whitfield@northwind-demo.com", "item_kind": "file", "item": "Q3.xlsx", "role": "reader"}
+        )
+        self.assertEqual(approvals_flags(data)[1], ("Customer Records", "Dana Whitfield", "Yes"))
+
+    def test_a_kept_share_to_another_person_with_the_same_name_is_not_known(self):
+        data = without_extract(fixture())
+        evidence_control(data, "Catalog-Client-Viewers")["kept_direct_shares"].append(
+            {"person": "Dana Whitfield", "email": "dana.whitfield@elsewhere.example", "item_kind": "file", "item": "Q3.xlsx", "role": "reader"}
+        )
+        self.assertEqual(approvals_flags(data)[0], ("Catalog-Client-Viewers", "Dana Whitfield", "Not known"))
+        marked = [cells for folder_set, cells in people_rows(render_report.render(data)["report.html"])
+                  if folder_set == "Catalog-Client-Viewers" and cells[7] == "Yes"]
+        self.assertEqual(marked, [])
+
+    def test_a_name_two_members_share_is_not_known(self):
+        data = fixture()
+        twin = copy.deepcopy(members_named(data, "Leah Brooks")[0])
+        twin.update({"id": "m-twin", "name": "Dana Whitfield", "email": "dana.whitfield@elsewhere.example"})
+        next(
+            entry for entry in data["responses"] if entry["tool"] == "list_control_members" and "offset" in entry["arguments"]
+        )["response"]["members"].append(twin)
+        self.assertEqual(approvals_flags(data)[0], ("Catalog-Client-Viewers", "Dana Whitfield", "Not known"))
+        marked = [cells for _, cells in people_rows(render_report.render(data)["report.html"]) if cells[7] == "Yes"]
+        self.assertEqual(len(marked), 1)
+
+    def test_a_name_two_members_without_email_share_is_not_known(self):
+        data = fixture()
+        dana = members_named(data, "Dana Whitfield")[0]
+        dana["email"] = ""
+        members = next(
+            entry for entry in data["responses"] if entry["tool"] == "list_control_members" and dana in entry["response"]["members"]
+        )["response"]["members"]
+        twin = copy.deepcopy(dana)
+        twin["id"] = "m-twin"
+        members.append(twin)
+        self.assertEqual(approvals_flags(data)[0], ("Catalog-Client-Viewers", "Dana Whitfield", "Not known"))
+        marked = [cells for _, cells in people_rows(render_report.render(data)["report.html"]) if cells[7] == "Yes"]
+        self.assertEqual(len(marked), 1)
+
+    def test_a_same_name_member_who_loses_access_makes_the_match_not_known(self):
+        data = fixture()
+        dana = members_named(data, "Dana Whitfield")[0]
+        twin = copy.deepcopy(dana)
+        twin.update({"id": "m-twin", "email": "dana.whitfield@elsewhere.example", "keeps_access": False})
+        next(
+            entry for entry in data["responses"] if entry["tool"] == "list_control_members" and dana in entry["response"]["members"]
+        )["response"]["members"].append(twin)
+        self.assertEqual(approvals_flags(data)[0], ("Catalog-Client-Viewers", "Dana Whitfield", "Not known"))
+
+    def test_the_column_is_a_default_approvals_column(self):
+        columns = report_data.load_reference("columns.json")["approvals"]["columns"]
+        column = next(column for column in columns if column["id"] == "approver_has_access")
+        self.assertTrue(column["default"])
+        self.assertEqual(column["header"], "Approver has access")
+        data = fixture()
+        data["inputs"].pop("columns")
+        self.assertIn("approver_has_access", rows_of(render_report.render(data)["approvals.csv"])[0])
+
+    def test_polar_sky_approvals_are_left_blank_and_unknown_accounts_are_not_known(self):
+        data = with_system_approval()
+        evidence_control(data, "Customer Records")["approvals"][-1]["actor"]["name"] = "a removed account"
+        flags = approvals_flags(data)
+        self.assertEqual(flags[0], ("Catalog-Client-Viewers", "Polar Sky", ""))
+        self.assertIn(("Customer Records", "a removed account", "Not known"), flags)
+
+    def test_names_match_ignoring_case_and_outer_spaces(self):
+        data = fixture()
+        evidence_control(data, "Catalog-Client-Viewers")["approvals"][0]["actor"]["name"] = "  dana WHITFIELD "
+        self.assertEqual(approvals_flags(data)[0][2], "Yes")
+
+    def test_a_member_who_keeps_no_access_is_still_marked_as_the_approver(self):
+        data = without_extract(fixture())
+        for member in members_named(data, "Dana Whitfield"):
+            member["keeps_access"] = False
+        self.assertEqual(approvals_flags(data)[0], ("Catalog-Client-Viewers", "Dana Whitfield", "No"))
+        marked = [
+            (folder_set, cells[6]) for folder_set, cells in people_rows(render_report.render(data)["report.html"])
+            if cells[0].startswith("Dana Whitfield") and cells[7] == "Yes"
+        ]
+        self.assertEqual(marked, [("Catalog-Client-Viewers", "No")])
+
+    def test_an_unknown_account_marks_no_member(self):
+        data = fixture()
+        evidence_control(data, "Catalog-Client-Viewers")["approvals"][0]["actor"]["name"] = "a removed account"
+        marked = [cells for folder_set, cells in people_rows(render_report.render(data)["report.html"])
+                  if folder_set == "Catalog-Client-Viewers" and cells[7] == "Yes"]
+        self.assertEqual(marked, [])
+
+    def test_the_people_list_marks_the_approver_in_their_own_folder_set_only(self):
+        marked = [
+            (folder_set, cells[0].split(" ")[0] + " " + cells[0].split(" ")[1])
+            for folder_set, cells in people_rows(render_report.render(fixture())["report.html"]) if cells[7] == "Yes"
+        ]
+        self.assertEqual(marked, [("Catalog-Client-Viewers", "Dana Whitfield"), ("Model Eval Results", "Omar Haddad")])
+
+    def test_section_1_and_the_summary_block_count_and_name_them(self):
+        expected = (
+            "In 3 of 3 folder sets, a person who approved the access also has access to it, as a member who keeps access "
+            "(8.1), a kept direct share (5.4) or access the live read found (3.3): Catalog-Client-Viewers (Dana Whitfield); "
+            "Customer Records (Dana Whitfield); Model Eval Results (Omar Haddad). Approvers are matched by name, as Polar "
+            "Sky records approvers by name."
+        )
+        _, files, printed = render_with_main(fixture())
+        section = html.unescape(files["report.html"].split('id="s1"', 1)[1].split("</section>", 1)[0])
+        self.assertIn(expected, section)
+        self.assertIn(f"Approver has access: {expected}", summary_block(printed))
+
+    def test_none_found_is_said_once_and_an_empty_report_says_nothing(self):
+        data = without_extract(fixture())
+        for name in ("Dana Whitfield", "Omar Haddad"):
+            for member in members_named(data, name):
+                member["keeps_access"] = False
+        model = report_data.build_model(data)
+        self.assertEqual(render_report.approver_access_text(model), (
+            "In no folder set does a person who approved the access also have access to it, as a member who keeps "
+            "access (8.1) or a kept direct share (5.4). Approvers are matched by name, as Polar Sky records approvers by name."
+        ))
+        lines = render_report.summary_lines(report_data.build_model(empty_review(fixture())))
+        self.assertFalse(any(line.startswith("Approver has access") for line in lines))
+
+
+    def test_a_not_known_approver_is_not_said_to_have_no_access(self):
+        data = without_extract(fixture())
+        for name in ("Dana Whitfield", "Omar Haddad"):
+            for member in members_named(data, name):
+                member["keeps_access"] = False
+        evidence_control(data, "Customer Records")["approvals"][-1]["actor"]["name"] = "a removed account"
+        text = render_report.approver_access_text(report_data.build_model(data))
+        self.assertNotIn("In no folder set does", text)
+        self.assertIn("In no folder set is a person who approved the access known to also have access to it", text)
+        self.assertIn(
+            "In 1 of 3 folder sets, it is not known whether an approver has access, as the name is shared by more than "
+            "one person or names no known account: Customer Records (a removed account).", text
+        )
+
+
+class PlaceholderSectionsTest(unittest.TestCase):
+    def test_sections_the_report_cannot_fill_are_left_out(self):
+        for name, data in (("fixture", fixture()), ("no folder sets", empty_review(fixture()))):
+            with self.subTest(data=name):
+                files, model = render_report.render_with_model(data)
+                page = files["report.html"]
+                self.assertNotIn("Exceptions", page)
+                self.assertNotIn("Site owners and applications", page)
+                self.assertNotIn("Separate access rules", page)
+                self.assertNotIn("id=\"s9\"", page)
+                summary = render_report.render_summary_text(model)
+                for part in ("exceptions", "site owners", "separate access rules"):
+                    self.assertNotIn(part, summary)
+
+    def test_sign_off_and_attachments_are_sections_7_and_8(self):
         page = render_report.render(fixture())["report.html"]
-        self.assertIn("Changes in period counts the same events as the Polar Sky audit trail", page)
-        self.assertIn("Polar Sky proposing access, or sending a proposal for review, is not counted.", page)
+        toc = page.split('<ol class="toc">', 1)[1].split("</ol>", 1)[0]
+        self.assertIn('<a href="#s7"><span>7</span>Sign-off and management acknowledgment</a>', toc)
+        self.assertIn('<a href="#s8"><span>8</span>Attachments</a>', toc)
+        self.assertIn('<p class="eyebrow" id="s7">Section 7</p>\n  <h2>Sign-off and management acknowledgment</h2>', page)
+        self.assertIn('<p class="eyebrow" id="s8">Section 8</p>\n  <h2>Attachments</h2>', page)
+
+    def test_the_acknowledgment_rows_point_to_section_7(self):
+        for key, framework in report_data.load_reference("frameworks.json").items():
+            for item in framework["checklist"]:
+                with self.subTest(framework=key, evidence=item["evidence"]):
+                    self.assertTrue(set(item["sections"]) <= {"1", "2", "3", "4", "5", "6", "7", "8"})
+                    if item["evidence"] in ("acknowledgment", "owner_approvals"):
+                        self.assertEqual(item["sections"], ["7"])
+
+
+class ChangesInPeriodTest(unittest.TestCase):
+    def test_the_by_folder_set_table_does_not_count_changes_in_the_period(self):
+        page = render_report.render(fixture())["report.html"]
+        self.assertNotIn("Changes in period", page)
+        self.assertNotIn("audit trail", page)
+        self.assertFalse(hasattr(report_data, "AUDIT_TRAIL_EVENT_TYPES"))
 
 
 def controls_by_name(data):
@@ -1526,7 +1808,7 @@ class ClockTest(unittest.TestCase):
         del data["inputs"]["generated_at"]
         status, files, _ = render_with_main(data)
         self.assertEqual(status, 0)
-        self.assertIn("by the Polar Sky compliance report skill", files["report.html"])
+        self.assertIn("<tr><td>Generated</td>", files["report.html"])
 
 
 OVERFLOW_SCRIPT = (
@@ -1610,7 +1892,7 @@ class SummaryTest(unittest.TestCase):
         self.assertIn("Folder sets: 3: 2 approved in the period; 1 approved, then withdrawn.", lines)
         self.assertIn("Removals: 1 applied, 0 failed, 0 pending, 0 not applied. Re-scan confirmation: not available in this version.", lines)
         self.assertIn("TBD: nothing.", lines)
-        self.assertTrue(any(line.startswith("Extract: Taken 2026-11-02 13:55 UTC. SHA-256 " + STORED_SHA256) for line in lines))
+        self.assertTrue(any(line.startswith("Extract: Taken 2026-11-02 13:55 UTC. 3 groups counted.") for line in lines))
 
     def test_every_summary_count_is_worded_as_the_html_states_it(self):
         model = report_data.build_model(fixture())
@@ -1632,9 +1914,9 @@ class SummaryTest(unittest.TestCase):
         pages[-1]["response"]["sha256"] = "00" * 32
         pages[0]["response"]["sha256_verified"] = False
         line = next(line for line in render_report.summary_lines(report_data.build_model(data)) if line.startswith("Extract:"))
-        self.assertIn("not confirmed when its rows were read", line)
+        self.assertIn("Attachment F: Polar Sky did not confirm the stored file against this SHA-256", line)
         self.assertIn("The row pages name a different SHA-256 than the stored file.", line)
-        self.assertIn("This differs from the extract's own row counts: ", line)
+        self.assertIn("This differs from the extract's own count, 6: ", line)
 
     def test_a_line_break_in_extract_data_stays_inside_its_summary_line(self):
         data = fail_extract(fixture())
@@ -1731,7 +2013,7 @@ def without_optional_values(data):
 class MissingDataTest(unittest.TestCase):
     def test_a_failed_extract_shows_its_hash_as_not_available(self):
         page = render_report.render(fail_extract(fixture()))["report.html"]
-        self.assertIn('<td>SHA-256 of extract</td><td><span class="na">Not available: the extract failed</span></td>', page)
+        self.assertNotIn("SHA-256 of extract", page)
         self.assertNotIn("None", visible_text({"report.html": page}))
 
     def test_missing_and_null_data_never_shows_none_or_a_placeholder(self):
@@ -1920,11 +2202,7 @@ class NoFolderSetsTest(unittest.TestCase):
         self.assertNotIn("Within the deadline", self.page)
         self.assertIn("Removals: No removals.", self.lines)
         self.assertIn("People who approved access or added or changed it: no one.", self.lines)
-        self.assertIn(
-            "Not available in this version: Section 4 separate access rules; Section 5.5 site owners and applications; "
-            "Section 7 exceptions.",
-            self.lines,
-        )
+        self.assertIn("Not available in this version: nothing.", self.lines)
 
     def test_the_render_command_still_prints_the_block_to_paste(self):
         status, _, printed = render_with_main(empty_review(fixture()))
@@ -1977,6 +2255,9 @@ def every_column(data):
     return data
 
 
+HOW_IT_WAS_MADE = re.compile(r"\bskill\b|renderer|typed into|Claude Code|session", re.IGNORECASE)
+
+
 def framework_texts(framework):
     """The framework texts that may use the auditor's own word control, such as SOX IT general controls."""
     texts = [framework[key] for key in ("eyebrow", "subtitle", "control", "purpose", "requirement")]
@@ -2026,6 +2307,22 @@ class NoPolarSkyJargonTest(unittest.TestCase):
                     data["inputs"]["framework"] = framework
                     data["inputs"]["review_interval"] = "Quarterly"
                     self.assertEqual([line for line in reader_words(data) if JARGON.search(line)], [])
+
+    def test_the_report_never_says_how_it_was_made(self):
+        variants = {
+            "Microsoft 365": fixture, "Google Workspace": google_fixture, "mixed": mixed_fixture,
+            "failed extract": lambda: fail_extract(fixture()), "no extract": lambda: without_extract(fixture()),
+            "no folder sets": lambda: empty_review(fixture()),
+        }
+        for frameworks in (["pci_dss"], ["soc2"], ["soc2", "iso27001", "hipaa"]):
+            for name, build in variants.items():
+                with self.subTest(frameworks=frameworks, data=name):
+                    data = every_column(build())
+                    data["inputs"].pop("framework", None)
+                    data["inputs"]["frameworks"] = frameworks
+                    data["inputs"]["review_interval"] = "Quarterly"
+                    text = visible_text(render_report.render(data))
+                    self.assertEqual([line for line in text.splitlines() if HOW_IT_WAS_MADE.search(line)], [])
 
     def test_the_csv_column_ids_name_folder_sets_not_controls(self):
         definitions = report_data.load_reference("columns.json")
@@ -2739,7 +3036,7 @@ class SeveralFrameworksTest(unittest.TestCase):
         self.assertIn("Interval set by the company: Every 6 months.", timing[1])
         self.assertEqual(rows[0][0], ["HIPAA 164.308(a)(4) Sites that hold patient data named"])
         owner_row = [row for row in rows if row[0] == ["ISO 27001 Annex A 5.18 Reviewed by the owner of the information"]][0]
-        self.assertEqual(owner_row[2], "8")
+        self.assertEqual(owner_row[2], "7")
         self.assertTrue(owner_row[1].startswith("1 of 3 folder sets approved by their data owner in the period."))
         self.assertEqual(rows[-1][0][0], "PCI DSS Requirement 7.2.4 Management acknowledgment")
         self.assertEqual(rows[2][2], "3, 5")
@@ -2843,10 +3140,10 @@ class DataOwnerSignoffTest(unittest.TestCase):
         evidence_control(data, "Customer Records")["approvals"] = []
         self.assertEqual(signoff_of(data)["Customer Records"]["note"], "No approval recorded")
 
-    def test_section_8_shows_the_signoff_table_before_the_acknowledgment(self):
+    def test_section_7_shows_the_signoff_table_before_the_acknowledgment(self):
         page = render_report.render(fixture())["report.html"]
-        section = html.unescape(page.split('id="s8"', 1)[1].split("</section>", 1)[0])
-        self.assertLess(section.index("<h3>8.1 Data owner sign-off</h3>"), section.index("<h3>8.2 Management acknowledgment</h3>"))
+        section = html.unescape(page.split('id="s7"', 1)[1].split("</section>", 1)[0])
+        self.assertLess(section.index("<h3>7.1 Data owner sign-off</h3>"), section.index("<h3>7.2 Management acknowledgment</h3>"))
         self.assertIn("Data owners do not sign this report.", section)
         self.assertIn("Polar Sky records approvers by name", section)
         self.assertIn("<p>1 of 3 folder sets were approved by their data owner in the period.</p>", section)

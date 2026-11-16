@@ -22,7 +22,7 @@
       {"requirement": "Access matches job function", "evidence": "who_decided", "sections": ["4", "5"]},
       {"requirement": "Vendor accounts included", "evidence": "account_types", "sections": ["5"]},
       {"requirement": "Inappropriate access addressed", "evidence": "removals", "sections": ["6"]},
-      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["7"]}
     ]
   },
   "soc2": {
@@ -47,7 +47,7 @@
       {"requirement": "All accounts and access reviewed", "evidence": "decisions", "sections": ["3", "5"]},
       {"requirement": "Access authorized by a named person", "evidence": "who_decided", "sections": ["4", "5"]},
       {"requirement": "Unnecessary and inappropriate access removed", "evidence": "removals", "sections": ["6"]},
-      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["7"]}
     ]
   },
   "iso27001": {
@@ -71,7 +71,7 @@
       {"requirement": "Reviewed at the interval the organization set", "evidence": "interval", "sections": ["5"]},
       {"requirement": "All access rights in scope reviewed", "evidence": "decisions", "sections": ["3", "5"]},
       {"requirement": "Access rights authorized by a named person", "evidence": "who_decided", "sections": ["4", "5"]},
-      {"requirement": "Reviewed by the owner of the information", "evidence": "owner_approvals", "sections": ["8"]},
+      {"requirement": "Reviewed by the owner of the information", "evidence": "owner_approvals", "sections": ["7"]},
       {"requirement": "Access rights modified or removed", "evidence": "removals", "sections": ["6"]}
     ]
   },
@@ -97,7 +97,7 @@
       {"requirement": "Access authorized by a named person", "evidence": "who_decided", "sections": ["4", "5"]},
       {"requirement": "Access reviewed and documented", "evidence": "decisions", "sections": ["5"]},
       {"requirement": "Access modified or removed", "evidence": "removals", "sections": ["6"]},
-      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["7"]}
     ]
   },
   "sox": {
@@ -122,7 +122,7 @@
       {"requirement": "All accounts and access reviewed", "evidence": "decisions", "sections": ["3", "5"]},
       {"requirement": "Reviewed by an appropriate person", "evidence": "who_decided", "sections": ["4", "5"]},
       {"requirement": "Inappropriate access removed", "evidence": "removals", "sections": ["6"]},
-      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["8"]}
+      {"requirement": "Management acknowledgment", "evidence": "acknowledgment", "sections": ["7"]}
     ]
   }
 }

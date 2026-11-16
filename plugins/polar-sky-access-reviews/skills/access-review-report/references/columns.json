@@ -88,6 +88,7 @@
       {"id": "folders", "header": "Folders", "default": true, "description": "The folders in the folder set."},
       {"id": "approved_by", "header": "Approved by", "default": true, "description": "Who approved."},
       {"id": "approver_type", "header": "Approver type", "default": true, "description": "Person or Polar Sky."},
+      {"id": "approver_has_access", "header": "Approver has access", "default": true, "description": "Whether the approver also has access to the folder set, matched by name."},
       {"id": "approved_at", "header": "Approved at", "default": true, "description": "When it was approved."},
       {"id": "carried_into_period", "header": "Approved before the period", "default": true, "description": "Whether the approval was made before the period and still in force when it began."},
       {"id": "ended", "header": "Approval ended", "default": true, "description": "When and how the approval ended in the period, if it did."},

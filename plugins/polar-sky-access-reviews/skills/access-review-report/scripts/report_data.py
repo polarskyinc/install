@@ -129,11 +129,6 @@ BASIS_LABELS = {
     "service_account": "Service account",
 }
 
-AUDIT_TRAIL_EVENT_TYPES = frozenset({
-    "proposal_approved", "proposal_reopened", "proposal_superseded", "member_added", "member_removed",
-    "role_changed", "made_owner", "group_kept", "group_dropped", "plan_applied", "plan_partially_applied",
-})
-
 APPROVAL_ENDINGS = {
     "proposal_reopened": "withdrawn",
     "proposal_superseded": "replaced by a later approval",
@@ -146,6 +141,8 @@ CONTROL_ENDED = "ended"
 
 POLICY_LABEL = "Polar Sky"
 NOT_RECORDED = "Not recorded"
+NOT_KNOWN = "Not known"
+UNNAMED_APPROVERS = frozenset({"an unknown account", "a removed account"})
 APPROVER_PERSON = "Person"
 APPROVER_SYSTEM = "Polar Sky"
 KEPT_BY_POLICY = "Proposed by Polar Sky"
@@ -1006,22 +1003,6 @@ def approval_text(control):
     return text
 
 
-def _activity_in_period(entries, period):
-    """Return the control events in the period that the audit trail lists, each once."""
-    start, end = _period_bounds(period)
-    seen = set()
-    kept = []
-    for entry in entries:
-        if entry.get("type") not in AUDIT_TRAIL_EVENT_TYPES:
-            continue
-        at = parse_time(entry.get("at"))
-        key = json.dumps(entry, sort_keys=True)
-        if at and start <= at < end and key not in seen:
-            seen.add(key)
-            kept.append(entry)
-    return kept
-
-
 def members_read_at(inputs, extract, responses):
     """Return the time the member lists stand for: a completed extract's as-of time, else when the last member list was saved, else the report generation time."""
     if extract and extract["status"] == EXTRACT_COMPLETED and extract.get("as_of"):
@@ -1149,6 +1130,45 @@ def _later_approvals(rows):
     return f"approved again later by {join_names(dict.fromkeys(row['approved_by'] for row in rows))}, last {rows[-1]['approved_at']}"
 
 
+def _name_key(name):
+    return (name or "").strip().casefold()
+
+
+def approvers_with_access(members, approvals, others):
+    """Mark each approval whose approver also has access to the folder set (a member who keeps access, a kept direct share or access only the live read found), mark each member who approved the folder set whether or not they keep access, and return the approvers with access; approvals carry no email, so an approver is matched by name, and a name two people share is not known."""
+    people = {}
+    with_access = set()
+    for index, row in enumerate(members):
+        name = _name_key(row["person_name"])
+        people.setdefault(name, set()).add(row["email"].lower() or f"member {index}")
+        if row["_keeps_access"]:
+            with_access.add(name)
+    for row in others:
+        name = _name_key(row["person_name"])
+        found = people.setdefault(name, set())
+        if row.get("email"):
+            found.add(row["email"].lower())
+        with_access.add(name)
+    shared = {name for name, found in people.items() if len(found) > 1}
+    approvers = set()
+    for row in approvals:
+        name = _name_key(row["approved_by"])
+        if not row["_by_person"]:
+            row["approver_has_access"] = ""
+            continue
+        if name not in UNNAMED_APPROVERS and name not in shared:
+            approvers.add(name)
+        if name in UNNAMED_APPROVERS or (name in shared and name in with_access):
+            row["approver_has_access"] = NOT_KNOWN
+        elif name in with_access:
+            row["approver_has_access"] = "Yes"
+        else:
+            row["approver_has_access"] = "No"
+    for row in members:
+        row["_approved_this_folder_set"] = _name_key(row["person_name"]) in approvers
+    return sorted({row["approved_by"] for row in approvals if row["approver_has_access"] == "Yes"}, key=str.lower)
+
+
 def owner_signoff(owners, approvals):
     """Say whether a folder set's data owner approved it in the period, with when and through what, or why not; an approver is the data owner when the names match, as approvals carry no email."""
     names = {name.strip().casefold() for name in owners if name and name.strip()}
@@ -1269,10 +1289,12 @@ def build_model(data):
         entry["owner"] = owners[0]["person_name"] if owners else ""
         entry["owners"] = [{"name": row["person_name"], "title": row["title"]} for row in owners]
         entry["owner_signoff"] = owner_signoff([row["person_name"] for row in owners], approvals)
-        groups = _group_rows(entry, detail)
         shares = _share_rows(entry, evidence, evidence.get("shares_read_at") or records["shares_read_at"])
+        entry["_approval_rows"] = approvals
+        entry["_member_rows"] = members
+        entry["_share_rows"] = shares
+        groups = _group_rows(entry, detail)
         removals = _removal_rows(entry, evidence, deadline_days, open_until)
-        entry["activity_in_period"] = len(_activity_in_period(records["activity"].get(control_id, []), period))
         entry["counts"] = {
             "members": len(members),
             "kept_by_policy": sum(1 for row in members if row["_keeps_access"] and row["_decided_by_policy"]),
@@ -1294,6 +1316,13 @@ def build_model(data):
         tables["approvals"].extend(approvals)
 
     unlisted = reconcile_extract(extract, controls, tables, records["controls"])
+    for control in controls:
+        others = control.pop("_share_rows") + [row for row in unlisted or [] if row["_control_id"] == control["id"]]
+        approvals = control.pop("_approval_rows")
+        control["approvers_with_access"] = approvers_with_access(control.pop("_member_rows"), approvals, others)
+        control["approvers_not_known"] = sorted(
+            {row["approved_by"] for row in approvals if row["approver_has_access"] == NOT_KNOWN}, key=str.lower
+        )
     controls.sort(key=lambda control: (control["name"].lower(), control["id"]))
     order = {control["name"]: index for index, control in enumerate(controls)}
     for name in tables:
@@ -1542,6 +1571,8 @@ def _totals(controls, tables):
     totals["controls_carried"] = sum(1 for control in controls if control["state"] == CONTROL_CARRIED)
     totals["owner_signed_off"] = sum(1 for control in controls if control["owner_signoff"]["signed_off"])
     totals["owner_not_signed_off"] = [control for control in controls if not control["owner_signoff"]["signed_off"]]
+    totals["controls_approver_has_access"] = [control for control in controls if control["approvers_with_access"]]
+    totals["controls_approver_not_known"] = [control for control in controls if control["approvers_not_known"]]
     ended = {}
     for control in controls:
         if control["state"] == CONTROL_ENDED:

@@ -30,16 +30,9 @@ WIDEST_TABLE_COLUMNS = 12
 BAR_COLORS = ("#380081", "#00B2E2", "#BEDEF0", "#4A4A4E")
 SECTIONS = (
     "Executive summary", "Scope and method", "Review population", "Why people have access", "Review results",
-    "Access removed", "Exceptions", "Sign-off and management acknowledgment", "Attachments",
+    "Access removed", "Sign-off and management acknowledgment", "Attachments",
 )
 
-
-CHANGES_COUNTED = (
-    "Changes in period counts the same events as the Polar Sky audit trail: access approved, approval withdrawn "
-    "or replaced by a later approval, member added or removed, permission changed, made owner, group kept or "
-    "dropped, and approved changes carried out in full or in part. Polar Sky proposing access, or sending a proposal "
-    "for review, is not counted. Removals have their own column."
-)
 
 OTHER_SYSTEMS = "Other systems in scope for the requirement are reviewed separately."
 
@@ -466,10 +459,7 @@ def render_contents(model):
     rows += optional_row("Previous review", inputs.get("previous_review"))
     rows += [
         ("Data source", escape(data_source)),
-        ("Generated", escape(
-            f"{report_data.format_time(inputs['generated_at'])} by the Polar Sky compliance report skill. "
-            "The skill's renderer computed every count and hash from Polar Sky records."
-        )),
+        ("Generated", escape(report_data.format_time(inputs["generated_at"]))),
         ("Acknowledged", acknowledged),
         ("Issued", escape(report_data.format_time(model["issued_at"]))),
     ]
@@ -577,7 +567,7 @@ def owner_approvals_evidence(model):
         return "No folder sets."
     text = (
         f"{number(totals['owner_signed_off'])} of {counted(totals['controls'], 'folder set', 'folder sets')} approved by "
-        "their data owner in the period. Section 8 lists each folder set with its data owner's approval, when and through what."
+        "their data owner in the period. Section 7 lists each folder set with its data owner's approval, when and through what."
     )
     if totals["owner_not_signed_off"]:
         text += " Not approved by their data owner in the period: " + "; ".join(
@@ -707,7 +697,38 @@ def summary_paragraph(model):
         text += " " + approved_by_polar_sky_only(totals)
     if totals["controls_ended"]:
         text += " " + ended_controls(totals)
-    return text
+    return text + " " + approver_access_text(model)
+
+
+def approver_access_text(model):
+    """Say in how many folder sets a person who approved the access also has access to it, naming them, or that there are none."""
+    totals = model["totals"]
+    controls = totals["controls_approver_has_access"]
+    where = "as a member who keeps access (8.1) or a kept direct share (5.4)"
+    if model["unlisted"] is not None:
+        where = "as a member who keeps access (8.1), a kept direct share (5.4) or access the live read found (3.3)"
+    matched = "Approvers are matched by name, as Polar Sky records approvers by name."
+    not_known = totals["controls_approver_not_known"]
+    if not controls and not not_known:
+        return f"In no folder set does a person who approved the access also have access to it, {where}. {matched}"
+    if controls:
+        text = (
+            f"In {number(len(controls))} of {counted(totals['controls'], 'folder set', 'folder sets')}, a person who "
+            f"approved the access also has access to it, {where}: {_approvers_by_folder_set(controls, 'approvers_with_access')}."
+        )
+    else:
+        text = f"In no folder set is a person who approved the access known to also have access to it, {where}."
+    if not_known:
+        text += (
+            f" In {number(len(not_known))} of {counted(totals['controls'], 'folder set', 'folder sets')}, it is not known "
+            f"whether an approver has access, as the name is shared by more than one person or names no known account: "
+            f"{_approvers_by_folder_set(not_known, 'approvers_not_known')}."
+        )
+    return f"{text} {matched}"
+
+
+def _approvers_by_folder_set(controls, key):
+    return "; ".join(f"{control['name']} ({report_data.join_names(control[key])})" for control in controls)
 
 
 def summary_stats(model):
@@ -1051,56 +1072,33 @@ def _kinds(counts):
 
 
 def extract_rows(extract):
-    """The Section 3 rows that describe the extract."""
+    """The Section 3 rows that describe the extract: when it was taken, the independent count and what could not be read."""
     if not extract:
-        return [(key, not_available()) for key in ("Extract taken", "Independent count", "SHA-256 of extract")]
-    days = ("Extract days", escape(f"Folder sets with an approval in force {extract['from']} to {extract['to']}")
-            if extract["from"] and extract["to"] else not_available("Not recorded"))
+        return [(key, not_available()) for key in ("Extract taken", "Independent count")]
     if not completed(extract):
-        return [
-            ("Extract", escape(f"Failed: {extract['failure_reason'] or 'Polar Sky gave no reason'}")),
-            days,
-            ("SHA-256 of extract", not_available("Not available: the extract failed")),
-        ]
-    file = extract["file"]
-    stored = ", ".join(part for part in (
-        file.get("reference") or "",
-        counted(file["bytes"], "byte", "bytes") if isinstance(file.get("bytes"), int) else "",
-        file.get("format") or "",
-    ) if part)
-    verified = {
-        True: "Yes. Polar Sky checked the whole stored file against this SHA-256 when its rows were read.",
-        False: "No. Polar Sky did not confirm the stored file against this SHA-256 when its rows were read.",
-    }.get(extract["sha256_verified"], "Not recorded")
-    if not extract["row_hashes_match"]:
-        verified += " The row pages name a different SHA-256 than the stored file."
-    rows_text = number(extract["rows"])
-    if extract["rows_by_kind"]:
-        rows_text += f": {_kinds(extract['rows_by_kind'])}"
-    rows_text += (
-        f". From {counted(extract['controls'] or 0, 'folder set', 'folder sets')} and "
-        f"{counted(extract['folders_read'] or 0, 'folder', 'folders')} read"
-    )
-    if read_no_folder(extract) and not extract["rows"]:
-        rows_text = "No rows: Polar Sky read no folder"
-    read_text = f"{number(extract['rows_read'])}, all in Attachment F" if extract["rows_read"] else "No rows"
-    if not extract["rows_read_match"]:
-        read_text = (
-            f"{number(extract['rows_read'])}: {_kinds(extract['rows_read_by_kind'])}. "
-            "This differs from the extract's own row counts above."
-        )
-    exclusions = extract["exclusions"]
+        return [("Extract", escape(f"Failed: {extract['failure_reason'] or 'Polar Sky gave no reason'}"))]
     return [
         ("Extract taken", escape(report_data.format_time(extract["as_of"]))),
-        days,
-        ("Extract file", escape(stored)),
-        ("SHA-256 of extract", f"<code>{escape(file.get('sha256'))}</code>" if file.get("sha256") else tbd()),
-        ("Hash checked", escape(verified)),
-        ("Extract rows", escape(rows_text)),
-        ("Rows read", escape(read_text)),
         ("Independent count", escape(independent_count(extract))),
         ("Could not be read", escape(could_not_be_read(extract))),
     ]
+
+
+def extract_file_findings(extract):
+    """Say what did not match when Polar Sky read the stored extract back, or nothing when everything matched."""
+    findings = []
+    if extract["sha256_verified"] is False:
+        findings.append("Polar Sky did not confirm the stored file against this SHA-256 when its rows were read.")
+    elif extract["sha256_verified"] is None:
+        findings.append("Polar Sky did not record whether it checked the stored file against this SHA-256.")
+    if not extract["row_hashes_match"]:
+        findings.append("The row pages name a different SHA-256 than the stored file.")
+    if not extract["rows_read_match"]:
+        findings.append(
+            f"{number(extract['rows_read'])} rows were read: {_kinds(extract['rows_read_by_kind'])}. This differs from "
+            f"the extract's own count, {number(extract['rows'])}: {_kinds(extract['rows_by_kind'])}."
+        )
+    return findings
 
 
 def could_not_be_read(extract):
@@ -1234,14 +1232,13 @@ def render_policy(model):
         "authorized approver reviewed and approved it. The reason below applies to the people Polar Sky proposed. "
         "For people a person added or whose access a person changed, Attachment A names who made the change and when."
     )
-    note = "Separate access rules with their own approvals: " + NOT_AVAILABLE.lower() + "."
     reasons = f"  <p>{escape(text)}</p>\n  {data_table(columns, rows, numeric=('kept_by_policy',))}\n"
     if no_folder_sets(model):
         reasons = "  <p>No folder sets, so no reasons for access.</p>\n"
     return (
         section_heading(4, SECTIONS[3])
         + reasons
-        + f'  <p class="note">{escape(note)}</p>\n</section>\n'
+        + "</section>\n"
     )
 
 
@@ -1263,7 +1260,6 @@ def render_results(model):
         {"id": "kept_by_person", "header": "Added or changed by a person"},
         {"id": "shares", "header": "Direct shares"},
         {"id": "removals", "header": "Removals"},
-        {"id": "activity", "header": "Changes in period"},
     ]
     numeric = tuple(column["id"] for column in by_control_columns[1:])
     rows = []
@@ -1274,14 +1270,12 @@ def render_results(model):
             "groups_kept": number(counts["groups_kept"]), "members": number(counts["members"]),
             "kept_by_policy": number(counts["kept_by_policy"]), "kept_by_person": number(counts["kept_by_person"]),
             "shares": number(counts["shares"]), "removals": number(counts["removals"]),
-            "activity": number(control["activity_in_period"]),
         })
     rows.append({
         "name": escape("Total"), "folders": number(totals["folders"]), "groups_kept": number(totals["groups_kept"]),
         "members": number(totals["members"]), "kept_by_policy": number(totals["kept_by_policy"]),
         "kept_by_person": number(totals["kept_by_person"]), "shares": number(totals["shares"]),
         "removals": number(totals["removals"]),
-        "activity": number(sum(control["activity_in_period"] for control in model["controls"])),
         "_row_attributes": ' class="total"',
     })
     approvers = {}
@@ -1317,17 +1311,14 @@ def render_results(model):
             "  <h3>5.2 Access approvals</h3>\n  <p>No access was approved during the period.</p>\n",
             "  <h3>5.3 Groups</h3>\n  <p>No groups.</p>\n",
             "  <h3>5.4 Kept direct shares</h3>\n  <p>No kept direct shares.</p>\n",
-            "  <h3>5.5 Site owners and applications</h3>\n",
-            f"  <p>{not_available()}.</p>\n",
             "</section>\n",
         ])
     parts = [
         section_heading(5, SECTIONS[4]),
         "  <h3>5.1 By folder set</h3>\n",
         f"  <p>Members are read as they are at report time, {escape(report_data.format_time(model['members_as_of']))}, "
-        "not as at the end of the period. Attachment A lists every member with who decided their access, and "
+        "not as at the end of the period. Attachment A lists every member with who decided their access, printed in Section 8.1, and "
         "Attachment B every group.</p>\n",
-        f"  <p>{escape(CHANGES_COUNTED)}</p>\n",
         f"  {data_table(by_control_columns, rows, numeric=numeric)}\n",
         "  <h3>5.2 Access approvals</h3>\n",
         "  <p>Each approval of the access to one folder set is recorded in Polar Sky with the date and who approved it. "
@@ -1346,8 +1337,6 @@ def render_results(model):
         "them or when.</p>\n",
         f"  {data_table(share_columns, model['tables']['shares'])}\n" if model["tables"]["shares"]
         else "  <p>No kept direct shares.</p>\n",
-        "  <h3>5.5 Site owners and applications</h3>\n",
-        f"  <p>{not_available()}.</p>\n",
         "</section>\n",
     ]
     return "".join(parts)
@@ -1418,31 +1407,18 @@ def render_removals(model):
     )
 
 
-def render_exceptions():
-    return (
-        section_heading(7, SECTIONS[6], first_on_page=False)
-        + f"  <p>{not_available()}. Polar Sky does not record exceptions or time-limited access yet.</p>\n</section>\n"
-    )
-
-
 def render_signoff(model):
     acknowledgment = model["acknowledgment"]
-    session = model["inputs"].get("session") or {}
     statement = acknowledgment.get("statement") or report_data.DEFAULT_ACKNOWLEDGMENT
     name = ", ".join(part for part in (acknowledgment.get("name"), acknowledgment.get("title")) if part)
-    session_text = "Not recorded"
-    if session.get("id"):
-        session_text = session["id"]
     details = (
         f"<dt>Name</dt><dd>{value_or_tbd(name)}</dd>"
-        f"<dt>Recorded</dt><dd>{value_or_tbd(report_data.format_date(acknowledgment.get('date')))}"
-        f"{', typed into the Polar Sky compliance report skill in Claude Code' if acknowledgment.get('date') else ''}</dd>"
-        f"<dt>Claude Code session</dt><dd><code>{escape(session_text)}</code></dd>"
+        f"<dt>Date</dt><dd>{value_or_tbd(report_data.format_date(acknowledgment.get('date')))}</dd>"
     )
     return (
-        section_heading(8, SECTIONS[7])
+        section_heading(7, SECTIONS[6])
         + owner_signoff_section(model)
-        + "  <h3>8.2 Management acknowledgment</h3>\n"
+        + "  <h3>7.2 Management acknowledgment</h3>\n"
         + '  <div class="attest"><span class="label">Management acknowledgment</span>\n'
         + f"    <p>{escape(statement)}</p>\n"
         + f"    <dl>{details}</dl>\n  </div>\n</section>\n"
@@ -1481,8 +1457,8 @@ def owner_signoff_rows(model):
 
 
 def owner_signoff_section(model):
-    """Section 8.1: each folder set's data owner sign-off, as the approvals show it."""
-    heading = "  <h3>8.1 Data owner sign-off</h3>\n"
+    """Section 7.1: each folder set's data owner sign-off, as the approvals show it."""
+    heading = "  <h3>7.1 Data owner sign-off</h3>\n"
     if no_folder_sets(model):
         return heading + "  <p>No folder sets, so no data owner sign-off.</p>\n"
     totals = model["totals"]
@@ -1515,18 +1491,97 @@ def render_attachments(model, hashes):
         count = len(model["tables"][table])
         body += (
             f'<tbody class="att"><tr class="has-hash"><td>{letter}</td><td>{escape(definition["title"])}</td>'
-            f"<td>{escape(definition['description'])} {number(count)} rows.</td><td><code>{escape(definition['file'])}</code></td></tr>"
+            f"<td>{escape(definition['description'])} {number(count)} rows.{' Printed in Section 8.1.' if table == 'members' else ''}</td>"
+            f"<td><code>{escape(definition['file'])}</code></td></tr>"
             f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{hashes[definition["file"]]}</code></td></tr></tbody>'
         )
     body += extract_attachment(model["extract"], definitions[EXTRACT_TABLE], hashes)
     return (
-        section_heading(9, SECTIONS[8])
+        section_heading(8, SECTIONS[7])
         + "  <p>The attachments hold the detail behind every count in this report. Each row is complete on its own, "
         "so no row needs another file to be understood. Each attachment is delivered with this report, and its "
         "SHA-256 hash below ties it to this version.</p>\n"
         + f'  <table class="ps-table "><thead><tr><th></th><th>Attachment</th><th>Contents</th><th>File</th></tr></thead>{body}</table>\n'
+        + people_section(model)
         + "</section>\n"
     )
+
+
+PEOPLE_COLUMNS = (
+    "Person", "Job title", "Account type", "Permission", "Through", "Proposed, added or changed by", "Keeps access",
+    "Approved this folder set",
+)
+
+
+def people_section(model):
+    """Section 8.1: Attachment A printed in the report, the people of each folder set at report time with how they have access and who decided it."""
+    heading = '  <h3 class="page">8.1 People with access at report time</h3>\n'
+    if no_folder_sets(model):
+        return heading + "  <p>No folder sets, so no people.</p>\n"
+    intro = (
+        "Every member of each folder set at report time, as in Attachment A, grouped by folder set and sorted by name. "
+        "Each folder set's row gives who approved its access and when. Each person's row gives their job title and "
+        "account type from the directory, their permission, whether they have it directly or through a group, who "
+        "proposed, added or changed their access and when, whether they keep access, and whether they approved the "
+        "folder set's access themselves, matched by name, even if they no longer keep access. Members are read at report "
+        f"time, {report_data.format_time(model['members_as_of'])}, not as at the end of the period."
+    )
+    if model["unlisted"]:
+        intro += " Access the live read found for people this list does not show is in Section 3.3."
+    return heading + f"  <p>{escape(intro)}</p>\n  {people_table(model)}\n"
+
+
+def people_table(model):
+    """One table of every member, a header row per folder set and one row per person, so the column headings repeat on every page."""
+    head = "".join(f"<th>{escape(header)}</th>" for header in PEOPLE_COLUMNS)
+    members = {}
+    for row in model["tables"]["members"]:
+        members.setdefault(row["_control_id"], []).append(row)
+    body = ""
+    for control in model["controls"]:
+        rows = members.get(control["id"], [])
+        body += f'<tbody class="people"><tr class="group"><td colspan="{len(PEOPLE_COLUMNS)}">{people_group_cell(control, len(rows))}</td></tr>'
+        body += "".join(people_row(row) for row in rows)
+        body += "</tbody>"
+    return f'<table class="ps-table appendix people"><thead><tr>{head}</tr></thead>{body}</table>'
+
+
+def people_group_cell(control, count):
+    """The folder set row of the people list: its name, how many people, its folders, who approved its access and when, and its data owner."""
+    approval = "Approval not recorded"
+    if control["approved_on"]:
+        approval = report_data.approval_text(control).replace("Approved ", f"Access approved by {control['approved_by']} on ", 1)
+    details = [counted(count, "person", "people"), approval, f"Data owner: {owner_label(control['owners'])}"]
+    folders = "; ".join(control["folders"]) or "No folders recorded"
+    return (
+        f'<span class="gcode">{escape(control["name"])}</span>'
+        f'<span class="gmeta">{escape(". ".join(details))}</span>'
+        f'<br><span class="cell-note">Folders: {breakable(folders)}</span>'
+    )
+
+
+def through_text(row):
+    """Say how a member has access: directly, through groups, or both."""
+    direct = row.get("individual_access") == "Yes"
+    groups = row["through_groups"]
+    if direct and groups:
+        return f"Direct, and groups: {groups}"
+    if groups:
+        return f"Groups: {groups}"
+    return "Direct" if direct else report_data.NOT_RECORDED
+
+
+def people_row(row):
+    """One person's row in the people list."""
+    decided = escape(row["decided_by"]) + (f'<br><span class="nw">{escape(row["decided_on"])}</span>' if row["decided_on"] else "")
+    person = escape(row["person_name"])
+    if row["email"] and row["email"] != row["person_name"]:
+        person += f'<br><span class="cell-note">{breakable(row["email"])}</span>'
+    cells = (
+        person, escape(row["title"] or report_data.NOT_RECORDED), escape(row["account_type"]), escape(row["role"]),
+        escape(through_text(row)), decided, escape(row["keeps_access"]), "Yes" if row["_approved_this_folder_set"] else "",
+    )
+    return "<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>"
 
 
 def extract_attachment(extract, definition, hashes):
@@ -1540,12 +1595,14 @@ def extract_attachment(extract, definition, hashes):
             f'<td colspan="2">{escape(f"Not available. The extract failed: {reason}")}</td></tr></tbody>'
         )
     file = extract["file"]
+    findings = "".join(f" {escape(finding)}" for finding in extract_file_findings(extract))
+    sha256 = f"<code>{escape(file['sha256'])}</code>" if file.get("sha256") else tbd()
     return (
         '<tbody class="att"><tr class="has-hash"><td>F</td><td>Original extract</td>'
         "<td>The stored extract that Section 3 counts from, kept write-once in Polar Sky. "
-        f"{counted(extract['rows'], 'row', 'rows')}.</td>"
+        f"{counted(extract['rows'], 'row', 'rows')}.{findings}</td>"
         f"<td class=\"p\"><code>{escape(file.get('reference') or '')}</code></td></tr>"
-        f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{escape(file.get("sha256") or "")}</code></td></tr>'
+        f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2">{sha256}</td></tr>'
         f"<tr class=\"has-hash\"><td></td><td>{escape(definition['title'])}</td>"
         f"<td>{escape(definition['description'])} {number(extract['rows_read'])} rows."
         f"{' ' + escape(SYSTEM_ACCOUNT_NOTE) if extract.get('system_account') else ''}</td>"
@@ -1576,7 +1633,7 @@ def render_html(model, hashes):
     sections = [
         render_cover(model), render_contents(model), render_summary(model), render_scope(model),
         render_population(model), render_policy(model), render_results(model), render_removals(model),
-        render_exceptions(), render_signoff(model), render_attachments(model, hashes),
+        render_signoff(model), render_attachments(model, hashes),
     ]
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
@@ -1623,17 +1680,15 @@ def not_available_parts(model):
     totals = model["totals"]
     parts = []
     if not extract:
-        parts += ["Section 3 extract taken, independent count and SHA-256 of extract", "Attachment F original extract"]
+        parts += ["Section 3 extract taken and independent count", "Attachment F original extract"]
     if not completed(extract):
         parts += ["Section 3 how the list was built", "Section 3 link types not listed"]
     if totals["members"] and not totals["account_types_known"]:
         parts.append("Account types of members")
-    parts += ["Section 4 separate access rules", "Section 5.5 site owners and applications"]
     if totals["removals"] and not totals["removals_recorded"]:
         parts.append("Section 6.2 confirmed by re-scan")
     if totals["removals"] and deadline_check(model) is None:
         parts.append("Section 6.2 within the deadline")
-    parts.append("Section 7 exceptions")
     return parts
 
 
@@ -1644,23 +1699,17 @@ def extract_summary(extract):
     if not completed(extract):
         reason = (extract["failure_reason"] or "Polar Sky gave no reason").rstrip(".")
         return f"Failed: {reason}. The report has no extract rows; Attachment F says the extract failed and has no file."
-    sha256 = extract["file"].get("sha256") or "TBD"
-    checked = {True: "checked", False: "not confirmed"}.get(extract["sha256_verified"], "not recorded as checked")
     exclusions = extract["exclusions"]
     could_not = counted(len(exclusions), "item", "items") if exclusions else "none"
-    text = f"Taken {report_data.format_time(extract['as_of'])}. SHA-256 {sha256}, {checked} when its rows were read."
+    text = f"Taken {report_data.format_time(extract['as_of'])}."
     if read_no_folder(extract):
         text += (
             " Polar Sky read no folder, so the extract is empty." if extract["exclusions"]
             else " No folder was in scope, so the extract is empty."
         )
-    if not extract["row_hashes_match"]:
-        text += " The row pages name a different SHA-256 than the stored file."
-    if not extract["rows_read_match"]:
-        text += (
-            f" Rows read: {number(extract['rows_read'])}: {_kinds(extract['rows_read_by_kind'])}. This differs from "
-            f"the extract's own row counts: {number(extract['rows'])}: {_kinds(extract['rows_by_kind'])}."
-        )
+    findings = extract_file_findings(extract)
+    if findings:
+        text += " Attachment F: " + " ".join(findings)
     return f"{text} {independent_count(extract)} Could not be read: {could_not}."
 
 
@@ -1686,11 +1735,12 @@ def summary_lines(model):
         f"People who approved access or added or changed it: {people}.",
         *([f"Approval by a person: {approved_by_polar_sky_only(totals)}"] if totals["controls_without_person"] else []),
         f"Data owner sign-off: {owner_approvals_evidence(model)}",
+        *([f"Approver has access: {approver_access_text(model)}"] if not no_folder_sets(model) else []),
         f"Extract: {extract_summary(model['extract'])}",
         *([f"Access not in the members list: {unlisted_text(model['unlisted'])}."] if model["unlisted"] is not None else []),
         f"Generated: {report_data.format_time(model['inputs']['generated_at'])}.",
         f"Issued: {issued_text(model)}.",
-        "Not available in this version: " + "; ".join(not_available_parts(model)) + ".",
+        "Not available in this version: " + ("; ".join(not_available_parts(model)) or "nothing") + ".",
         "TBD: " + ("; ".join(tbd_fields(model)) if tbd_fields(model) else "nothing") + ".",
     ]
     return lines
