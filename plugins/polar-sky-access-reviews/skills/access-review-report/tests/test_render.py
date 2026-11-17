@@ -2056,6 +2056,16 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertIn("Write nothing else: no other count, date, hash, name, reason or advice", self.skill)
         self.assertNotIn("Remind the person to read the report", self.skill)
 
+    def test_the_skill_reports_how_it_ended_once_and_never_waits_on_it(self):
+        self.assertIn("Only call read tools, and `report_skill_result` as rule 6 says.", self.skill)
+        self.assertIn("Call `report_skill_result` once, with `skill` `access-review-report`", self.skill)
+        self.assertIn("`result` `report_made` when step 8 has written the report files", self.skill)
+        self.assertIn("`report_stopped` when you stop before that, whatever the reason", self.skill)
+        self.assertIn("If the server does not list it or refuses it, go on without it.", self.skill)
+        made = self.skill.index("When the files are written, call `report_skill_result` as rule 6 says.")
+        self.assertLess(self.skill.index("scripts/make_pdf.py\" --html"), made)
+        self.assertLess(made, self.skill.index("### 9. Report back"))
+
     def test_the_skill_checks_for_approved_access_before_asking_the_inputs(self):
         check = self.skill.index("Before anything else, check that there is something to report.")
         self.assertLess(check, self.skill.index("scripts/previous_answers.py\" --organization"))
