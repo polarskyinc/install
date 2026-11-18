@@ -10,8 +10,6 @@ It needs three kinds of rights. Ask who has them before you start:
 - **Change an organization policy** (Organization Policy Administrator, `roles/orgpolicy.policyAdmin`). The role is granted on the Google Cloud organization only, not on a folder or the project (Google refuses it there), and is almost always held by the organization administrators rather than the person you are talking to.
 - **Create roles and grant them in the project** (Owner, or Role Administrator together with Project IAM Admin).
 
-A Google Workspace super admin is needed for one more thing at the end: the ceiling checker's delegation entry.
-
 ## Look first
 
 Use the gcloud account the person confirmed in the final plan, or ask which one to use. Call `get_helper_identity_values` (read only). It gives:
@@ -19,8 +17,7 @@ Use the gcloud account the person confirmed in the final plan, or ask which one 
 - `provisioner_service_account` and `worker_service_account`: the two Polar Sky service accounts that each get one role in the project. The provisioner creates helper accounts. The worker reads as them and withdraws them when a helper is revoked;
 - `workspace_customer_id`: Polar Sky's Google Workspace customer ID, which the project's organization policy must allow;
 - `apis_to_enable`, `role_grants` (two roles, each with its `role_id`, `title` and `permissions`) and `organization_policies`: the exact setup, which the sections below use;
-- `registered_project_id`: the project already recorded for this organization, or null;
-- `delegation_link`, `delegation_client_id` and `delegation_scopes`, only when Polar Sky has already set up this organization's ceiling checker.
+- `registered_project_id`: the project already recorded for this organization, or null.
 
 If `registered_project_id` is set, tell the person which project it is and ask whether to keep it. If they want another, go on and register the new one at the end: it replaces the old one for new helpers.
 
@@ -198,17 +195,9 @@ Thank you.
 
 Say the setup waits for them, and that the rest of the install is not affected. Go on with the other commands only when they tell you it is done.
 
-## The ceiling checker's delegation entry
+## The ceiling checker
 
-Only when `get_helper_identity_values` gave a `delegation_link`. The ceiling checker is the separate identity Polar Sky uses to check that the person a helper acts for can still open each approved folder. A Google Workspace super admin adds its entry, and the link opens the Admin console's dialog with its client ID and scopes already filled in.
-
-Give the person the link exactly as it was returned. Tell them to open it while signed in as a super admin, check the client ID (`delegation_client_id`) and the scopes (`delegation_scopes`), and click **Authorize**. If the link does not open the dialog, give the entry to add by hand under **Security** > **Access and data control** > **API controls** > **Domain-wide delegation** > **Manage all**, with the scopes as one line, comma-separated, no spaces. Add this warning:
-
-> **Important:** The link and an edit by hand both replace the entry's whole scope list. This client ID belongs to Polar Sky's ceiling checker, so its entry should hold exactly these scopes.
-
-Google can take up to 24 hours to apply it, though it is often minutes.
-
-When there is no `delegation_link`, say the ceiling checker is not set up for this organization yet, and that Polar Sky will send the entry when helpers are switched on.
+An AI assistant also needs the organization's ceiling checker authorized once by a Google Workspace super admin. That is a separate step, and it does not depend on this one: [AI assistants](ai-assistants.md).
 
 ## Finish
 

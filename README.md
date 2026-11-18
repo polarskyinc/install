@@ -75,6 +75,8 @@ An On-Prem install usually takes one to two hours, most of it waiting for the cl
 
 Optionally, after the install is done and only when you ask for it, the agent can put the accounts of Polar Sky's AI helpers in a Google Cloud project you own (Google Workspace only). You then own and control those accounts. Google Drive still treats them as outside your Workspace, so a Shared Drive that blocks outside sharing has to allow it before a helper can read there. It needs someone who can change an organization policy, and the agent says which steps need which rights.
 
+Before any AI assistant can be approved (Google Workspace only), a Google Workspace super admin has to authorize Polar Sky's ceiling checker once in the Google Admin console. Polar Sky makes that account for your organization alone, and the agent gives you the link that fills in the entry and then checks that it works.
+
 ## Install
 
 Run two commands in a terminal. If your agent was already running and `/mcp` does not list the server, restart it. Restart Codex in any case.
