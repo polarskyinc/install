@@ -20,10 +20,13 @@ import report_data  # noqa: E402
 
 ASSETS_DIRECTORY = os.path.join(report_data.SKILL_DIRECTORY, "assets")
 NOT_AVAILABLE = "Not available in this version"
-PATH_COLUMNS = frozenset({"folders", "folder", "target", "item", "email", "group_email", "principal_email"})
+PATH_COLUMNS = frozenset({"folders", "folder", "path", "target", "item", "email", "group_email", "principal_email"})
 PATH_BREAK_POINTS = re.compile(r"(?<=@)|(?=[./-])")
 TABLE_ORDER = ("members", "groups", "shares", "removals", "approvals")
 EXTRACT_TABLE = "extract"
+FOLDERS_TABLE = "folders"
+FOLDERS_ATTACHMENT = "G"
+FOLDERS_SHOWN = 500
 PDF_FILE = "report.pdf"
 WIDE_TABLE_COLUMNS = 8
 WIDEST_TABLE_COLUMNS = 12
@@ -76,15 +79,46 @@ def tbd():
 
 
 def no_folder_sets(model):
-    """Say whether Polar Sky recorded no folder set with an approval in force in the period, so there was no access to review."""
+    """Say whether Polar Sky recorded no folder set with an approval in force in the period."""
     return not model["totals"]["controls"]
 
 
-def no_access_to_review(model):
-    """The one statement an empty report makes: no folder set had an approval in force, so there was no access to review."""
+def no_folder_sets_in_force(model):
+    """The statement a report with no folder sets makes: Polar Sky recorded none with an approval in force in the period."""
     return (
         f"Polar Sky recorded no folder sets with an access approval in force from {model['period']['from']} to "
-        f"{model['period']['to']}, so there was no access to review."
+        f"{model['period']['to']}."
+    )
+
+
+def folder_coverage_text(model):
+    """Say how many sensitive folders were reviewed in the period, that Polar Sky found none, or None when the folder list is not available."""
+    coverage = model["folder_coverage"]
+    if coverage is None:
+        return None
+    if coverage["total"]:
+        return (
+            f"{number(coverage['reviewed'])} of {counted(coverage['total'], 'sensitive folder', 'sensitive folders')} "
+            "reviewed in this period."
+        )
+    if no_folder_sets(model):
+        return (
+            "Polar Sky found no folders with sensitive data and recorded no folder sets with an access approval in force "
+            f"from {model['period']['from']} to {model['period']['to']}."
+        )
+    return "Polar Sky found no folders with sensitive data."
+
+
+def folders_reviewed_evidence(model):
+    """The sentence on the sensitive folders reviewed that opens the checklist row on reviewing all access."""
+    coverage = model["folder_coverage"]
+    if coverage is None:
+        return f"Sensitive folders reviewed: {NOT_AVAILABLE}."
+    if not coverage["total"]:
+        return "Polar Sky found no folders with sensitive data."
+    return (
+        f"{folder_coverage_text(model)[:-1]}, listed in Section 5.1, read "
+        f"{report_data.format_date(coverage['as_of'])}."
     )
 
 
@@ -497,10 +531,11 @@ def checklist_evidence(model, key):
         checked = interval_findings(model)
         return text + (" " + " ".join(checked) if checked else "")
     if key == "decisions":
+        folders = folders_reviewed_evidence(model)
         if not totals["members"] and not totals["shares"]:
-            return "No members or kept direct shares."
+            return f"{folders} No members or kept direct shares."
         text = (
-            f"{counted(totals['members'], 'member', 'members')} at report time, as at "
+            f"{folders} {counted(totals['members'], 'member', 'members')} at report time, as at "
             f"{report_data.format_date(model['members_as_of'])}, each with who decided and when."
         )
         if totals["shares"]:
@@ -680,12 +715,31 @@ def section_links(sections):
     return ", ".join(f'<a class="xref" href="#s{section}">{section}</a>' for section in sections)
 
 
+def folder_coverage_lead(model):
+    """The sentences on the sensitive folders that open the Section 1 paragraph, or nothing without a folder list."""
+    coverage = model["folder_coverage"]
+    if coverage is None:
+        return ""
+    if not coverage["total"]:
+        return f"{folder_coverage_text(model)} "
+    return f"{folder_coverage_text(model)} Section 5.1 lists every sensitive folder. "
+
+
 def summary_paragraph(model):
-    """The paragraph that opens Section 1: what was reviewed and by whom, or that there was no access to review."""
+    """The paragraph that opens Section 1: how many sensitive folders were reviewed, what was reviewed and by whom, or that no folder set had an approval in force."""
     totals = model["totals"]
+    coverage = folder_coverage_text(model)
+    folder_set = " A folder set is one folder, or a group of folders, with a data owner."
     if no_folder_sets(model):
-        return no_access_to_review(model) + " A folder set is one folder, or a group of folders, with a data owner."
-    text = (
+        if model["folder_coverage"] is None:
+            return no_folder_sets_in_force(model) + folder_set
+        if not model["folder_coverage"]["total"]:
+            return coverage + folder_set
+        return (
+            f"{coverage} {no_folder_sets_in_force(model)} Section 5.1 lists every sensitive folder."
+            + folder_set
+        )
+    text = folder_coverage_lead(model) + (
         f"{model['inputs']['organization']} reviewed access to {scope_noun(model)} in "
         f"{model['provider_label']} from {model['period']['from']} to {model['period']['to']} for "
         f"{counted(totals['controls'], 'folder set', 'folder sets')}. Each folder set is one folder, or a group of folders, "
@@ -704,9 +758,9 @@ def approver_access_text(model):
     """Say in how many folder sets a person who approved the access also has access to it, naming them, or that there are none."""
     totals = model["totals"]
     controls = totals["controls_approver_has_access"]
-    where = "as a member who keeps access (8.1) or a kept direct share (5.4)"
+    where = "as a member who keeps access (8.1) or a kept direct share (5.5)"
     if model["unlisted"] is not None:
-        where = "as a member who keeps access (8.1), a kept direct share (5.4) or access the live read found (3.3)"
+        where = "as a member who keeps access (8.1), a kept direct share (5.5) or access the live read found (3.3)"
     matched = "Approvers are matched by name, as Polar Sky records approvers by name."
     not_known = totals["controls_approver_not_known"]
     if not controls and not not_known:
@@ -844,9 +898,23 @@ def render_scope(model):
             "A person who added someone or changed their access is named, with the date. Each approval is recorded with "
             "who approved it and when.",
         ]
+    paragraphs.insert(2, folders_scope(model))
     paragraphs += requirement_paragraphs(model)
     body = f"  <p>{escape(paragraphs[0])}</p>\n" + "".join(f"  <p>{_bold_lead(paragraph)}</p>\n" for paragraph in paragraphs[1:])
     return section_heading(2, SECTIONS[1]) + body + "</section>\n"
+
+
+def folders_scope(model):
+    """The Section 2 paragraph that says which folders the folder list holds and when it was read."""
+    coverage = model["folder_coverage"]
+    if coverage is None:
+        return f"<b>Sensitive folders.</b> The list of folders where Polar Sky found sensitive data is {NOT_AVAILABLE.lower()}."
+    return (
+        "<b>Sensitive folders.</b> Section 5.1 lists the folders where Polar Sky found sensitive data, not every folder in "
+        f"the drive, read at report time, {report_data.format_time(coverage['as_of'])}. A folder counts as reviewed in "
+        "this period when it is, or lies below, a folder of a folder set whose access approval was in force at some time "
+        "in the period."
+    )
 
 
 def requirement_paragraphs(model):
@@ -1307,20 +1375,22 @@ def render_results(model):
     if no_folder_sets(model):
         return "".join([
             section_heading(5, SECTIONS[4]),
-            "  <h3>5.1 By folder set</h3>\n  <p>No folder sets.</p>\n",
-            "  <h3>5.2 Access approvals</h3>\n  <p>No access was approved during the period.</p>\n",
-            "  <h3>5.3 Groups</h3>\n  <p>No groups.</p>\n",
-            "  <h3>5.4 Kept direct shares</h3>\n  <p>No kept direct shares.</p>\n",
+            folders_table(model),
+            "  <h3>5.2 By folder set</h3>\n  <p>No folder sets.</p>\n",
+            "  <h3>5.3 Access approvals</h3>\n  <p>No access was approved during the period.</p>\n",
+            "  <h3>5.4 Groups</h3>\n  <p>No groups.</p>\n",
+            "  <h3>5.5 Kept direct shares</h3>\n  <p>No kept direct shares.</p>\n",
             "</section>\n",
         ])
     parts = [
         section_heading(5, SECTIONS[4]),
-        "  <h3>5.1 By folder set</h3>\n",
+        folders_table(model),
+        "  <h3>5.2 By folder set</h3>\n",
         f"  <p>Members are read as they are at report time, {escape(report_data.format_time(model['members_as_of']))}, "
         "not as at the end of the period. Attachment A lists every member with who decided their access, printed in Section 8.1, and "
         "Attachment B every group.</p>\n",
         f"  {data_table(by_control_columns, rows, numeric=numeric)}\n",
-        "  <h3>5.2 Access approvals</h3>\n",
+        "  <h3>5.3 Access approvals</h3>\n",
         "  <p>Each approval of the access to one folder set is recorded in Polar Sky with the date and who approved it. "
         "An approval by a person is that person's review and sign-off; an approval whose approver type is Polar Sky was "
         "made by Polar Sky itself, not by a person. Approvers do not sign again at period end. The table below shows how "
@@ -1328,11 +1398,11 @@ def render_results(model):
         "any from before the period that was still in force when it began.</p>\n",
         f"  {data_table(approver_columns, approver_rows, numeric=('controls',), css_class='owners')}\n" if approver_rows
         else "  <p>No access was approved during the period.</p>\n",
-        "  <h3>5.3 Groups</h3>\n",
+        "  <h3>5.4 Groups</h3>\n",
         f"  {data_table(group_columns, model['tables']['groups'], numeric=('people_count',))}\n" if model["tables"]["groups"]
         else "  <p>No groups.</p>\n",
         system_account_groups_note(model["tables"]["groups"]),
-        "  <h3>5.4 Kept direct shares</h3>\n",
+        "  <h3>5.5 Kept direct shares</h3>\n",
         "  <p>Direct shares are read as they are now, not as at approval. Polar Sky does not record who decided to keep "
         "them or when.</p>\n",
         f"  {data_table(share_columns, model['tables']['shares'])}\n" if model["tables"]["shares"]
@@ -1340,6 +1410,50 @@ def render_results(model):
         "</section>\n",
     ]
     return "".join(parts)
+
+
+FOLDER_COLUMNS = (
+    {"id": "path", "header": "Folder"},
+    {"id": "reviewed", "header": "Reviewed in the period"},
+    {"id": "approved_on_lines", "header": "Approved on", "html": True},
+    {"id": "approved_by_lines", "header": "Approved by", "html": True},
+    {"id": "folder_set_lines", "header": "Folder set", "html": True},
+)
+
+
+def folder_table_row(row):
+    """A folder's row in 5.1, with one line per folder set in the approval and folder set cells, so the lines of a folder with several folder sets line up."""
+    cells = row["_cells"]
+    return {
+        **row,
+        "approved_on_lines": "<br>".join(escape(line) for line in cells["approved_on"]),
+        "approved_by_lines": "<br>".join(escape(line) for line in cells["approved_by"]),
+        "folder_set_lines": "<br>".join(escape(line) for line in cells["folder_set"]),
+    }
+
+
+def folders_table(model):
+    """Section 5.1: every sensitive folder, whether it was reviewed in the period, and the approved folder set behind it or the folder set still waiting."""
+    heading = "  <h3>5.1 By folder</h3>\n"
+    coverage = model["folder_coverage"]
+    if coverage is None:
+        return heading + f"  <p>{not_available()}</p>\n"
+    if not coverage["total"]:
+        return heading + "  <p>Polar Sky found no folders with sensitive data.</p>\n"
+    file = report_data.load_reference("columns.json")[FOLDERS_TABLE]["file"]
+    text = (
+        f"Every folder where Polar Sky found sensitive data, read at report time, {report_data.format_time(coverage['as_of'])}. "
+        f"{folder_coverage_text(model)} A folder is reviewed when it is, or lies below, a folder of a folder set whose "
+        "access approval was in force at some time in the period; the row names that folder set and its latest "
+        "approval in the period, one line per folder set. Folders not reviewed come first. "
+        f"Attachment {FOLDERS_ATTACHMENT}, {file}, lists every folder."
+    )
+    if coverage["total"] > FOLDERS_SHOWN:
+        text += (
+            f" This table shows the first {number(FOLDERS_SHOWN)} of {number(coverage['total'])} folders; {file} lists "
+            f"all {number(coverage['total'])}."
+        )
+    return heading + f"  <p>{escape(text)}</p>\n  {data_table(FOLDER_COLUMNS, [folder_table_row(row) for row in coverage['rows'][:FOLDERS_SHOWN]])}\n"
 
 
 def approver_label(name, kind, owners):
@@ -1352,7 +1466,7 @@ def approver_label(name, kind, owners):
 
 
 def system_account_groups_note(groups):
-    """The sentence under 5.3 naming the groups whose people count includes SharePoint's System Account, or nothing."""
+    """The sentence under 5.4 naming the groups whose people count includes SharePoint's System Account, or nothing."""
     names = []
     for row in groups:
         if row.get("_system_account") and row["group_name"] not in names:
@@ -1429,7 +1543,7 @@ OWNER_SIGNOFF_MEANING = (
     "Each data owner's approval of a folder set is their sign-off for it, recorded in Polar Sky with the time and how "
     "they approved: in the Polar Sky console, or through an AI assistant connected to Polar Sky. Data owners do not "
     "sign this report. The table shows, for each folder set, whether its data owner approved it during the review "
-    "period. An approval by another person, or by Polar Sky itself, is not the data owner's sign-off; Section 5.2 "
+    "period. An approval by another person, or by Polar Sky itself, is not the data owner's sign-off; Section 5.3 "
     "lists every approver. Polar Sky records approvers by name, so an approval counts as the data owner's when the "
     "approver's name matches the data owner's."
 )
@@ -1496,6 +1610,7 @@ def render_attachments(model, hashes):
             f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{hashes[definition["file"]]}</code></td></tr></tbody>'
         )
     body += extract_attachment(model["extract"], definitions[EXTRACT_TABLE], hashes)
+    body += folders_attachment(model["folder_coverage"], definitions[FOLDERS_TABLE], hashes)
     return (
         section_heading(8, SECTIONS[7])
         + "  <p>The attachments hold the detail behind every count in this report. Each row is complete on its own, "
@@ -1611,6 +1726,21 @@ def extract_attachment(extract, definition, hashes):
     )
 
 
+def folders_attachment(coverage, definition, hashes):
+    """Attachment G: every sensitive folder as a CSV file with its SHA-256, or not available without the folder list."""
+    if coverage is None:
+        return (
+            f'<tbody class="att"><tr><td>{FOLDERS_ATTACHMENT}</td><td>{escape(definition["title"])}</td>'
+            f'<td colspan="2">{not_available()}</td></tr></tbody>'
+        )
+    return (
+        f'<tbody class="att"><tr class="has-hash"><td>{FOLDERS_ATTACHMENT}</td><td>{escape(definition["title"])}</td>'
+        f"<td>{escape(definition['description'])} {number(coverage['total'])} rows.</td>"
+        f"<td><code>{escape(definition['file'])}</code></td></tr>"
+        f'<tr><td></td><td class="hk">SHA-256</td><td colspan="2"><code>{hashes[definition["file"]]}</code></td></tr></tbody>'
+    )
+
+
 CSS_STRING_SAFE = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:;_-/()#&+'!?%")
 
 
@@ -1683,6 +1813,8 @@ def not_available_parts(model):
         parts += ["Section 3 extract taken and independent count", "Attachment F original extract"]
     if not completed(extract):
         parts += ["Section 3 how the list was built", "Section 3 link types not listed"]
+    if model["folder_coverage"] is None:
+        parts += ["Section 5.1 sensitive folders", f"Attachment {FOLDERS_ATTACHMENT} sensitive folders"]
     if totals["members"] and not totals["account_types_known"]:
         parts.append("Account types of members")
     if totals["removals"] and not totals["removals_recorded"]:
@@ -1725,9 +1857,14 @@ def summary_lines(model):
     """The figures the skill reports back to the person, worded as the report states them."""
     totals = model["totals"]
     people = number(totals["people_deciding"]) if totals["people_deciding"] else "no one"
-    folder_sets = no_access_to_review(model) if no_folder_sets(model) else controls_population(totals) + "."
+    coverage = folder_coverage_text(model)
+    if coverage is None:
+        folder_sets = no_folder_sets_in_force(model) if no_folder_sets(model) else controls_population(totals) + "."
+        first = [f"Folder sets: {folder_sets}", f"Sensitive folders reviewed: {NOT_AVAILABLE}."]
+    else:
+        first = [coverage, f"Folder sets: {controls_population(totals)}."]
     lines = [
-        f"Folder sets: {folder_sets}",
+        *first,
         f"Access decisions: {decisions_text(totals)}.",
         f"Members at report time: {members_text(model)}.",
         f"Removals: {checklist_evidence(model, 'removals')}",
@@ -1770,6 +1907,10 @@ def render_with_model(data, generated_at=None):
     if completed(model["extract"]):
         files[definitions[EXTRACT_TABLE]["file"]] = render_csv(
             selected_columns(model, EXTRACT_TABLE), model["extract"]["table"]
+        )
+    if model["folder_coverage"] is not None:
+        files[definitions[FOLDERS_TABLE]["file"]] = render_csv(
+            selected_columns(model, FOLDERS_TABLE), model["folder_coverage"]["rows"]
         )
     hashes = {name: hashlib.sha256(text.encode("utf-8")).hexdigest() for name, text in files.items()}
     files["report.html"] = render_html(model, hashes)

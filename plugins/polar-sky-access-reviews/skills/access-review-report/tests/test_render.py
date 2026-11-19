@@ -38,12 +38,28 @@ def rows_of(text):
     return list(csv.DictReader(io.StringIO(text, newline="")))
 
 
+FOLDERS_TOOL = "list_access_review_folders"
+
+
+def folder_response(data):
+    return next(entry for entry in data["responses"] if entry["tool"] == FOLDERS_TOOL)
+
+
+def add_folder_range(data, start, end):
+    """Add a copy of the folder list for another date range, as the skill calls it for every part of a long period."""
+    copied = copy.deepcopy(folder_response(data))
+    copied["arguments"] = {"from": start, "to": end}
+    copied["response"].update({"from": start, "to": end})
+    data["responses"].append(copied)
+    return data
+
+
 class GoldenTest(unittest.TestCase):
     def test_output_matches_golden_files(self):
         files = render_report.render(fixture())
         self.assertEqual(
             sorted(files),
-            ["approvals.csv", "extract.csv", "groups.csv", "members.csv", "removals.csv", "report.html", "shares.csv"],
+            ["approvals.csv", "extract.csv", "folders.csv", "groups.csv", "members.csv", "removals.csv", "report.html", "shares.csv"],
         )
         for name, text in files.items():
             path = os.path.join(GOLDEN_DIRECTORY, name)
@@ -197,7 +213,7 @@ class LogoTest(unittest.TestCase):
             self.assertEqual(render_report.main(["--data", data_file, "--out", out]), 0)
         self.assertEqual(
             sorted(os.listdir(out)),
-            ["approvals.csv", "extract.csv", "fonts", "groups.csv", "members.csv", "removals.csv", "report.html", "shares.csv"],
+            ["approvals.csv", "extract.csv", "folders.csv", "fonts", "groups.csv", "members.csv", "removals.csv", "report.html", "shares.csv"],
         )
 
     def test_a_refused_logo_stops_the_render_command_with_the_reason(self):
@@ -236,7 +252,7 @@ class ContentTest(unittest.TestCase):
         self.assertEqual(len(self.members), 7)
 
     def test_csv_is_rfc_4180(self):
-        for name in ("members.csv", "groups.csv", "shares.csv", "removals.csv", "approvals.csv", "extract.csv"):
+        for name in ("members.csv", "groups.csv", "shares.csv", "removals.csv", "approvals.csv", "extract.csv", "folders.csv"):
             text = self.files[name]
             self.assertTrue(text.endswith("\r\n"), name)
             self.assertNotIn("\n", text.replace("\r\n", ""), name)
@@ -354,6 +370,7 @@ class ContentTest(unittest.TestCase):
         ]
         control["removals"] = [{"action": "Remove a grant", "step": "Remove Kai.", "target": "APAC", "state": "failed", "at": "2026-01-11T10:00:00Z"}]
         data["responses"].insert(1, second)
+        add_folder_range(data, "2025-11-01", "2026-04-30")
         model = report_data.build_model(data)
         control = next(item for item in model["controls"] if item["name"] == "Catalog-Client-Viewers")
         self.assertEqual(control["counts"]["removals"], 2)
@@ -374,6 +391,7 @@ class ContentTest(unittest.TestCase):
             if control["control_id"] == with_shares["control_id"]:
                 control["kept_direct_shares"] = []
         data["responses"].insert(1, second)
+        add_folder_range(data, "2025-11-01", "2026-04-30")
         model = report_data.build_model(data)
         control = next(item for item in model["controls"] if item["id"] == with_shares["control_id"])
         self.assertEqual(control["counts"]["shares"], 0)
@@ -398,6 +416,7 @@ class ContentTest(unittest.TestCase):
             control["approvals"] = [dict(approval, carried_into_range=True) for approval in control.get("approvals") or []][-1:]
             control["removals"] = []
         data["responses"].insert(0, later)
+        add_folder_range(data, "2026-11-01", "2026-12-31")
         data["inputs"]["period"] = {"from": "2026-05-01", "to": "2026-12-31"}
         expected = report_data.build_model(fixture())["tables"]["approvals"]
         approvals = report_data.build_model(data)["tables"]["approvals"]
@@ -429,6 +448,7 @@ class ContentTest(unittest.TestCase):
         second["response"]["kept_direct_shares_as_of"] = "2026-11-03T08:00:00Z"
         second["response"]["controls"] = [copy.deepcopy(with_shares)]
         data["responses"].insert(1, second)
+        add_folder_range(data, "2025-11-01", "2026-04-30")
         data["inputs"]["period"] = {"from": "2025-11-01", "to": "2026-10-31"}
         shares = rows_of(render_report.render(data)["shares.csv"])
         read_at = {row["folder_set"]: row["read_at"] for row in shares}
@@ -1149,7 +1169,7 @@ class ApproverHasAccessTest(unittest.TestCase):
     def test_section_1_and_the_summary_block_count_and_name_them(self):
         expected = (
             "In 3 of 3 folder sets, a person who approved the access also has access to it, as a member who keeps access "
-            "(8.1), a kept direct share (5.4) or access the live read found (3.3): Catalog-Client-Viewers (Dana Whitfield); "
+            "(8.1), a kept direct share (5.5) or access the live read found (3.3): Catalog-Client-Viewers (Dana Whitfield); "
             "Customer Records (Dana Whitfield); Model Eval Results (Omar Haddad). Approvers are matched by name, as Polar "
             "Sky records approvers by name."
         )
@@ -1166,7 +1186,7 @@ class ApproverHasAccessTest(unittest.TestCase):
         model = report_data.build_model(data)
         self.assertEqual(render_report.approver_access_text(model), (
             "In no folder set does a person who approved the access also have access to it, as a member who keeps "
-            "access (8.1) or a kept direct share (5.4). Approvers are matched by name, as Polar Sky records approvers by name."
+            "access (8.1) or a kept direct share (5.5). Approvers are matched by name, as Polar Sky records approvers by name."
         ))
         lines = render_report.summary_lines(report_data.build_model(empty_review(fixture())))
         self.assertFalse(any(line.startswith("Approver has access") for line in lines))
@@ -1839,7 +1859,7 @@ class TableWidthTest(unittest.TestCase):
         page = render_report.render(all_columns(fixture()))["report.html"]
         removals = page.split("<h3>6.1 Removals</h3>", 1)[1]
         self.assertTrue(removals.lstrip().startswith('<table class="ps-table wide widest">'))
-        default_shares = render_report.render(fixture())["report.html"].split("<h3>5.4 Kept direct shares</h3>", 1)[1]
+        default_shares = render_report.render(fixture())["report.html"].split("<h3>5.5 Kept direct shares</h3>", 1)[1]
         self.assertNotIn("wide", default_shares.split("<thead>", 1)[0])
 
     def test_the_default_removals_table_is_wide_but_keeps_the_wider_path_cells(self):
@@ -2069,8 +2089,14 @@ class SkillInstructionsTest(unittest.TestCase):
     def test_the_skill_checks_for_approved_access_before_asking_the_inputs(self):
         check = self.skill.index("Before anything else, check that there is something to report.")
         self.assertLess(check, self.skill.index("scripts/previous_answers.py\" --organization"))
-        self.assertIn("If every `total` is 0, there is no approved access to report", self.skill)
-        self.assertIn("call it once for each part of 366 days or less", self.skill)
+        self.assertIn("If every evidence `total` is 0 and every folder `total` is 0", self.skill)
+        self.assertIn("there is nothing to report", self.skill)
+        self.assertIn("call each once for each part of 366 days or less", self.skill)
+        self.assertIn(
+            "If every evidence `total` is 0 but a folder `total` is more than 0, do not stop. Tell the person in one line",
+            self.skill,
+        )
+        self.assertIn("the report will show them as not reviewed.", self.skill)
         self.assertIn("`status` `approved`, `dismissed` and `superseded`", self.skill)
         self.assertIn("Call `list_controls`", self.skill)
         self.assertIn("never take a refused call as an empty period or as no controls", self.skill)
@@ -2143,6 +2169,17 @@ def empty_review(data):
     rows = extract_responses(data, "read_access_review_extract_rows")
     data["responses"] = [entry for entry in data["responses"] if entry not in rows[1:]]
     rows[0]["response"].update({"rows": [], "next_cursor": None})
+    for entry in extract_responses(data, FOLDERS_TOOL):
+        entry["response"]["reviewed"] = 0
+        for folder in entry["response"]["folders"]:
+            folder.update({"reviewed": False, "evidence_controls": []})
+    return data
+
+
+def no_sensitive_folders(data):
+    """Make the folder list one in which Polar Sky found no folder with sensitive data."""
+    for entry in extract_responses(data, FOLDERS_TOOL):
+        entry["response"].update({"folders": [], "total": 0, "reviewed": 0})
     return data
 
 
@@ -2150,7 +2187,7 @@ class ProviderTest(unittest.TestCase):
     def test_no_provider_is_named_when_the_data_names_none(self):
         model = report_data.build_model(empty_review(fixture()))
         self.assertEqual(model["extract"]["providers"], [])
-        files = render_report.render(empty_review(fixture()))
+        files = render_report.render(no_sensitive_folders(empty_review(fixture())))
         text = visible_text(files).replace("Microsoft 365 tenant northwind-demo.onmicrosoft.com", "")
         self.assertNotIn("Microsoft 365", text)
         self.assertNotIn("Google", text)
@@ -2176,10 +2213,8 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(row["result"], "No count from the provider")
 
 
-NO_ACCESS_TO_REVIEW = (
-    "Polar Sky recorded no folder sets with an access approval in force from 2026-05-01 to 2026-10-31, "
-    "so there was no access to review."
-)
+NO_FOLDER_SETS_IN_FORCE = "Polar Sky recorded no folder sets with an access approval in force from 2026-05-01 to 2026-10-31."
+NONE_REVIEWED = "0 of 6 sensitive folders reviewed in this period."
 
 
 class NoFolderSetsTest(unittest.TestCase):
@@ -2189,11 +2224,20 @@ class NoFolderSetsTest(unittest.TestCase):
         self.text = visible_text(self.files)
         self.lines = render_report.summary_lines(self.model)
 
-    def test_the_report_says_once_that_there_was_no_access_to_review(self):
-        self.assertEqual(self.text.count(NO_ACCESS_TO_REVIEW), 1)
-        summary = self.page.split('id="s1"', 1)[1].split("</section>", 1)[0]
-        self.assertIn(NO_ACCESS_TO_REVIEW, summary)
-        self.assertEqual(self.lines[0], "Folder sets: " + NO_ACCESS_TO_REVIEW)
+    def test_the_report_says_none_of_the_sensitive_folders_was_reviewed(self):
+        summary = html.unescape(self.page.split('id="s1"', 1)[1].split("</section>", 1)[0])
+        self.assertIn(f"{NONE_REVIEWED} {NO_FOLDER_SETS_IN_FORCE} Section 5.1 lists every sensitive folder.", summary)
+        self.assertEqual(self.lines[0], NONE_REVIEWED)
+        self.assertEqual(self.lines[1], "Folder sets: No folder sets.")
+
+    def test_the_folder_table_lists_every_sensitive_folder_as_not_reviewed(self):
+        rows = folder_table_rows(self.page)
+        self.assertEqual(len(rows), 6)
+        self.assertEqual({row[1] for row in rows}, {"No"})
+        self.assertEqual([row[0] for row in rows][:2], ["Catalog / Model Eval Results", "Catalog / Product Adoption / APAC"])
+        self.assertIn(("Finance / Payroll", "No", "Waiting for approval", "", "Payroll"), rows)
+        self.assertIn(("People / Contracts", "No", "", "", "No review set up for this folder"), rows)
+        self.assertEqual({row["reviewed"] for row in rows_of(self.files["folders.csv"])}, {"No"})
 
     def test_the_report_does_not_claim_a_review_happened(self):
         for claim in ("reviewed access to", "approved that access", "0 of 0", "for 0 folder sets", "Outcome of the",
@@ -2217,7 +2261,7 @@ class NoFolderSetsTest(unittest.TestCase):
     def test_the_render_command_still_prints_the_block_to_paste(self):
         status, _, printed = render_with_main(empty_review(fixture()))
         self.assertEqual(status, 0)
-        self.assertEqual(summary_block(printed)[0], "Folder sets: " + NO_ACCESS_TO_REVIEW)
+        self.assertEqual(summary_block(printed)[0], NONE_REVIEWED)
 
     def test_nothing_reads_as_a_python_value(self):
         self.assertEqual([line for line in self.text.splitlines() if LEAK.search(line)], [])
@@ -2396,7 +2440,7 @@ class ApproverTypeTest(unittest.TestCase):
 
     def test_the_approvals_table_shows_polar_sky_apart_with_the_data_owner(self):
         page = render_report.render(with_system_approval())["report.html"]
-        table = page.split("<h3>5.2 Access approvals</h3>", 1)[1].split("</table>", 1)[0]
+        table = page.split("<h3>5.3 Access approvals</h3>", 1)[1].split("</table>", 1)[0]
         self.assertIn("<td>Dana Whitfield</td><td>Person</td>", table)
         self.assertIn("<td>Polar Sky; data owner Dana Whitfield</td><td>Polar Sky</td>", table)
 
@@ -3191,3 +3235,283 @@ class SeveralFrameworksSkillTest(unittest.TestCase):
         self.assertIn("If any chosen framework has `needs_interval` set (SOC 2, ISO 27001 and SOX), also ask the review interval", skill)
         self.assertIn("Put one framework in `framework`, or several in `frameworks`", skill)
         self.assertIn("folder sets their data owner did not approve in the period", skill)
+
+
+def folder_section(page):
+    return page.split("<h3>5.1 By folder</h3>", 1)[1].split("<h3>5.2 By folder set</h3>", 1)[0]
+
+
+def folder_table_rows(page):
+    """The rows of the Section 5.1 folder table as (folder, reviewed, approved on, approved by, folder set) tuples, in the order printed, with " / " between the lines of a cell."""
+    rows = []
+    for row in re.findall(r"<tr>(.*?)</tr>", folder_section(page).split("<tbody>", 1)[-1], flags=re.S):
+        cells = [
+            " ".join(html.unescape(re.sub(r"<[^>]+>", "", cell.replace("<wbr>", "").replace("<br>", " / "))).split())
+            for cell in re.findall(r"<td[^>]*>(.*?)</td>", row, flags=re.S)
+        ]
+        rows.append(tuple(cells))
+    return rows
+
+
+def sensitive_folder(number, reviewed=False):
+    folder = {
+        "folder_id": f"folder-{number:04d}", "integration_id": "99999999-9999-4999-8999-999999999999",
+        "provider": "google_workspace", "path": f"/Shared/Folder {number:04d}", "reviewed": reviewed,
+        "evidence_controls": [], "waiting_controls": [],
+    }
+    if reviewed:
+        folder["evidence_controls"] = [{
+            "control_id": "11111111-1111-4111-8111-111111111111", "name": "Catalog-Client-Viewers",
+            "latest_approval": {"at": "2026-09-15T16:20:00Z", "carried_into_range": False,
+                                "actor": {"type": "user", "surface": "console", "assistant_client": None, "name": "Dana Whitfield"}},
+        }]
+    return folder
+
+
+def with_folders(data, folders):
+    folder_response(data)["response"].update({
+        "folders": folders, "total": len(folders), "reviewed": sum(1 for folder in folders if folder["reviewed"]),
+    })
+    return data
+
+
+BANNED = "no access to review"
+
+
+class FolderCoverageTest(unittest.TestCase):
+    def setUp(self):
+        self.files, self.model = render_report.render_with_model(fixture())
+        self.page = self.files["report.html"]
+        self.lines = render_report.summary_lines(self.model)
+
+    def test_the_summary_block_opens_with_the_sensitive_folders_reviewed(self):
+        self.assertEqual(self.lines[0], "4 of 6 sensitive folders reviewed in this period.")
+        self.assertEqual(self.lines[1], "Folder sets: 3: 2 approved in the period; 1 approved, then withdrawn.")
+        summary = html.unescape(self.page.split('id="s1"', 1)[1].split("</section>", 1)[0])
+        self.assertIn("4 of 6 sensitive folders reviewed in this period. Section 5.1 lists every sensitive folder. ", summary)
+
+    def test_the_checklist_row_on_reviewing_all_access_gives_n_of_m_for_every_framework(self):
+        for key, framework in report_data.load_reference("frameworks.json").items():
+            with self.subTest(framework=key):
+                data = fixture()
+                data["inputs"]["framework"] = key
+                model = report_data.build_model(data)
+                self.assertTrue(any(item["evidence"] == "decisions" for item in framework["checklist"]))
+                self.assertTrue(render_report.checklist_evidence(model, "decisions").startswith(
+                    "4 of 6 sensitive folders reviewed in this period, listed in Section 5.1, read 2026-11-02. "
+                ))
+
+    def test_the_folder_table_lists_folders_not_reviewed_first_with_their_evidence(self):
+        self.assertEqual(folder_table_rows(self.page), [
+            ("Finance / Payroll", "No", "Waiting for approval", "", "Payroll"),
+            ("People / Contracts", "No", "", "", "No review set up for this folder"),
+            ("Catalog / Model Eval Results", "Yes", "2026-03-02 (before the period, still in force when it began)",
+             "Omar Haddad", "Model Eval Results"),
+            ("Catalog / Product Adoption / APAC", "Yes", "2026-09-15", "Dana Whitfield", "Catalog-Client-Viewers"),
+            ("Catalog / Product Adoption / EMEA / Pricing", "Yes", "2026-09-15", "Dana Whitfield", "Catalog-Client-Viewers"),
+            ("Customer Support / Customer Records", "Yes", "2026-08-04", "Dana Whitfield", "Customer Records"),
+        ])
+        self.assertIn("<th>Approved on</th><th>Approved by</th><th>Folder set</th>", self.page)
+        self.assertNotIn("No folder set<", self.page)
+        self.assertLess(self.page.index("<h3>5.1 By folder</h3>"), self.page.index("<h3>5.2 By folder set</h3>"))
+
+    def test_the_scope_says_which_folders_and_when_they_were_read(self):
+        scope = html.unescape(self.page.split('id="s2"', 1)[1].split("</section>", 1)[0])
+        self.assertIn(
+            "Section 5.1 lists the folders where Polar Sky found sensitive data, not every folder in the drive, read at "
+            "report time, 2026-11-02 13:58 UTC.", scope
+        )
+
+    def test_folders_csv_holds_every_folder_with_its_evidence(self):
+        rows = rows_of(self.files["folders.csv"])
+        self.assertEqual(list(rows[0]), ["path", "provider", "reviewed", "evidence_folder_sets", "latest_approval_at",
+                                         "approved_by", "waiting_folder_sets", "as_of"])
+        self.assertEqual(rows[0], {
+            "path": "Finance / Payroll", "provider": "Microsoft 365", "reviewed": "No", "evidence_folder_sets": "",
+            "latest_approval_at": "", "approved_by": "", "waiting_folder_sets": "Payroll", "as_of": "2026-11-02 13:58 UTC",
+        })
+        self.assertEqual(rows[-1]["approved_by"], "Dana Whitfield")
+        self.assertEqual(rows[-1]["latest_approval_at"], "2026-08-04 12:30 UTC")
+        self.assertIn("<td>G</td><td>Sensitive folders</td>", self.page)
+
+    def test_one_folder_reads_in_the_singular(self):
+        model = report_data.build_model(with_folders(fixture(), [sensitive_folder(1, reviewed=True)]))
+        self.assertEqual(render_report.summary_lines(model)[0], "1 of 1 sensitive folder reviewed in this period.")
+
+    def test_microsoft_365_folders_with_one_id_in_two_drives_stay_two_folders(self):
+        first, second = sensitive_folder(1, reviewed=True), sensitive_folder(1)
+        for folder, drive in ((first, "drive-a"), (second, "drive-b")):
+            folder.update({"provider": "microsoft365", "drive_id": drive})
+        second["path"] = "/Other drive/Folder 0001"
+        data = with_folders(fixture(), [first, second])
+        model = report_data.build_model(data)
+        self.assertEqual(render_report.summary_lines(model)[0], "1 of 2 sensitive folders reviewed in this period.")
+        data["inputs"].setdefault("columns", {})["folders"] = ["path", "drive_id", "folder_id"]
+        files, _ = render_report.render_with_model(data)
+        self.assertEqual(
+            sorted((row["drive_id"], row["folder_id"]) for row in rows_of(files["folders.csv"])),
+            [("drive-a", "folder-0001"), ("drive-b", "folder-0001")],
+        )
+
+    def test_a_folder_cell_that_starts_a_formula_is_escaped_in_the_csv_only(self):
+        folder = sensitive_folder(1)
+        folder["path"] = "=HYPERLINK(1)"
+        files = render_report.render(with_folders(fixture(), [folder]))
+        self.assertEqual(rows_of(files["folders.csv"])[0]["path"], "'=HYPERLINK(1)")
+        self.assertEqual(folder_table_rows(files["report.html"])[0][0], "=HYPERLINK(1)")
+
+    def test_several_approved_folder_sets_are_all_named_with_the_latest_approval_in_the_csv(self):
+        folder = sensitive_folder(1, reviewed=True)
+        folder["evidence_controls"].append({
+            "control_id": "22222222-2222-4222-8222-222222222222", "name": "Customer Records",
+            "latest_approval": {"at": "2026-10-01T08:00:00Z", "carried_into_range": False,
+                                "actor": {"type": "system", "surface": "", "assistant_client": None, "name": ""}},
+        })
+        folder["evidence_controls"].append({"control_id": "33333333-3333-4333-8333-333333333333", "name": "Model Eval Results",
+                                            "latest_approval": None})
+        files = render_report.render(with_folders(fixture(), [folder]))
+        self.assertEqual(folder_table_rows(files["report.html"])[0][2:], (
+            "2026-09-15 / 2026-10-01 / Not recorded",
+            "Dana Whitfield / Polar Sky / Not recorded",
+            "Catalog-Client-Viewers / Customer Records / Model Eval Results",
+        ))
+        self.assertIn(
+            "<td>2026-09-15<br>2026-10-01<br>Not recorded</td><td>Dana Whitfield<br>Polar Sky<br>Not recorded</td>",
+            files["report.html"],
+        )
+        row = rows_of(files["folders.csv"])[0]
+        self.assertEqual(row["evidence_folder_sets"], "Catalog-Client-Viewers; Customer Records; Model Eval Results")
+        self.assertEqual((row["latest_approval_at"], row["approved_by"]), ("2026-10-01 08:00 UTC", "Polar Sky"))
+
+    def test_several_waiting_folder_sets_are_named_together(self):
+        folder = sensitive_folder(1)
+        folder["waiting_controls"] = [{"control_id": "b", "name": "Payroll"}, {"control_id": "a", "name": "Finance"}]
+        page = render_report.render(with_folders(fixture(), [folder]))["report.html"]
+        self.assertEqual(folder_table_rows(page)[0][2:], ("Waiting for approval / Waiting for approval", "", "Finance / Payroll"))
+
+    def test_more_than_500_folders_show_the_first_500_and_point_to_the_csv(self):
+        folders = [sensitive_folder(number, reviewed=number % 2 == 0) for number in range(1, 503)]
+        files = render_report.render(with_folders(fixture(), folders))
+        rows = folder_table_rows(files["report.html"])
+        self.assertEqual(len(rows), 500)
+        self.assertEqual([row[1] for row in rows[:251]], ["No"] * 251)
+        self.assertIn("This table shows the first 500 of 502 folders; folders.csv lists all 502.", files["report.html"])
+        self.assertEqual(len(rows_of(files["folders.csv"])), 502)
+        self.assertNotIn("This table shows the first", self.page)
+
+    def test_two_pages_are_merged(self):
+        data = with_folders(fixture(), [sensitive_folder(number, reviewed=number == 1) for number in range(1, 4)])
+        first = folder_response(data)
+        second = copy.deepcopy(first)
+        first["response"].update({"folders": first["response"]["folders"][:2], "next_offset": 2})
+        second["arguments"]["offset"] = 2
+        second["response"].update({"folders": second["response"]["folders"][2:], "offset": 2, "next_offset": None})
+        data["responses"].append(second)
+        model = report_data.build_model(data)
+        self.assertEqual(render_report.summary_lines(model)[0], "1 of 3 sensitive folders reviewed in this period.")
+
+    def test_a_missing_page_stops_the_render(self):
+        data = fixture()
+        folder_response(data)["response"]["next_offset"] = 100
+        with self.assertRaises(report_data.ReportDataError) as raised:
+            render_report.render(data)
+        self.assertIn("list_access_review_folders for 2026-05-01 to 2026-10-31 is missing its page at offset 100", str(raised.exception))
+
+    def test_a_gap_or_a_range_outside_the_period_stops_the_render(self):
+        for arguments, expected in (
+            ({"from": "2026-05-01", "to": "2026-08-31"}, "No list_access_review_folders response covers 2026-09-01 to 2026-10-31"),
+            ({"from": "2026-04-01", "to": "2026-10-31"}, "list_access_review_folders for 2026-04-01 to 2026-10-31 reaches outside"),
+        ):
+            with self.subTest(arguments=arguments):
+                data = fixture()
+                folder_response(data)["arguments"] = arguments
+                with self.assertRaises(report_data.ReportDataError) as raised:
+                    render_report.render(data)
+                self.assertIn(expected, str(raised.exception))
+
+    def test_two_date_ranges_are_merged_by_folder(self):
+        data = fixture()
+        evidence = copy.deepcopy(data["responses"][0])
+        evidence["arguments"] = {"from": "2025-11-01", "to": "2026-04-30"}
+        data["responses"].insert(1, evidence)
+        data["inputs"]["period"] = {"from": "2025-11-01", "to": "2026-10-31"}
+        earlier = add_folder_range(data, "2025-11-01", "2026-04-30")["responses"][-1]["response"]
+        earlier["as_of"] = "2026-11-02T14:05:00Z"
+        payroll, contracts = earlier["folders"][0], earlier["folders"][1]
+        payroll.update({"reviewed": True, "waiting_controls": [], "evidence_controls": [{
+            "control_id": "44444444-4444-4444-8444-444444444444", "name": "Payroll",
+            "latest_approval": {"at": "2026-01-10T10:00:00Z", "carried_into_range": False,
+                                "actor": {"type": "user", "name": "Laura Kim"}},
+        }]})
+        contracts["waiting_controls"] = [{"control_id": "55555555-5555-4555-8555-555555555555", "name": "Contracts"}]
+        apac = earlier["folders"][2]["evidence_controls"][0]
+        apac["latest_approval"] = dict(apac["latest_approval"], at="2026-02-01T09:00:00Z")
+        earlier["folders"].append(sensitive_folder(7))
+        files, model = render_report.render_with_model(data)
+        self.assertEqual(render_report.summary_lines(model)[0], "5 of 7 sensitive folders reviewed in this period.")
+        rows = {row["path"]: row for row in rows_of(files["folders.csv"])}
+        self.assertEqual((rows["Finance / Payroll"]["reviewed"], rows["Finance / Payroll"]["waiting_folder_sets"]), ("Yes", ""))
+        self.assertEqual(rows["Finance / Payroll"]["approved_by"], "Laura Kim")
+        self.assertEqual(rows["People / Contracts"]["waiting_folder_sets"], "Contracts")
+        self.assertEqual(rows["Catalog / Product Adoption / APAC"]["latest_approval_at"], "2026-09-15 16:20 UTC")
+        self.assertEqual({row["as_of"] for row in rows.values()}, {"2026-11-02 14:05 UTC"})
+
+    def test_without_the_tool_the_folder_list_is_not_available_and_never_read_as_none_found(self):
+        data = without(fixture(), FOLDERS_TOOL)
+        files, model = render_report.render_with_model(data)
+        lines = render_report.summary_lines(model)
+        self.assertEqual(lines[0], "Folder sets: 3: 2 approved in the period; 1 approved, then withdrawn.")
+        self.assertEqual(lines[1], "Sensitive folders reviewed: Not available in this version.")
+        self.assertIn("Section 5.1 sensitive folders", lines[-2])
+        self.assertNotIn("folders.csv", files)
+        self.assertIn('<h3>5.1 By folder</h3>\n  <p><span class="na">Not available in this version</span></p>', files["report.html"])
+        self.assertIn('<td>G</td><td>Sensitive folders</td><td colspan="2"><span class="na">Not available in this version</span>',
+                      files["report.html"])
+        self.assertTrue(render_report.checklist_evidence(model, "decisions").startswith(
+            "Sensitive folders reviewed: Not available in this version. "))
+        self.assertNotIn("found no folders", visible_text(files))
+
+    def test_an_empty_report_without_the_tool_says_no_folder_set_was_in_force(self):
+        model = report_data.build_model(without(empty_review(fixture()), FOLDERS_TOOL))
+        lines = render_report.summary_lines(model)
+        self.assertEqual(lines[0], "Folder sets: " + NO_FOLDER_SETS_IN_FORCE)
+        self.assertEqual(lines[1], "Sensitive folders reviewed: Not available in this version.")
+
+    def test_an_empty_report_with_no_sensitive_folders_says_polar_sky_found_none(self):
+        files, model = render_report.render_with_model(no_sensitive_folders(empty_review(fixture())))
+        expected = (
+            "Polar Sky found no folders with sensitive data and recorded no folder sets with an access approval in force "
+            "from 2026-05-01 to 2026-10-31."
+        )
+        self.assertEqual(render_report.summary_lines(model)[0], expected)
+        self.assertIn(expected, html.unescape(files["report.html"].split('id="s1"', 1)[1].split("</section>", 1)[0]))
+        self.assertIn("<h3>5.1 By folder</h3>\n  <p>Polar Sky found no folders with sensitive data.</p>", files["report.html"])
+        self.assertNotIn("0 of 0", visible_text(files))
+        self.assertEqual(rows_of(files["folders.csv"]), [])
+
+    def test_no_sensitive_folders_with_folder_sets_in_force_says_polar_sky_found_none(self):
+        files, model = render_report.render_with_model(no_sensitive_folders(fixture()))
+        self.assertEqual(render_report.summary_lines(model)[0], "Polar Sky found no folders with sensitive data.")
+        summary = html.unescape(files["report.html"].split('id="s1"', 1)[1].split("</section>", 1)[0])
+        self.assertIn("<p>Polar Sky found no folders with sensitive data. Northwind Traders reviewed access to", summary)
+        self.assertNotIn("Section 5.1 lists every sensitive folder", summary)
+        self.assertTrue(render_report.checklist_evidence(model, "decisions").startswith(
+            "Polar Sky found no folders with sensitive data. 7 members"))
+
+    def test_the_phrase_no_access_to_review_appears_nowhere(self):
+        for name, data in (
+            ("fixture", fixture()), ("no folder sets", empty_review(fixture())),
+            ("no sensitive folders", no_sensitive_folders(empty_review(fixture()))),
+            ("no folder tool", without(empty_review(fixture()), FOLDERS_TOOL)),
+        ):
+            with self.subTest(data=name):
+                files, model = render_report.render_with_model(data)
+                text = visible_text(files) + render_report.render_summary_text(model)
+                self.assertNotIn(BANNED, text.lower())
+        for folder, _, names in os.walk(SKILL_DIRECTORY):
+            if {"tests", "assets"} & set(folder.split(os.sep)):
+                continue
+            for name in names:
+                if name.endswith((".md", ".py", ".json")):
+                    with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                        self.assertNotIn(BANNED, handle.read().lower(), name)

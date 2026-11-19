@@ -96,6 +96,24 @@
       {"id": "assistant_client", "header": "AI assistant", "default": false, "description": "Which AI assistant was used, if any."}
     ]
   },
+  "folders": {
+    "title": "Sensitive folders",
+    "file": "folders.csv",
+    "description": "One row per folder where Polar Sky found sensitive data, read at report time: whether it was reviewed in the period, the approved folder sets that cover it with their latest approval in the period, or the folder sets still waiting for approval. Folders not reviewed come first.",
+    "columns": [
+      {"id": "path", "header": "Folder", "default": true, "description": "The folder's path."},
+      {"id": "provider", "header": "Source", "default": true, "description": "Where the folder is, such as Google Workspace or Microsoft 365."},
+      {"id": "reviewed", "header": "Reviewed in the period", "default": true, "description": "Whether a folder set with an access approval in force in the period covers the folder."},
+      {"id": "evidence_folder_sets", "header": "Approved folder sets", "default": true, "description": "The folder sets with an approval in force in the period that cover the folder."},
+      {"id": "latest_approval_at", "header": "Latest approval", "default": true, "description": "The latest approval in the period of those folder sets."},
+      {"id": "approved_by", "header": "Approved by", "default": true, "description": "Who made that approval, a person or Polar Sky."},
+      {"id": "waiting_folder_sets", "header": "Folder sets waiting for approval", "default": true, "description": "For a folder not reviewed, the folder sets that cover it and still wait for a decision."},
+      {"id": "integration_id", "header": "Integration id", "default": false, "description": "Polar Sky's id for the connected system the folder is in."},
+      {"id": "drive_id", "header": "Drive id", "default": false, "description": "The Microsoft 365 drive the folder is in, which a Microsoft 365 folder id is unique within."},
+      {"id": "folder_id", "header": "Folder id", "default": false, "description": "The provider's id for the folder."},
+      {"id": "as_of", "header": "Folders as at", "default": true, "description": "When the folder list was read."}
+    ]
+  },
   "extract": {
     "title": "Extract rows",
     "file": "extract.csv",

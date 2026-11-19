@@ -17,6 +17,7 @@ TOOL_ACTIVITY = "get_control_activity"
 TOOL_EXTRACT_START = "start_access_review_extract"
 TOOL_EXTRACT_GET = "get_access_review_extract"
 TOOL_EXTRACT_ROWS = "read_access_review_extract_rows"
+TOOL_FOLDERS = "list_access_review_folders"
 
 SAVED_AT = "_saved_at"
 
@@ -66,6 +67,10 @@ MICROSOFT_365_GUEST = "Guest"
 PROVIDER_LABELS = {
     "microsoft365": ("Microsoft 365", "Microsoft 365 tenant"),
     "google_workspace": ("Google Workspace", "Google Workspace domain"),
+}
+
+FOLDER_PROVIDER_LABELS = {
+    "google_workspace": "Google Workspace", "microsoft365": "Microsoft 365", "filesystem": "File system",
 }
 
 SURFACE_LABELS = {"console": "Polar Sky console", "connector": "AI assistant"}
@@ -353,7 +358,9 @@ def collect(data):
     activity = {}
     extracts = {}
     tools_called = set()
-    pages = {TOOL_EVIDENCE: {}, TOOL_MEMBERS: {}, TOOL_ACTIVITY: {}}
+    folders = {}
+    folders_as_of = None
+    pages = {TOOL_EVIDENCE: {}, TOOL_MEMBERS: {}, TOOL_ACTIVITY: {}, TOOL_FOLDERS: {}}
     for entry in data.get("responses", []):
         tool = entry.get("tool")
         tools_called.add(tool)
@@ -383,6 +390,12 @@ def collect(data):
             activity.setdefault(control_id, []).extend(entries)
         elif tool in (TOOL_EXTRACT_START, TOOL_EXTRACT_GET, TOOL_EXTRACT_ROWS):
             _collect_extract(extracts, tool, arguments, response)
+        elif tool == TOOL_FOLDERS:
+            date_range = (arguments.get("from") or response.get("from"), arguments.get("to") or response.get("to"))
+            pages[TOOL_FOLDERS].setdefault(date_range, {})[_offset_of(arguments, response)] = response.get("next_offset")
+            folders_as_of = _later_time(folders_as_of, response.get("as_of"))
+            for folder in response.get("folders") or []:
+                _merge_folder(folders, folder)
     if TOOL_EVIDENCE not in tools_called:
         raise ReportDataError(f"The data file holds no {TOOL_EVIDENCE} response.")
     return {
@@ -393,7 +406,49 @@ def collect(data):
         "activity": activity,
         "extracts": extracts,
         "pages": pages,
+        "folders": folders if TOOL_FOLDERS in tools_called else None,
+        "folders_as_of": folders_as_of,
     }
+
+
+def _later_time(first, second):
+    """Return the later of two RFC 3339 times, either of which may be missing."""
+    if not first or not second:
+        return first or second
+    return first if parse_time(first) >= parse_time(second) else second
+
+
+def _newer_approval(known, candidate):
+    """Say whether a folder set's approval from another date range replaces the one kept: a later one, or the same one not carried into its range."""
+    if not candidate:
+        return False
+    if not known:
+        return True
+    known_at, candidate_at = parse_time(known.get("at")), parse_time(candidate.get("at"))
+    if known_at is None or (candidate_at is not None and candidate_at > known_at):
+        return True
+    return candidate_at == known_at and bool(known.get("carried_into_range")) and not candidate.get("carried_into_range")
+
+
+def _merge_folder(folders, folder):
+    """Add a folder from one page of the folder list, joining what date ranges say: reviewed in any range, every approved folder set with its latest approval, and the waiting folder sets."""
+    key = (folder.get("integration_id") or "", folder.get("drive_id") or "", folder.get("folder_id") or "")
+    known = folders.setdefault(key, {
+        "integration_id": key[0], "drive_id": key[1], "folder_id": key[2], "path": "", "provider": "", "reviewed": False,
+        "evidence": {}, "waiting": {},
+    })
+    known["path"] = folder.get("path") or known["path"]
+    known["provider"] = folder.get("provider") or known["provider"]
+    known["reviewed"] = known["reviewed"] or bool(folder.get("reviewed"))
+    for control in folder.get("evidence_controls") or []:
+        entry = known["evidence"].setdefault(control.get("control_id") or control.get("name") or "", {
+            "name": control.get("name") or "", "latest_approval": None,
+        })
+        entry["name"] = control.get("name") or entry["name"]
+        if _newer_approval(entry["latest_approval"], control.get("latest_approval")):
+            entry["latest_approval"] = control["latest_approval"]
+    for control in folder.get("waiting_controls") or []:
+        known["waiting"][control.get("control_id") or control.get("name") or ""] = control.get("name") or ""
 
 
 def _collect_extract(extracts, tool, arguments, response):
@@ -468,19 +523,19 @@ def _check_activity_pages(cursors, label, period_start):
         cursor = next_cursor
 
 
-def _check_period_covered(date_ranges, period):
+def _check_period_covered(date_ranges, period, tool=TOOL_EVIDENCE):
     first_day = datetime.fromisoformat(period["from"]).date()
     last_day = datetime.fromisoformat(period["to"]).date()
     covered_until = first_day
     usable = []
     for start, end in date_ranges:
         if not start or not end:
-            raise ReportDataError(f"A {TOOL_EVIDENCE} response has no from and to dates in its arguments.")
+            raise ReportDataError(f"A {tool} response has no from and to dates in its arguments.")
         start_day = datetime.fromisoformat(start).date()
         end_day = datetime.fromisoformat(end).date()
         if start_day < first_day or end_day > last_day:
             raise ReportDataError(
-                f"{TOOL_EVIDENCE} for {start} to {end} reaches outside the review period "
+                f"{tool} for {start} to {end} reaches outside the review period "
                 f"{period['from']} to {period['to']}. Call it only for dates inside the period."
             )
         usable.append((start_day, end_day))
@@ -489,7 +544,7 @@ def _check_period_covered(date_ranges, period):
             covered_until = end + timedelta(days=1)
     if covered_until <= last_day:
         raise ReportDataError(
-            f"No {TOOL_EVIDENCE} response covers {covered_until.isoformat()} to {last_day.isoformat()}. "
+            f"No {tool} response covers {covered_until.isoformat()} to {last_day.isoformat()}. "
             "Call it for every part of the review period, 366 days or less at a time."
         )
 
@@ -512,6 +567,11 @@ def check_complete(records, period):
         if activity_pages is None:
             raise ReportDataError(f"The data holds no {TOOL_ACTIVITY} response for control {control_id}.")
         _check_activity_pages(activity_pages, f"{TOOL_ACTIVITY} for control {control_id}", period_start)
+    folder_pages = records["pages"][TOOL_FOLDERS]
+    for (start, end), offsets in sorted(folder_pages.items(), key=lambda item: (str(item[0][0]), str(item[0][1]))):
+        _check_offset_pages(offsets, f"{TOOL_FOLDERS} for {start} to {end}")
+    if records["folders"] is not None:
+        _check_period_covered(folder_pages, period, TOOL_FOLDERS)
 
 
 def latest_extract(records):
@@ -1212,6 +1272,77 @@ def owner_signoff(owners, approvals):
     return result
 
 
+NO_REVIEW_SET_UP = "No review set up for this folder"
+WAITING_FOR_APPROVAL = "Waiting for approval"
+NOT_RECORDED = "Not recorded"
+
+
+def folder_cells(folder):
+    """The lines of a folder's Approved on, Approved by and Folder set cells, one line per folder set: each approved folder set with its latest approval in the period, the folder sets waiting for approval, or none."""
+    if folder["_reviewed"]:
+        approved_on, approved_by = [], []
+        for entry in folder["_evidence"]:
+            approval = entry["latest_approval"]
+            if not approval:
+                approved_on.append(NOT_RECORDED)
+                approved_by.append(NOT_RECORDED)
+                continue
+            carried = " (before the period, still in force when it began)" if approval.get("carried_into_range") else ""
+            approved_on.append(format_date(approval.get("at")) + carried)
+            approved_by.append(_approval_actor_name(approval))
+        return {"approved_on": approved_on, "approved_by": approved_by,
+                "folder_set": [entry["name"] for entry in folder["_evidence"]]}
+    if folder["_waiting"]:
+        return {"approved_on": [WAITING_FOR_APPROVAL] * len(folder["_waiting"]), "approved_by": [],
+                "folder_set": list(folder["_waiting"])}
+    return {"approved_on": [], "approved_by": [], "folder_set": [NO_REVIEW_SET_UP]}
+
+
+def _folder_row(folder, as_of):
+    evidence = sorted(folder["evidence"].values(), key=lambda entry: (entry["name"].lower(), entry["name"])) if folder["reviewed"] else []
+    approvals = [entry["latest_approval"] for entry in evidence if entry["latest_approval"]]
+    latest = max(approvals, key=lambda approval: parse_time(approval.get("at"))) if approvals else None
+    waiting = [] if folder["reviewed"] else sorted(folder["waiting"].values(), key=lambda name: (name.lower(), name))
+    row = {
+        "path": folder["path"],
+        "provider": FOLDER_PROVIDER_LABELS.get(folder["provider"], folder["provider"]),
+        "reviewed": _yes_no(folder["reviewed"]),
+        "evidence_folder_sets": _join(entry["name"] for entry in evidence),
+        "latest_approval_at": format_time(latest.get("at")) if latest else "",
+        "approved_by": _approval_actor_name(latest) if latest else "",
+        "waiting_folder_sets": _join(waiting),
+        "integration_id": folder["integration_id"],
+        "drive_id": folder["drive_id"],
+        "folder_id": folder["folder_id"],
+        "as_of": format_time(as_of),
+        "_reviewed": folder["reviewed"],
+        "_drive_id": folder["drive_id"],
+        "_evidence": evidence,
+        "_waiting": waiting,
+    }
+    row["_cells"] = folder_cells(row)
+    return row
+
+
+def build_folder_coverage(records):
+    """Turn the folder list into the rows and counts of the sensitive folders, or None when the data has no folder list, as from a server without the tool."""
+    if records["folders"] is None:
+        return None
+    as_of = records["folders_as_of"]
+    rows = sorted(
+        (_folder_row(folder, as_of) for folder in records["folders"].values()),
+        key=lambda row: (
+            row["_reviewed"], row["path"].lower(), row["path"], row["integration_id"], row["_drive_id"], row["folder_id"],
+        ),
+    )
+    return {
+        "as_of": as_of,
+        "total": len(rows),
+        "reviewed": sum(1 for row in rows if row["_reviewed"]),
+        "rows": rows,
+    }
+
+
 def build_model(data):
     """Turn the data file into the rows, counts and texts the renderer lays out."""
     inputs = data.get("inputs") or {}
@@ -1360,6 +1491,7 @@ def build_model(data):
         "logo": load_logo(inputs.get("logo")),
         "totals": _totals(controls, tables),
         "unlisted": unlisted,
+        "folder_coverage": build_folder_coverage(records),
     }
 
 

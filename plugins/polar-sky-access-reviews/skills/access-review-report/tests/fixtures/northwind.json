@@ -106,6 +106,84 @@
       }
     },
     {
+      "tool": "list_access_review_folders",
+      "arguments": {"from": "2026-05-01", "to": "2026-10-31"},
+      "response": {
+        "request_id": "req-folders-1",
+        "from": "2026-05-01",
+        "to": "2026-10-31",
+        "as_of": "2026-11-02T13:58:30Z",
+        "total": 6,
+        "reviewed": 4,
+        "offset": 0,
+        "next_offset": null,
+        "folders": [
+          {
+            "folder_id": "01NWFINANCEPAYROLL",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "Finance / Payroll",
+            "reviewed": false,
+            "evidence_controls": [],
+            "waiting_controls": [{"control_id": "44444444-4444-4444-8444-444444444444", "name": "Payroll"}]
+          },
+          {
+            "folder_id": "01NWHRCONTRACTS",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "People / Contracts",
+            "reviewed": false,
+            "evidence_controls": [],
+            "waiting_controls": []
+          },
+          {
+            "folder_id": "01NWCATALOGAPAC",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "Catalog / Product Adoption / APAC",
+            "reviewed": true,
+            "evidence_controls": [
+              {"control_id": "11111111-1111-4111-8111-111111111111", "name": "Catalog-Client-Viewers", "latest_approval": {"at": "2026-09-15T16:20:00Z", "carried_into_range": false, "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Dana Whitfield", "user_id": "aaaaaaaa-0000-4000-8000-000000000001"}}}
+            ],
+            "waiting_controls": []
+          },
+          {
+            "folder_id": "01NWCATALOGEMEAPRICING",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "Catalog / Product Adoption / EMEA / Pricing",
+            "reviewed": true,
+            "evidence_controls": [
+              {"control_id": "11111111-1111-4111-8111-111111111111", "name": "Catalog-Client-Viewers", "latest_approval": {"at": "2026-09-15T16:20:00Z", "carried_into_range": false, "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Dana Whitfield", "user_id": "aaaaaaaa-0000-4000-8000-000000000001"}}}
+            ],
+            "waiting_controls": []
+          },
+          {
+            "folder_id": "01NWCATALOGMODELEVAL",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "Catalog / Model Eval Results",
+            "reviewed": true,
+            "evidence_controls": [
+              {"control_id": "33333333-3333-4333-8333-333333333333", "name": "Model Eval Results", "latest_approval": {"at": "2026-03-02T09:15:00Z", "carried_into_range": true, "actor": {"type": "user", "surface": "console", "assistant_client": null, "name": "Omar Haddad", "user_id": "aaaaaaaa-0000-4000-8000-000000000002"}}}
+            ],
+            "waiting_controls": []
+          },
+          {
+            "folder_id": "01NWSUPPORTRECORDS",
+            "integration_id": "99999999-9999-4999-8999-999999999999",
+            "provider": "microsoft365",
+            "path": "Customer Support / Customer Records",
+            "reviewed": true,
+            "evidence_controls": [
+              {"control_id": "22222222-2222-4222-8222-222222222222", "name": "Customer Records", "latest_approval": {"at": "2026-08-04T12:30:00Z", "carried_into_range": false, "actor": {"type": "user", "surface": "connector", "assistant_client": "Claude", "name": "Dana Whitfield", "user_id": "aaaaaaaa-0000-4000-8000-000000000001"}}}
+            ],
+            "waiting_controls": []
+          }
+        ]
+      }
+    },
+    {
       "tool": "get_control",
       "arguments": {"control_id": "11111111-1111-4111-8111-111111111111"},
       "response": {

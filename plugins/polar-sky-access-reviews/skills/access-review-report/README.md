@@ -44,11 +44,15 @@ git diff plugins/polar-sky-access-reviews/skills/access-review-report/tests/gold
 
 ## Summary
 
-After the file paths, `render_report.py` prints a block that starts with `Summary, worded as the report states it:`: the folder sets, access decisions, members, removals, kept direct shares, the extract, what is not available and what is TBD, in the report's own words. The skill gives it to the person word for word, so Claude never counts or adds.
+After the file paths, `render_report.py` prints a block that starts with `Summary, worded as the report states it:`: how many of the sensitive folders were reviewed in the period, the folder sets, access decisions, members, removals, kept direct shares, the extract, what is not available and what is TBD, in the report's own words. The skill gives it to the person word for word, so Claude never counts or adds.
 
 ## Extract
 
 The skill starts a live read of who has access (`start_access_review_extract`) right after it asks for the inputs, polls `get_access_review_extract` until it completes or fails, and then reads every page of groups, exclusions and rows. Section 3 shows when the extract was taken, each group's member count next to the provider's own count (for Google Workspace, the direct members of the group and of every group nested in it) and what could not be read. Attachment F lists the stored file and `extract.csv` with a SHA-256 each; they differ because the CSV is a rendering of the stored file. It also says when the stored file was not confirmed against its SHA-256, or the rows read differ from the extract's own counts. A failed extract is reported as failed and the rest of the report renders; with no extract tools on the server, the report marks the extract "Not available in this version".
+
+## Sensitive folders
+
+The skill calls `list_access_review_folders` for the period, every page. It lists every folder where Polar Sky found sensitive data, read at report time, and says whether each was reviewed in the period: the folder is, or lies below, a folder of a folder set whose approval was in force at some time in the period. Section 5.1 shows them, folders not reviewed first, with the approved folder set and its latest approval, or the folder set still waiting for approval; above 500 folders it shows the first 500. `folders.csv` (Attachment G) holds them all. The summary opens with "N of M sensitive folders reviewed in this period". A data folder from a server without the tool has no folder list: the report marks it "Not available in this version" and never reads it as no sensitive folders.
 
 ## Earlier answers
 
