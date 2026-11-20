@@ -2086,8 +2086,20 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertLess(self.skill.index("scripts/make_pdf.py\" --html"), made)
         self.assertLess(made, self.skill.index("### 9. Report back"))
 
-    def test_the_skill_checks_for_approved_access_before_asking_the_inputs(self):
-        check = self.skill.index("Before anything else, check that there is something to report.")
+    def test_the_skill_asks_only_period_frameworks_and_organization_first(self):
+        first = self.skill.index("First, ask in one short message for whichever of these three the person has not given yet")
+        self.assertLess(first, self.skill.index("Then check that there is something to report"))
+        self.assertIn("Ask nothing else in this message.", self.skill)
+        self.assertIn("Never ask again for the period, frameworks or organization.", self.skill)
+
+    def test_the_skill_shows_the_other_details_with_tbd_so_go_builds_the_report(self):
+        self.assertIn('Show the report details in one message headed "Report details"', self.skill)
+        self.assertIn('Say "go" to build the report with these; anything left TBD shows as TBD in the report.', self.skill)
+        self.assertIn("Report ID: default `AR-<last day of the period>`", self.skill)
+        self.assertIn('When the person says "go", leave every TBD detail out of `inputs.json`', self.skill)
+
+    def test_the_skill_checks_for_approved_access_before_asking_the_report_details(self):
+        check = self.skill.index("Then check that there is something to report")
         self.assertLess(check, self.skill.index("scripts/previous_answers.py\" --organization"))
         self.assertIn("If every evidence `total` is 0 and every folder `total` is 0", self.skill)
         self.assertIn("there is nothing to report", self.skill)

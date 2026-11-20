@@ -26,7 +26,15 @@ Polar Sky controls reach Claude through one of two MCP servers: one the person a
 
 ### 2. Ask for the inputs
 
-Before anything else, check that there is something to report. If the person has not given the review period, ask only for it, in one line, and wait (a period such as "last quarter" is enough: turn it into first and last day, UTC). Then call `get_access_review_evidence`, and `list_access_review_folders` when the server lists it (step 1), each with `from` and `to` set to that period and no `offset`; for a period longer than 366 days, call each once for each part of 366 days or less, as in step 5. Do not save these results; step 5 calls them again. If any call in this check, the `list_controls` calls below included, is refused, handle it as step 5 says for a refused call; never take a refused call as an empty period or as no controls. If any evidence `total` is more than 0, go on below.
+Inputs come in two messages. The first asks only what the report cannot be built without; the second shows every other detail filled in or marked TBD, so the person can just say "go".
+
+First, ask in one short message for whichever of these three the person has not given yet, and wait:
+
+- Review period: first and last day (a period such as "last quarter" is enough: turn it into first and last day, UTC).
+- Frameworks: one or more of PCI DSS 4.0.1 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC (read `references/frameworks.json` for their names). One framework is the usual case; one report can also map its evidence to several, for example SOC 2 and ISO 27001.
+- Organization name, as it should appear on the cover (for example Northwind Traders).
+
+Ask nothing else in this message. Then check that there is something to report: call `get_access_review_evidence`, and `list_access_review_folders` when the server lists it (step 1), each with `from` and `to` set to that period and no `offset`; for a period longer than 366 days, call each once for each part of 366 days or less, as in step 5. Do not save these results; step 5 calls them again. If any call in this check, the `list_controls` calls below included, is refused, handle it as step 5 says for a refused call; never take a refused call as an empty period or as no controls. If any evidence `total` is more than 0, go on below.
 
 If every evidence `total` is 0 but a folder `total` is more than 0, do not stop. Tell the person in one line, with the largest folder `total` as N: "Polar Sky found N sensitive folders but no folder set was approved in this period; the report will show them as not reviewed." Then go on below.
 
@@ -43,7 +51,7 @@ Then run:
 python3 "${CLAUDE_SKILL_DIR}/scripts/previous_answers.py" --organization "<organization>"
 ```
 
-Pass `--organization` with the organization's name when the person has already named it, so only that organization's earlier answers are shown; leave it out when they have not. If the answers found are for another organization than the one the person names, do not show them.
+Pass `--organization` with the organization's name the person gave, so only that organization's earlier answers are shown. If the answers found are for another organization than the one the person names, do not show them.
 
 It prints the answers this skill wrote for earlier reports in the person's Claude Code sessions on this computer: `by_framework` holds the latest answers for each framework (an answer set for several frameworks is listed under each of them; it has `frameworks` instead of `framework`), and `latest` the latest of any framework, each with its `date` and the `last_report` (report ID and period). It never prints anything else from the sessions.
 
@@ -52,7 +60,7 @@ If it found answers, use the newest of those for the frameworks the person asked
 1. One line: "I found your answers from an earlier report in your Claude Code sessions on this computer."
 2. The answers as one short list, headed "From your last <framework names> report on <date>:", one answer per line with its label from the list below. Leave out the period, report ID and acknowledgment date, which are new each time.
 3. "Anything to change?" Use the earlier answers only once the person has confirmed them or given new ones; a logo is shown with its full path so the person sees which file the cover will carry.
-4. The answers that are new for this report: the review period (if the person has not given it), the report ID, and the management acknowledgment date. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
+4. The answers that are new for this report: the report ID, with the default described below, and the management acknowledgment date, as TBD. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
 5. The answers the earlier report did not have, from `not_given_last_time` printed next to those answers, under the heading "Not given last time:", one line each in its order, with its label and example from the table below. Leave out the review interval when no framework asked for now has `needs_interval`. When an item has a `suggestion`, the script read that value from the earlier answer named in `read_from`: quote that answer and ask the person to confirm the value, for example "Removal deadline in days (for example 30): your last answer says "30 days after the decision". Use 30?" or "Review interval as a number (for example 6 months): your last answer says "Every 6 months". Use 6 months?". Without a `suggestion`, ask with the example only. Never put one of these in `inputs.json` until the person has confirmed it or given their own.
 
    | `inputs` | Label and example |
@@ -75,18 +83,20 @@ If it found answers, use the newest of those for the frameworks the person asked
 
    Show the full column lists, numbered and with descriptions as below, only if the person wants to change the columns.
 
-If it found nothing, or the person asks for a different framework with only organization answers found, ask for everything below as usual, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still ask the review interval if a framework asked for now needs it.
+If it found nothing, or the person asks for a different framework with only organization answers found, show the report details below, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still show the review interval if a framework asked for now needs it.
 
-Ask in one message, with short examples. Read `references/frameworks.json` for the five frameworks and their names.
+Show the report details in one message headed "Report details", one line each, with its value or "TBD", and a short example after each TBD. Then say: "Say "go" to build the report with these; anything left TBD shows as TBD in the report. Or give any of them now." Never ask again for the period, frameworks or organization.
 
-- Review period: first and last day (YYYY-MM-DD, UTC).
-- Frameworks: one or more of PCI DSS 4.0.1 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC. One report can map its evidence to several frameworks, for example SOC 2 and ISO 27001; one framework is the usual case. If any chosen framework has `needs_interval` set (SOC 2, ISO 27001 and SOX), also ask the review interval the company set, once for the report, as a number of months or days (for example 6 months), and its wording if it is not just that (for example "Every 6 months, per the review procedure").
-- Organization name, report ID, and who requested the report (name and title).
-- Review procedure (name and version), retention period.
+- Report ID: default `AR-<last day of the period>`, for example `AR-2026-11-20`. If a folder `access-review-<that id>/` already exists in the working folder, add `-2`, `-3` and on, taking the first that does not exist, so an earlier report is never overwritten.
+- Requested by: name and title (for example Steve Morgan, Director of Security Operations).
+- Review procedure: name and version (for example User Access Review Procedure, version 3.2).
+- Retention period (for example 3 years).
 - Removal deadline: the number of days after the decision by which access must be removed (for example 30), and, optionally, where it is set (for example "per the review procedure"). With the number, the report checks each removal against it; without it, Section 6.2 says the check is not available.
-- Optional: review owner (who owns the access review, for example an IT compliance manager), previous review (date and system), data source line, exclusions (what was left out and why; the report already says that systems other than these folder sets are reviewed separately), who the report is prepared for.
-- Optional: a logo for the cover, as the path to a PNG, JPEG or SVG file up to 2 MB on this computer, for example `~/Documents/northwind-logo.png`. Polar Sky does not keep logos, so without a file the cover has no logo.
-- Management acknowledgment: name, title, date (YYYY-MM-DD), and the statement. Ask for all three of name, title and date. Offer this default statement word for word: "I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate."
+- Review interval. If any chosen framework has `needs_interval` set (SOC 2, ISO 27001 and SOX), also ask the review interval the company set, once for the report, as a number of months or days (for example 6 months), and its wording if it is not just that (for example "Every 6 months, per the review procedure"). Leave this line out for the other frameworks.
+- Management acknowledgment: name, title and date (YYYY-MM-DD), and the statement, with this default statement word for word: "I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate."
+- Optional, in one line, with no TBD: review owner, previous review (date and system), data source line, exclusions (what was left out and why; the report already says that systems other than these folder sets are reviewed separately), who the report is prepared for, and a logo for the cover (the path to a PNG, JPEG or SVG file up to 2 MB on this computer, for example `~/Documents/northwind-logo.png`; Polar Sky does not keep logos, so without a file the cover has no logo).
+
+When the person says "go", leave every TBD detail out of `inputs.json`, and use the default report ID unless they gave one.
 
 Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the person's answer, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
 
