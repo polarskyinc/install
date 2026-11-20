@@ -164,7 +164,7 @@ class PreviousAnswersTest(unittest.TestCase):
         self.assertIn("`no_longer_offered`", skill)
         self.assertIn("`defaults_not_in_last`", skill)
         self.assertIn("Show the full column lists, numbered and with descriptions as below, only if the person wants to change the columns.", skill)
-        self.assertIn("Then, unless item 6 above already asked about the columns, show the columns", skill)
+        self.assertIn("Then, unless item 6 above already asked about the columns, add one line", skill)
         self.assertIn("Always write `columns` with every table in `references/columns.json`", skill)
 
     def test_saved_default_columns_are_returned_with_nothing_changed(self):

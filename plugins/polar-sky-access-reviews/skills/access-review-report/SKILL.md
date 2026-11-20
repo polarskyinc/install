@@ -85,7 +85,7 @@ If it found answers, use the newest of those for the frameworks the person asked
 
 If it found nothing, or the person asks for a different framework with only organization answers found, show the report details below, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still show the review interval if a framework asked for now needs it.
 
-Show the report details in one message headed "Report details", one line each, with its value or "TBD", and a short example after each TBD. Then say: "Say "go" to build the report with these; anything left TBD shows as TBD in the report. Or give any of them now." Never ask again for the period, frameworks or organization.
+Show the report details in one message headed "Report details", one line each, with its value or "TBD", and a short example after each TBD. End this message, and the message with earlier answers above, with the columns line below (left out when item 6 above already asked about the columns) and then this line: "Say "go" to build the report with these; anything left TBD shows as TBD in the report. Or give any of them now." Never ask again for the period, frameworks or organization.
 
 - Report ID: default `AR-<last day of the period>`, for example `AR-2026-11-20`. If a folder `access-review-<that id>/` already exists in the working folder, add `-2`, `-3` and on, taking the first that does not exist, so an earlier report is never overwritten.
 - Requested by: name and title (for example Steve Morgan, Director of Security Operations).
@@ -100,7 +100,7 @@ When the person says "go", leave every TBD detail out of `inputs.json`, and use 
 
 Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the person's answer, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
 
-Then, unless item 6 above already asked about the columns, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`. Number the columns 1, 2, 3 and on across all the tables, without starting again at each table, so every number names one column. Put one column per line: its number, `✓` for a default column or `·` for an optional one, its `header`, then " - " and its `description`, for example "5. ✓ Job title - The person's job title from the directory.". Under the lists, say: "✓ is in the report, · is not. To change this, give the numbers to drop or add, for example "drop 5, add 6", or say it in words." Accept numbers, headers or plain words. Keep the defaults for any table they do not change.
+Then, unless item 6 above already asked about the columns, add one line: "Columns: the default columns. Say "columns" to see or change them." Only when the person asks, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`. Number the columns 1, 2, 3 and on across all the tables, without starting again at each table, so every number names one column. Put one column per line: its number, `✓` for a default column or `·` for an optional one, its `header`, then " - " and its `description`, for example "5. ✓ Job title - The person's job title from the directory.". Under the lists, say: "✓ is in the report, · is not. To change this, give the numbers to drop or add, for example "drop 5, add 6", or say it in words." Accept numbers, headers or plain words. Keep the defaults for any table they do not change.
 
 ### 3. Make the data folder and start the extract
 
@@ -157,7 +157,7 @@ First run:
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_report.py" --data access-review-<report id> --check
 ```
 
-It writes no file. If it prints "Check before you render:", show the person its lines word for word: folder sets that no person approved in the period (only Polar Sky did), folder sets their data owner did not approve in the period, a review period longer than the review interval, folder sets a person last approved too long ago, and a missing acknowledgment name, title or date. Ask whether to fix anything first (for example, give the missing title or date, which you then put in `inputs.json`) or to render as it is. If it prints "Nothing to check before you render.", go straight on.
+It writes no file. If it prints "Check before you render:", show the person its lines word for word: folder sets that no person approved in the period (only Polar Sky did), folder sets their data owner did not approve in the period, a review period longer than the review interval, folder sets a person last approved too long ago, and a missing acknowledgment name, title or date. Ask whether to fix anything first (for example, give the missing title or date, which you then put in `inputs.json`) or to render as it is. When every line is about a detail the person left TBD when they said "go", show the lines and render without asking. If it prints "Nothing to check before you render.", go straight on.
 
 
 ```sh

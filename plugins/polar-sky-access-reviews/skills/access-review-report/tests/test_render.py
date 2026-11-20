@@ -2098,6 +2098,14 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertIn("Report ID: default `AR-<last day of the period>`", self.skill)
         self.assertIn('When the person says "go", leave every TBD detail out of `inputs.json`', self.skill)
 
+    def test_the_skill_names_the_default_columns_in_one_line_and_ends_with_go(self):
+        self.assertIn('add one line: "Columns: the default columns. Say "columns" to see or change them."', self.skill)
+        self.assertIn("Only when the person asks, show the columns from `references/columns.json`", self.skill)
+        self.assertIn("with the columns line below (left out when item 6 above already asked about the columns) and then this line: \"Say \"go\" to build the report", self.skill)
+
+    def test_the_check_does_not_ask_again_about_details_left_tbd(self):
+        self.assertIn('When every line is about a detail the person left TBD when they said "go", show the lines and render without asking.', self.skill)
+
     def test_the_skill_checks_for_approved_access_before_asking_the_report_details(self):
         check = self.skill.index("Then check that there is something to report")
         self.assertLess(check, self.skill.index("scripts/previous_answers.py\" --organization"))
