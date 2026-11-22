@@ -110,18 +110,56 @@ On the Polar Sky page they sign in and choose **Approve**. The page says that Po
 
 If the command fails, call `report_issue`, tell the person the install is done without the connection, and give them the command above to run later. Do not try another way.
 
-## Add Polar Sky's skills to Claude Code
+## Add Polar Sky's skills and status to Claude Code
 
-Only in Claude Code; skip this in Codex, which has no plugins. Run it after the connection above: the skills read Polar Sky controls through it. These skills let the person's team ask Claude for Polar Sky work, such as an access review report for their auditor. The final plan's yes covers this step, so do not ask again. Show the two commands, then run them:
+Only when you are Claude Code. Another assistant, such as Codex, skips this step and does not mention it, even when it runs inside a Claude Code terminal. When you are Claude Code, confirm that the environment variable `CLAUDECODE` is `1` and the `claude` command is installed:
+
+```bash
+printenv CLAUDECODE; command -v claude
+```
+
+When either is missing, skip this step and do not mention it.
+
+Run it after the connection above: the skills and the status read Polar Sky controls through it. The skills let the person's team ask Claude for Polar Sky work, such as an access review report for their auditor. The status shows above the Claude Code prompt while they work with Polar Sky controls: folders scanned, sensitive and protected, and controls active or waiting for review. The final plan's yes covers this step, so do not ask again. Show the commands, then run them:
 
 ```bash
 claude plugin marketplace add polarskyinc/install
 claude plugin install polar-sky-access-reviews@polar-sky --scope user
+claude plugin install polar-sky-status@polar-sky --scope user
 ```
 
-If the first command says the marketplace is already added, run `claude plugin marketplace update polar-sky` instead, then the second command. If a command fails, call `report_issue`, tell the person the install is done without the skills, and give them the two commands to run later. Do not try another way.
+If the first command says the marketplace is already added, run `claude plugin marketplace update polar-sky` instead, then the other two. A plugin that is already installed needs nothing more.
 
-Tell the person in one line: Polar Sky controls and the skills work in a new Claude Code session. In Codex, tell them Polar Sky controls work in a new Codex session, after they signed in.
+Then turn on updates for both plugins. Claude Code has no command for this, so add `"autoUpdate": true` to the `polar-sky` entry under `extraKnownMarketplaces` in the settings file of the Claude Code profile in use. Do not open or print the file: it can hold credentials. Run this, which changes only that entry and prints only the result:
+
+```bash
+python3 - "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" <<'PY'
+import json, os, sys, tempfile
+path = os.path.realpath(sys.argv[1])
+with open(path) as file:
+    settings = json.load(file)
+entry = settings.get("extraKnownMarketplaces", {}).get("polar-sky")
+if entry is None:
+    print("no polar-sky entry")
+elif entry.get("autoUpdate") is True:
+    print("already on")
+else:
+    entry["autoUpdate"] = True
+    descriptor, temporary = tempfile.mkstemp(dir=os.path.dirname(path))
+    with os.fdopen(descriptor, "w") as file:
+        json.dump(settings, file, indent=2)
+        file.write("\n")
+    os.chmod(temporary, os.stat(path).st_mode & 0o777)
+    os.replace(temporary, path)
+    print("turned on")
+PY
+```
+
+Run `claude plugin list` and check that it shows `polar-sky-access-reviews@polar-sky` and `polar-sky-status@polar-sky` enabled.
+
+If a command fails, call `report_issue` and tell the person what was set up and what was not: the skills, the status and updates each count on their own, and the install is done either way. Give them the commands that failed to run later. When turning on updates fails, or the script does not print `turned on` or `already on`, tell them to run `/plugin`, open **Marketplaces**, select `polar-sky` and select **Enable auto-update**. Do not try another way.
+
+Tell the person in one line what now works in a new Claude Code session: Polar Sky controls, and the skills and the status when they installed, and that the plugins update themselves only when updates are on. If they use auto mode and the status installed, tell them the status reads Polar Sky's status from the Controls connector once per turn, and give them the rule to add to `permissions.allow` in their Claude Code settings so it reads it without asking: `mcp__polar-sky-controls__get_status` when you added `polar-sky-controls`, or `mcp__` followed by the name of their organization's connector, as `claude mcp list` showed it with spaces and dots as `_`, then `__get_status`. In Codex, tell them Polar Sky controls work in a new Codex session, after they signed in.
 
 ## Clean up the install folder
 

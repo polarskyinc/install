@@ -124,22 +124,15 @@ codex mcp login polar-sky-controls
 
 You sign in with your Polar Sky console account in the browser; in Claude Code, on first use or with `/mcp`. Only administrators, named reviewers and delegates see controls.
 
-In Claude Code, the agent then adds Polar Sky's skills with the `polar-sky-access-reviews` plugin. With it, you can ask Claude for an access review report for your auditor, or for the audit trail of what changed in a date range. To add it yourself, run:
+In Claude Code, the agent then adds two plugins and turns on their updates. `polar-sky-access-reviews` holds Polar Sky's skills: you can ask Claude for an access review report for your auditor, or for the audit trail of what changed in a date range. `polar-sky-status` shows a band above the prompt with your folder and control status whenever Claude uses a Polar Sky connector. In other assistants, such as Codex, the agent skips this step. To add them yourself, run:
 
 ```bash
 claude plugin marketplace add polarskyinc/install
 claude plugin install polar-sky-access-reviews@polar-sky --scope user
+claude plugin install polar-sky-status@polar-sky --scope user
 ```
 
-## Polar Sky status in Claude Code
-
-Once Polar Sky is installed, you can add a band above the Claude Code prompt that shows your folder and control status whenever Claude uses a Polar Sky connector. In Claude Code, run:
-
-```
-/plugin install polar-sky-status --marketplace polarskyinc/install
-```
-
-See [`plugins/polar-sky-status/README.md`](plugins/polar-sky-status/README.md) for what it shows and the permission it needs in auto mode.
+Then run `/plugin`, open **Marketplaces**, select `polar-sky` and select **Enable auto-update**. See [`plugins/polar-sky-status/README.md`](plugins/polar-sky-status/README.md) for what the status shows and the permission it needs in auto mode.
 
 ## What is in this repository
 
