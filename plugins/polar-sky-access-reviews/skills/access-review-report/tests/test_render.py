@@ -2086,11 +2086,43 @@ class SkillInstructionsTest(unittest.TestCase):
         self.assertLess(self.skill.index("scripts/make_pdf.py\" --html"), made)
         self.assertLess(made, self.skill.index("### 9. Report back"))
 
-    def test_the_skill_asks_only_period_frameworks_and_organization_first(self):
-        first = self.skill.index("First, ask in one short message for whichever of these three the person has not given yet")
-        self.assertLess(first, self.skill.index("Then check that there is something to report"))
+    def test_the_skill_asks_only_period_and_frameworks_first(self):
+        first = self.skill.index("First, ask in one short message for whichever of these two the person has not given yet")
+        check = self.skill.index("Then check that there is something to report")
+        self.assertLess(first, check)
+        self.assertNotIn("Organization name", self.skill[first:check])
         self.assertIn("Ask nothing else in this message.", self.skill)
-        self.assertIn("Never ask again for the period, frameworks or organization.", self.skill)
+        self.assertIn("Never ask again for the period or frameworks.", self.skill)
+
+    def test_the_check_reads_the_default_organization_name_from_polar_sky(self):
+        check = self.skill.index("Then check that there is something to report")
+        status = self.skill.index("Also call `get_status` once, with no arguments, when the server lists it")
+        self.assertLess(check, status)
+        self.assertLess(status, self.skill.index("scripts/previous_answers.py\" --organization"))
+        self.assertIn("its `organization.name` is the default organization name", self.skill)
+        self.assertIn("If the person already gave an organization name, theirs is the default instead, whatever `get_status` returns.", self.skill)
+        self.assertIn("and do not save its result", self.skill)
+
+    def test_a_missing_organization_name_never_stops_the_check(self):
+        self.assertIn(
+            "Otherwise, when `get_status` is not listed, is refused or fails, or returns no name, there is no default organization name. "
+            "Either way, go on, and never stop or report a refusal for `get_status`.",
+            self.skill,
+        )
+        self.assertIn("If any other call in this check, the `list_controls` calls below included, is refused", self.skill)
+
+    def test_the_report_details_start_with_the_organization_name_the_person_can_change(self):
+        details = self.skill.index('Show the report details in one message headed "Report details"')
+        organization = self.skill.index("- Organization name: the default organization name", details)
+        self.assertLess(organization, self.skill.index("- Report ID: default", details))
+        self.assertIn("the person can change it like any other detail", self.skill)
+        self.assertIn('starting with "Organization name: <name>" as in the report details', self.skill)
+
+    def test_the_report_is_not_built_without_an_organization_name(self):
+        self.assertIn('show "Organization name: TBD (for example Northwind Traders)"', self.skill)
+        self.assertIn("it is the one detail that cannot stay TBD", self.skill)
+        self.assertIn("If the organization name is still TBD, ask for it in one line and do not build until they give it.", self.skill)
+        self.assertIn("Set `organization` to the name the person gave, or else the default organization name.", self.skill)
 
     def test_the_skill_shows_the_other_details_with_tbd_so_go_builds_the_report(self):
         self.assertIn('Show the report details in one message headed "Report details"', self.skill)

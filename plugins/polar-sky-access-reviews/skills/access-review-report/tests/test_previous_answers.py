@@ -379,6 +379,13 @@ class PreviousAnswersTest(unittest.TestCase):
         self.session("a.jsonl", self.inputs_call(inputs))
         self.assertEqual(previous_answers.find_previous_answers()["latest"]["last_report"], {"period_from": "2026-01-01"})
 
+    def test_the_skill_looks_up_earlier_answers_by_the_organization_name_it_will_use(self):
+        with open(os.path.join(os.path.dirname(TESTS_DIRECTORY), "SKILL.md"), encoding="utf-8") as handle:
+            skill = handle.read()
+        self.assertIn("Pass `--organization` with the default organization name", skill)
+        self.assertIn("If there is no default organization name, do not run it yet", skill)
+        self.assertIn("When the person gives the organization name or changes it, run it with their name", skill)
+
     def test_only_the_named_organization_is_shown_when_one_is_given(self):
         self.session("a.jsonl",
                      self.inputs_call(SOC2_INPUTS, "2026-07-02T10:00:00Z"),

@@ -26,15 +26,14 @@ Polar Sky controls reach Claude through one of two MCP servers: one the person a
 
 ### 2. Ask for the inputs
 
-Inputs come in two messages. The first asks only what the report cannot be built without; the second shows every other detail filled in or marked TBD, so the person can just say "go".
+Inputs come in two messages. The first asks only for the review period and frameworks; the second shows every other detail, the organization name first, filled in or marked TBD, so the person can just say "go".
 
-First, ask in one short message for whichever of these three the person has not given yet, and wait:
+First, ask in one short message for whichever of these two the person has not given yet, and wait:
 
 - Review period: first and last day (a period such as "last quarter" is enough: turn it into first and last day, UTC).
 - Frameworks: one or more of PCI DSS 4.0.1 7.2.4, SOC 2 CC6.2/CC6.3, ISO 27001:2022 Annex A 5.18, HIPAA 164.308(a)(4) and SOX ITGC (read `references/frameworks.json` for their names). One framework is the usual case; one report can also map its evidence to several, for example SOC 2 and ISO 27001.
-- Organization name, as it should appear on the cover (for example Northwind Traders).
 
-Ask nothing else in this message. Then check that there is something to report: call `get_access_review_evidence`, and `list_access_review_folders` when the server lists it (step 1), each with `from` and `to` set to that period and no `offset`; for a period longer than 366 days, call each once for each part of 366 days or less, as in step 5. Do not save these results; step 5 calls them again. If any call in this check, the `list_controls` calls below included, is refused, handle it as step 5 says for a refused call; never take a refused call as an empty period or as no controls. If any evidence `total` is more than 0, go on below.
+Ask nothing else in this message. Then check that there is something to report: call `get_access_review_evidence`, and `list_access_review_folders` when the server lists it (step 1), each with `from` and `to` set to that period and no `offset`; for a period longer than 366 days, call each once for each part of 366 days or less, as in step 5. Do not save these results; step 5 calls them again. Also call `get_status` once, with no arguments, when the server lists it, and do not save its result: its `organization.name` is the default organization name, the name Polar Sky knows the organization by. If the person already gave an organization name, theirs is the default instead, whatever `get_status` returns. Otherwise, when `get_status` is not listed, is refused or fails, or returns no name, there is no default organization name. Either way, go on, and never stop or report a refusal for `get_status`. If any other call in this check, the `list_controls` calls below included, is refused, handle it as step 5 says for a refused call; never take a refused call as an empty period or as no controls. If any evidence `total` is more than 0, go on below.
 
 If every evidence `total` is 0 but a folder `total` is more than 0, do not stop. Tell the person in one line, with the largest folder `total` as N: "Polar Sky found N sensitive folders but no folder set was approved in this period; the report will show them as not reviewed." Then go on below.
 
@@ -51,14 +50,14 @@ Then run:
 python3 "${CLAUDE_SKILL_DIR}/scripts/previous_answers.py" --organization "<organization>"
 ```
 
-Pass `--organization` with the organization's name the person gave, so only that organization's earlier answers are shown. If the answers found are for another organization than the one the person names, do not show them.
+Pass `--organization` with the default organization name, so only that organization's earlier answers are shown. If there is no default organization name, do not run it yet: show the report details below. When the person gives the organization name or changes it, run it with their name; if it finds answers not shown yet, show them as below before you build. If the answers found are for another organization than the one you passed, do not show them.
 
 It prints the answers this skill wrote for earlier reports in the person's Claude Code sessions on this computer: `by_framework` holds the latest answers for each framework (an answer set for several frameworks is listed under each of them; it has `frameworks` instead of `framework`), and `latest` the latest of any framework, each with its `date` and the `last_report` (report ID and period). It never prints anything else from the sessions.
 
 If it found answers, use the newest of those for the frameworks the person asked for, or else `latest`. Ask in one message:
 
 1. One line: "I found your answers from an earlier report in your Claude Code sessions on this computer."
-2. The answers as one short list, headed "From your last <framework names> report on <date>:", one answer per line with its label from the list below. Leave out the period, report ID and acknowledgment date, which are new each time.
+2. The answers as one short list, headed "From your last <framework names> report on <date>:", one answer per line with its label from the list below, starting with "Organization name: <name>" as in the report details. Leave out the period, report ID and acknowledgment date, which are new each time.
 3. "Anything to change?" Use the earlier answers only once the person has confirmed them or given new ones; a logo is shown with its full path so the person sees which file the cover will carry.
 4. The answers that are new for this report: the report ID, with the default described below, and the management acknowledgment date, as TBD. Offer the previous review as the last report, for example "Previous review: AR-2026-H1, 2026-01-01 to 2026-06-30, in Polar Sky", when `last_report` has them.
 5. The answers the earlier report did not have, from `not_given_last_time` printed next to those answers, under the heading "Not given last time:", one line each in its order, with its label and example from the table below. Leave out the review interval when no framework asked for now has `needs_interval`. When an item has a `suggestion`, the script read that value from the earlier answer named in `read_from`: quote that answer and ask the person to confirm the value, for example "Removal deadline in days (for example 30): your last answer says "30 days after the decision". Use 30?" or "Review interval as a number (for example 6 months): your last answer says "Every 6 months". Use 6 months?". Without a `suggestion`, ask with the example only. Never put one of these in `inputs.json` until the person has confirmed it or given their own.
@@ -85,8 +84,9 @@ If it found answers, use the newest of those for the frameworks the person asked
 
 If it found nothing, or the person asks for a different framework with only organization answers found, show the report details below, filling in the answers it found. When the earlier answers were for other frameworks than the ones asked for now, still show the review interval if a framework asked for now needs it.
 
-Show the report details in one message headed "Report details", one line each, with its value or "TBD", and a short example after each TBD. End this message, and the message with earlier answers above, with the columns line below (left out when item 6 above already asked about the columns) and then this line: "Say "go" to build the report with these; anything left TBD shows as TBD in the report. Or give any of them now." Never ask again for the period, frameworks or organization.
+Show the report details in one message headed "Report details", one line each, with its value or "TBD", and a short example after each TBD. End this message, and the message with earlier answers above, with the columns line below (left out when item 6 above already asked about the columns) and then this line: "Say "go" to build the report with these; anything left TBD shows as TBD in the report. Or give any of them now." Never ask again for the period or frameworks.
 
+- Organization name: the default organization name, as it should appear on the cover; the person can change it like any other detail. Without a default name, show "Organization name: TBD (for example Northwind Traders)" and add, on the same line, that the report needs it: it is the one detail that cannot stay TBD.
 - Report ID: default `AR-<last day of the period>`, for example `AR-2026-11-20`. If a folder `access-review-<that id>/` already exists in the working folder, add `-2`, `-3` and on, taking the first that does not exist, so an earlier report is never overwritten.
 - Requested by: name and title (for example Steve Morgan, Director of Security Operations).
 - Review procedure: name and version (for example User Access Review Procedure, version 3.2).
@@ -96,9 +96,9 @@ Show the report details in one message headed "Report details", one line each, w
 - Management acknowledgment: name, title and date (YYYY-MM-DD), and the statement, with this default statement word for word: "I acknowledge that, to the best of my knowledge, the access that remains to the data in this report is appropriate."
 - Optional, in one line, with no TBD: review owner, previous review (date and system), data source line, exclusions (what was left out and why; the report already says that systems other than these folder sets are reviewed separately), who the report is prepared for, and a logo for the cover (the path to a PNG, JPEG or SVG file up to 2 MB on this computer, for example `~/Documents/northwind-logo.png`; Polar Sky does not keep logos, so without a file the cover has no logo).
 
-When the person says "go", leave every TBD detail out of `inputs.json`, and use the default report ID unless they gave one.
+When the person says "go", leave every TBD detail out of `inputs.json`, and use the default report ID unless they gave one. Set `organization` to the name the person gave, or else the default organization name. If the organization name is still TBD, ask for it in one line and do not build until they give it.
 
-Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the person's answer, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
+Texts from `references/frameworks.json` hold placeholders such as `{organization}`. When you show one as a default, put in the organization name, or "your organization" while you do not have it yet, so they never see a placeholder: for example "your organization's Qualified Security Assessor".
 
 Then, unless item 6 above already asked about the columns, add one line: "Columns: the default columns. Say "columns" to see or change them." Only when the person asks, show the columns from `references/columns.json`: one short list per table, headed by the table's `title`. Number the columns 1, 2, 3 and on across all the tables, without starting again at each table, so every number names one column. Put one column per line: its number, `✓` for a default column or `·` for an optional one, its `header`, then " - " and its `description`, for example "5. ✓ Job title - The person's job title from the directory.". Under the lists, say: "✓ is in the report, · is not. To change this, give the numbers to drop or add, for example "drop 5, add 6", or say it in words." Accept numbers, headers or plain words. Keep the defaults for any table they do not change.
 
