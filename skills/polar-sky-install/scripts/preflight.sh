@@ -48,8 +48,7 @@ case "${inference_model_replicas}" in
     exit 2
     ;;
 esac
-phi_copies=$((inference_model_replicas > 1 ? inference_model_replicas - 1 : 1))
-gpus_needed=$((phi_copies + 1 + 1))
+gpus_needed=$((inference_model_replicas + 1))
 
 if [ -z "${polar_sky_host}" ]; then
   if [ "${POLAR_SKY_DEPLOYMENT_MODEL:-on_prem}" = cloud ]; then
@@ -184,7 +183,7 @@ EOF
   if [ "${count}" -eq 0 ]; then
     warn "no GPU nodes with label ${gpu_selector} right now" "fine if the GPU pool scales from zero: check that the pool has the GPU type and taint, and can grow to at least ${gpus_needed} nodes; ${gpu_label_origin}. If GPU nodes already run without this label, they do not match what Polar Sky needs on ${platform}"
   elif [ "${total}" -lt "${gpus_needed}" ]; then
-    warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs ${gpus_needed} (${phi_copies} for the Phi model, 1 for the Gemma model, 1 for the embedding model); fine if the pool can grow to ${gpus_needed}"
+    warn "${total} allocatable GPU(s) on ${count} GPU node(s) now" "the model fleet needs ${gpus_needed} (${inference_model_replicas} for the inference model, 1 for the embedding model); fine if the pool can grow to ${gpus_needed}"
   else
     pass "${total} allocatable GPUs on ${count} GPU node(s)"
   fi

@@ -49,6 +49,14 @@ GPU nodes require three things to schedule GPU workloads:
 
 An EFS filesystem provides ReadWriteMany (RWX) storage for model weights, allowing multiple pods to mount the same volume concurrently. The `efs-polarsky-retain` StorageClass provisions EFS Access Points with IAM authentication.
 
+**Clusters upgraded from a chart that served Phi-4-mini.** That chart made a 100 Gi claim named `<release>-phi-4-mini-storage-claim` (usually `polar-sky-phi-4-mini-storage-claim`) in the namespace the engine was installed in. The Helm upgrade deletes the claim, but the StorageClass has reclaim policy `Retain`, so the volume behind it stays in status `Released` and its EFS Access Point and the downloaded weights stay in the filesystem. To look for it:
+
+```bash
+kubectl get pv -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,NAMESPACE:.spec.claimRef.namespace,CLAIM:.spec.claimRef.name,SIZE:.spec.capacity.storage | grep phi-4-mini-storage-claim
+```
+
+Act only on a line whose NAMESPACE is the namespace the engine is installed in and whose STATUS is `Released`. A line with status `Bound` means the upgrade has not finished: wait. First write down the backing storage. `kubectl get pv <NAME> -o jsonpath='{.spec.csi.volumeHandle}'` prints `fs-...::fsap-...`, the filesystem and the Access Point, but not the directory. Record the directory too: `aws efs describe-access-points --access-point-id <fsap-...> --query 'AccessPoints[0].RootDirectory.Path' --output text`. Then delete the PersistentVolume with `kubectl delete pv <NAME>`, delete that Access Point in EFS, and last delete the recorded directory from the filesystem. Nothing else uses the volume.
+
 ## Usage
 
 ```bash

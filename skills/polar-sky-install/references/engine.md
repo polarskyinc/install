@@ -49,7 +49,7 @@ Tell the person, plainly:
 - Flux adds cluster-wide custom resource definitions, cluster roles and cluster role bindings. Its helm-controller is bound to `cluster-admin` to manage the Polar Sky release. `watchAllNamespaces=false` limits what it watches, not what it may do.
 - The `latest` channel installs new eligible Polar Sky releases by itself, and can move to a new minor version.
 - The rendered files are in the install folder if their security team wants to review them.
-- Only when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is set and not 3: the engine runs that count of inference copies (the Phi model gets one fewer, at least 1, and the Gemma model gets 1), and the install first writes the count into the `polar-sky-customer-config` ConfigMap, so Flux keeps it.
+- Only when `POLAR_SKY_INFERENCE_MODEL_REPLICAS` is set and not 3: the engine runs that many copies of the inference model, and the install first writes the count into the `polar-sky-customer-config` ConfigMap, so Flux keeps it.
 
 This is the stage's plan. Ask: "Does this look right? Any changes, or shall I go ahead?" That one yes covers the namespace, the secrets, Flux, the customer ConfigMap and the Polar Sky chart below. Then run them in order, showing each command, and report each result in one line.
 
@@ -121,7 +121,7 @@ helm upgrade --install flux2 fluxcd-community/flux2 --version 2.17.2 --namespace
 
 ## Fewer inference model copies
 
-The engine runs 3 copies of the inference models: 2 of the Phi model and 1 of the Gemma model. Only when the person asked for fewer ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model)), `values.env` has `POLAR_SKY_INFERENCE_MODEL_REPLICAS`. Never ask about the count here. Flux keeps the count only when it is in the ConfigMap `polar-sky-customer-config`, as `vllm.inferenceModelReplicas` in its `values.yaml`: a `--set` alone is undone by Flux's next update. So it goes there before the chart install. Run this section on every engine install, also with the default count: a ConfigMap from an earlier install may hold another count. The ConfigMap may already hold other settings of the person's, even the engine's API key (`vllm.apiKey`), so never print what it holds: show only the names of its top-level settings and the count line.
+The engine runs 3 copies of the inference model. Only when the person asked for fewer ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model)), `values.env` has `POLAR_SKY_INFERENCE_MODEL_REPLICAS`. Never ask about the count here. Flux keeps the count only when it is in the ConfigMap `polar-sky-customer-config`, as `vllm.inferenceModelReplicas` in its `values.yaml`: a `--set` alone is undone by Flux's next update. So it goes there before the chart install. Run this section on every engine install, also with the default count: a ConfigMap from an earlier install may hold another count. The ConfigMap may already hold other settings of the person's, even the engine's API key (`vllm.apiKey`), so never print what it holds: show only the names of its top-level settings and the count line.
 
 Below, the count is `POLAR_SKY_INFERENCE_MODEL_REPLICAS`, or 3 when it is not set. Check whether the ConfigMap exists (read only):
 
@@ -266,7 +266,7 @@ Report the shortage once with `report_issue`, outcome `worked_around`. On GKE, r
 
 ## Change the number of inference model copies
 
-Use it on an engine that is already installed, only when the person asks for fewer copies of the inference model ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model) says how to pick the count and what it costs), or to go back to the default 3 once the GPUs are there. The cluster must be able to run the GPU nodes the count needs: 4 for 3 copies, 3 for 2 copies and 3 for 1 copy. Write the person's choice into `values.env` as `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<copies>'`, with `'3'` to go back. Changing the ConfigMap and asking Flux to apply it change Polar Sky's settings, so they need their own yes.
+Use it on an engine that is already installed, only when the person asks for fewer copies of the inference model ([Fewer copies of the inference model](cluster.md#fewer-copies-of-the-inference-model) says how to pick the count and what it costs), or to go back to the default 3 once the GPUs are there. The cluster must be able to run the copies plus one GPU nodes. Write the person's choice into `values.env` as `export POLAR_SKY_INFERENCE_MODEL_REPLICAS='<copies>'`, with `'3'` to go back. Changing the ConfigMap and asking Flux to apply it change Polar Sky's settings, so they need their own yes.
 
 1. **Write the count into the ConfigMap,** as [Fewer inference model copies](#fewer-inference-model-copies) says.
 2. **Ask Flux to apply it now.** This changes only an annotation on the HelmRelease:
@@ -275,18 +275,17 @@ Use it on an engine that is already installed, only when the person asks for few
    kubectl annotate helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" --overwrite reconcile.fluxcd.io/requestedAt="$(date +%s)"
    ```
 
-3. **Wait for the first update** (read only). Flux applies the count in two updates: the first writes it into the HelmRelease, and the second changes the inference models to it. The Phi model gets one fewer than the count, at least 1. Check every minute or so until this prints the Phi count:
+3. **Wait for the first update** (read only). Flux applies the count in two updates: the first writes it into the HelmRelease, and the second changes the inference model to it. Check every minute or so until this prints the new count:
 
    ```bash
-   kubectl get helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.values.vllm.servingEngineSpec.modelSpec[?(@.name=="phi-4-mini")].replicaCount}'
+   kubectl get helmrelease polar-sky --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.values.vllm.servingEngineSpec.modelSpec[?(@.name=="gemma-4-12b")].replicaCount}'
    ```
 
    Then ask Flux again with the command in step 2, so the second update starts now.
 
-4. **Confirm the inference models run the new count** (read only). The first command must print the Phi count, and the second must print 1, the Gemma count:
+4. **Confirm the inference model runs the new count** (read only). It must print the count:
 
    ```bash
-   kubectl get deployment polar-sky-phi-4-mini-deployment-vllm --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.replicas}'
    kubectl get deployment polar-sky-gemma-4-12b-deployment-vllm --namespace="${POLAR_SKY_NAMESPACE}" -o jsonpath='{.spec.replicas}'
    ```
 

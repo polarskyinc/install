@@ -47,6 +47,14 @@ The cluster keeps AKS local accounts, and OpenTofu reaches the cluster with them
 
 The `premium-azurefile-retain` StorageClass provisions Azure Files premium NFS shares with ReadWriteMany access, so all model replicas share one copy of the model weights. The Azure Files CSI driver creates the storage account in the cluster's node resource group and adds a storage service endpoint to the node subnet; the cluster identity is granted Network Contributor on the virtual network for that.
 
+**Clusters upgraded from a chart that served Phi-4-mini.** That chart made a 100 Gi claim named `<release>-phi-4-mini-storage-claim` (usually `polar-sky-phi-4-mini-storage-claim`) in the namespace the engine was installed in. The Helm upgrade deletes the claim, but the StorageClass has reclaim policy `Retain`, so the volume behind it stays in status `Released` and the Azure Files share keeps its data and its cost. To look for it:
+
+```bash
+kubectl get pv -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,NAMESPACE:.spec.claimRef.namespace,CLAIM:.spec.claimRef.name,SIZE:.spec.capacity.storage | grep phi-4-mini-storage-claim
+```
+
+Act only on a line whose NAMESPACE is the namespace the engine is installed in and whose STATUS is `Released`. A line with status `Bound` means the upgrade has not finished: wait. First write down the backing storage: `kubectl get pv <NAME> -o jsonpath='{.spec.csi.volumeHandle}'` prints `<resource group>#<storage account>#<share name>#...`, so the third field is the share name. Then delete the PersistentVolume with `kubectl delete pv <NAME>`. Last, delete that file share in the storage account in the cluster's node resource group (`MC_...`). Nothing else uses the volume.
+
 ### Kubernetes Version
 
 `kubernetes_version` is the required Kubernetes minor version the cluster runs, such as `1.35`. Use the newest minor that AKS offers in the region and that is not a preview; Polar Sky needs 1.33 or newer. The cluster uses the `patch` upgrade channel, so AKS applies patch releases within that minor while AKS supports it. When AKS retires the minor, it upgrades the cluster to the next supported minor by itself, outside any maintenance window. The AKS Kubernetes release calendar shows when each minor retires.
@@ -60,7 +68,7 @@ az aks get-versions --location <location> --subscription <your-subscription> --q
 ## Prerequisites
 
 - **Permissions**: the person applying the recipe needs Owner, or Contributor and User Access Administrator, on the subscription. The recipe creates the resource group and assigns Network Contributor to the cluster identity; Contributor alone fails at that role assignment.
-- **GPU quota**: AKS adds one extra node to each pool while it upgrades the pool, and that node needs quota too. Four GPU nodes plus that extra node need 40 vCPUs of the NCasT4_v3 family quota in the chosen region (56 at the six-node maximum). An engine that runs fewer inference model copies needs fewer GPU nodes, 8 vCPUs each: 32 for two copies and 32 for one, because the Gemma model runs next to the Phi model. The engine chart's README explains the trade-off in "Run fewer inference model copies". The system pool needs 16 to 28 vCPUs of its size's family. New subscriptions often have no GPU quota. The `family` that `az vm list-skus` prints for a size (see [System Pool Size](#system-pool-size)) is the `name.value` of its quota line. Check with `az vm list-usage --location <location> --query "[].{family:name.value,used:currentValue,limit:limit}" --output table` and request more under the subscription's Usage + quotas page.
+- **GPU quota**: AKS adds one extra node to each pool while it upgrades the pool, and that node needs quota too. Four GPU nodes plus that extra node need 40 vCPUs of the NCasT4_v3 family quota in the chosen region (56 at the six-node maximum). An engine that runs fewer inference model copies needs one GPU node less per copy removed, 8 vCPUs each: 32 for two copies, 24 for one. The engine chart's README explains the trade-off in "Run fewer inference model copies". The system pool needs 16 to 28 vCPUs of its size's family. New subscriptions often have no GPU quota. The `family` that `az vm list-skus` prints for a size (see [System Pool Size](#system-pool-size)) is the `name.value` of its quota line. Check with `az vm list-usage --location <location> --query "[].{family:name.value,used:currentValue,limit:limit}" --output table` and request more under the subscription's Usage + quotas page.
 - **Machine sizes**: quota does not mean the subscription may use a size in the region. Check the sizes as [System Pool Size](#system-pool-size) shows before you plan.
 
 ## Usage
@@ -92,7 +100,7 @@ When the size check picks a system size other than `Standard_D4s_v5`, add `-var 
 | `cluster_name` | AKS cluster name and DNS prefix | `aks-polar-sky` |
 | `system_node_vm_size` | System pool size, one of the sizes in [System Pool Size](#system-pool-size) | `Standard_D4s_v5` |
 | `gpu_node_min_count` | Min GPU nodes | `0` |
-| `gpu_node_max_count` | Max GPU nodes (at least 3; the engine needs one per Phi copy, one for Gemma and one for the embedding model, 4 by default and 3 with fewer copies, and a model update needs one more while it runs) | `6` |
+| `gpu_node_max_count` | Max GPU nodes (at least 3; the engine needs one per inference model copy plus one, 4 by default, and a model update needs one more while it runs) | `6` |
 | `vnet_cidr` | Virtual network address space | `10.0.0.0/16` |
 | `nodes_cidr` | Node subnet CIDR | `10.0.0.0/20` |
 | `pods_cidr` | Pod overlay CIDR | `10.244.0.0/16` |
