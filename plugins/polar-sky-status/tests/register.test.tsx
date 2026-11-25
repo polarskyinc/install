@@ -315,6 +315,8 @@ test('helpers', () => {
   expect(nextTip([]).shown).toEqual([all[0]])
   expect(nextTip(all).shown).toEqual([all[0]])
 
+  expect(TIPS.map(tip => tip.text)).toContain('Ask "which service accounts can reach my most sensitive files?"')
+
   const install = INSTALL_TIPS.map(tip => tip.id)
   expect(nextTip([], INSTALL_TIPS).shown).toEqual([install[0]])
   expect(nextTip(install, INSTALL_TIPS).tip).toBe(INSTALL_TIPS[0]?.text)

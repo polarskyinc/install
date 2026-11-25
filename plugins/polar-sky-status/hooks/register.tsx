@@ -44,6 +44,7 @@ export const TIPS: readonly { id: string; text: string }[] = [
   { id: 'carried', text: 'Ask "which controls need me to confirm an earlier decision?"' },
   { id: 'plan', text: 'Ask "how will Polar Sky apply this control if I approve it?"' },
   { id: 'remind', text: 'Ask "remind owners to review the controls assigned to them"' },
+  { id: 'identities', text: 'Ask "which service accounts can reach my most sensitive files?"' },
 ]
 
 /** Tips the band rotates through during an install, each naming a question the install answers in both Cloud and On-Prem. */
