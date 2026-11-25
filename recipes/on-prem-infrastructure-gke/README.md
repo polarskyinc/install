@@ -69,7 +69,7 @@ Approximate us-central1 list prices (August 2026); verify with the [GCP pricing 
 | GKE cluster management fee | $0.10 | $2.40 | ~$73 |
 | **Total (on-demand GPUs, 24/7)** | **~$4.00** | **~$97** | **~$2,950** |
 
-- **GPU pool sized for the chart's default fleet**: 3 phi-4-mini replicas + 1 bge-embedding replica = 4 nodes at 1 GPU each. The count is the same however many zones the pool spans.
+- **GPU pool sized for the chart's default fleet**: 2 phi-4-mini replicas + 1 gemma-4-12b replica + 1 bge-embedding replica = 4 nodes at 1 GPU each. The count is the same however many zones the pool spans.
 - **Spot GPUs** (`gpu_node_spot = true`, ~$0.30/hr per g2-standard-8) cut the GPU line to ~$1.20/hr, ~$875/month, and the total to ~$1.80/hr, ~$1,330/month. Spot nodes can be preempted.
 - **GPU pool scaled to zero** (idle cluster): ~$0.57/hr, ~$14/day, ~$420/month.
 - The GKE management fee is often $0 in practice: GCP's free tier credit covers one zonal cluster per billing account.
